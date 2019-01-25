@@ -520,12 +520,12 @@ public:
    /// the scope where this object exists.
    /// @param lock Mutex to lock
    /// @param if_condition If this is false, CGuard will do completely nothing
-   CGuard(pthread_mutex_t& lock, bool if_condition = true);
+   CGuard(pthread_mutex_t& lock, bool if_condition = true, const std::string &info = std::string());
    ~CGuard();
 
 public:
-   static int enterCS(pthread_mutex_t& lock);
-   static int leaveCS(pthread_mutex_t& lock);
+   static int enterCS(pthread_mutex_t& lock, const std::string &info = std::string());
+   static int leaveCS(pthread_mutex_t& lock, const std::string &info = std::string());
 
    static void createMutex(pthread_mutex_t& lock);
    static void releaseMutex(pthread_mutex_t& lock);
@@ -538,6 +538,8 @@ public:
 private:
    pthread_mutex_t& m_Mutex;            // Alias name of the mutex to be protected
    int m_iLocked;                       // Locking status
+
+   std::string   m_Info;
 
    CGuard& operator=(const CGuard&);
 };

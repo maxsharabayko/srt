@@ -371,7 +371,7 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void* optval, int optlen)
 
     CGuard cg(m_ConnectionLock);
     CGuard sendguard(m_SendLock);
-    CGuard recvguard(m_RecvLock);
+    CGuard recvguard(m_RecvLock, "setOpt");
 
     switch (optName)
     {
@@ -4171,7 +4171,6 @@ void* CUDT::tsbpd(void* param)
 
    THREAD_STATE_INIT("SRT:TsbPd");
 
-   CGuard::enterCS(self->m_RecvLock);
    self->m_bTsbPdAckWakeup = true;
    while (!self->m_bClosing)
    {
@@ -4179,18 +4178,22 @@ void* CUDT::tsbpd(void* param)
       uint64_t tsbpdtime = 0;
       bool rxready = false;
 
+      CGuard::enterCS(self->m_RecvLock, "tsbpd inner loop updRcvAvgDataSize");
       CGuard::enterCS(self->m_AckLock);
 
 #ifdef SRT_ENABLE_RCVBUFSZ_MAVG
       self->m_pRcvBuffer->updRcvAvgDataSize(CTimer::getTime());
 #endif
+      CGuard::leaveCS(self->m_RecvLock, "tsbpd inner loop updRcvAvgDataSize");
 
       if (self->m_bTLPktDrop)
       {
           int32_t skiptoseqno = -1;
           bool passack = true; //Get next packet to wait for even if not acked
 
+          CGuard::enterCS(self->m_RecvLock, "tsbpd inner loop getRcvFirstMsg");
           rxready = self->m_pRcvBuffer->getRcvFirstMsg(Ref(tsbpdtime), Ref(passack), Ref(skiptoseqno), Ref(current_pkt_seq));
+          CGuard::leaveCS(self->m_RecvLock, "tsbpd inner loop getRcvFirstMsg");
           /*
            * VALUES RETURNED:
            *
@@ -4212,6 +4215,7 @@ void* CUDT::tsbpd(void* param)
                 * packet ready to play but preceeded by missing packets (hole).
                 */
 
+                CGuard::enterCS(self->m_RecvLock, "tsbpd inner loop skipData");
                 /* Update drop/skip stats */
                 self->m_iRcvDropTotal += seqlen;
                 self->m_iTraceRcvDrop += seqlen;
@@ -4222,6 +4226,7 @@ void* CUDT::tsbpd(void* param)
 
                 self->unlose(self->m_iRcvLastSkipAck, CSeqNo::decseq(skiptoseqno)); //remove(from,to-inclusive)
                 self->m_pRcvBuffer->skipData(seqlen);
+                CGuard::leaveCS(self->m_RecvLock, "tsbpd inner loop skipData");
 
                 self->m_iRcvLastSkipAck = skiptoseqno;
 
@@ -4281,12 +4286,14 @@ void* CUDT::tsbpd(void* param)
          * Buffer at head of queue is not ready to play.
          * Schedule wakeup when it will be.
          */
+         CGuard::enterCS(self->m_RecvLock, "tsbpd condTimedWaitUS");
           self->m_bTsbPdAckWakeup = false;
           THREAD_PAUSED();
           HLOGC(tslog.Debug, log << self->CONID() << "tsbpd: FUTURE PACKET seq=" << current_pkt_seq
               << " T=" << logging::FormatTime(tsbpdtime) << " - waiting " << (timediff/1000.0) << "ms");
           CTimer::condTimedWaitUS(&self->m_RcvTsbPdCond, &self->m_RecvLock, timediff);
           THREAD_RESUMED();
+          CGuard::leaveCS(self->m_RecvLock, "tsbpd condTimedWaitUS");
       }
       else
       {
@@ -4300,14 +4307,16 @@ void* CUDT::tsbpd(void* param)
          * - New buffers ACKed
          * - Closing the connection
          */
+          CGuard::enterCS(self->m_RecvLock, "tsbpd pthread_cond_wait(&self->m_RcvTsbPdCond");
          HLOGC(tslog.Debug, log << self->CONID() << "tsbpd: no data, scheduling wakeup at ack");
          self->m_bTsbPdAckWakeup = true;
          THREAD_PAUSED();
          pthread_cond_wait(&self->m_RcvTsbPdCond, &self->m_RecvLock);
          THREAD_RESUMED();
+         CGuard::leaveCS(self->m_RecvLock, "tsbpd pthread_cond_wait(&self->m_RcvTsbPdCond");
       }
    }
-   CGuard::leaveCS(self->m_RecvLock);
+   //CGuard::leaveCS(self->m_RecvLock);
    THREAD_EXIT();
    HLOGC(tslog.Debug, log << self->CONID() << "tsbpd: EXITING");
    return NULL;
@@ -4924,7 +4933,7 @@ int CUDT::receiveBuffer(char* data, int len)
     if (!m_Smoother->checkTransArgs(Smoother::STA_BUFFER, Smoother::STAD_RECV, data, len, -1, false))
         throw CUDTException(MJ_NOTSUP, MN_INVALBUFFERAPI, 0);
 
-    CGuard recvguard(m_RecvLock);
+    //CGuard recvguard(m_RecvLock);
 
     if ((m_bBroken || m_bClosing) && !m_pRcvBuffer->isRcvDataReady())
     {
@@ -4969,7 +4978,9 @@ int CUDT::receiveBuffer(char* data, int len)
                 while (stillConnected() && !m_pRcvBuffer->isRcvDataReady())
                 {
                     //Do not block forever, check connection status each 1 sec.
+                    CGuard::enterCS(m_RecvLock, "receiveBuffer: condTimedWaitUS");
                     CTimer::condTimedWaitUS(&m_RecvDataCond, &m_RecvLock, 1000000);
+                    CGuard::leaveCS(m_RecvLock, "receiveBuffer: condTimedWaitUS");
                 }
             }
             else
@@ -4977,7 +4988,9 @@ int CUDT::receiveBuffer(char* data, int len)
                 uint64_t exptime = CTimer::getTime() + m_iRcvTimeOut * 1000;
                 while (stillConnected() && !m_pRcvBuffer->isRcvDataReady())
                 {
+                    CGuard::enterCS(m_RecvLock, "receiveBuffer: condTimedWaitUS 2");
                     CTimer::condTimedWaitUS(&m_RecvDataCond, &m_RecvLock, m_iRcvTimeOut * 1000);
+                    CGuard::leaveCS(m_RecvLock, "receiveBuffer: condTimedWaitUS 2");
                     if (CTimer::getTime() >= exptime)
                         break;
                 }
@@ -5002,7 +5015,9 @@ int CUDT::receiveBuffer(char* data, int len)
         throw CUDTException(MJ_CONNECTION, MN_CONNLOST, 0);
     }
 
+    CGuard::enterCS(m_RecvLock, "receiveBuffer: readBuffer");
     int res = m_pRcvBuffer->readBuffer(data, len);
+    CGuard::leaveCS(m_RecvLock, "receiveBuffer: readBuffer");
 
     /* Kick TsbPd thread to schedule next wakeup (if running) */
     if (m_bTsbPd)
@@ -5379,8 +5394,6 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
     if (!m_Smoother->checkTransArgs(Smoother::STA_MESSAGE, Smoother::STAD_RECV, data, len, -1, false))
         throw CUDTException(MJ_NOTSUP, MN_INVALMSGAPI, 0);
 
-    CGuard recvguard(m_RecvLock);
-
     /* XXX DEBUG STUFF - enable when required
        char charbool[2] = {'0', '1'};
        char ptrn [] = "RECVMSG/BEGIN BROKEN 1 CONN 1 CLOSING 1 SYNCR 1 NMSG                                ";
@@ -5396,7 +5409,9 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
 
     if (m_bBroken || m_bClosing)
     {
+        CGuard::enterCS(m_RecvLock, "receiveMessage before readMsg 0");
         int res = m_pRcvBuffer->readMsg(data, len);
+        CGuard::leaveCS(m_RecvLock, "receiveMessage after readMsg 0");
         mctrl.srctime = 0;
 
         /* Kick TsbPd thread to schedule next wakeup (if running) */
@@ -5421,8 +5436,9 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
 
     if (!m_bSynRecving)
     {
-
+        CGuard::enterCS(m_RecvLock, "receiveMessage before readMsg 1");
         int res = m_pRcvBuffer->readMsg(data, len, r_mctrl);
+        CGuard::leaveCS(m_RecvLock, "receiveMessage after readMsg 1");
         if (res == 0)
         {
             // read is not available any more
@@ -5464,6 +5480,7 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
         if (stillConnected() && !timeout && (!m_pRcvBuffer->isRcvDataReady()))
         {
             /* Kick TsbPd thread to schedule next wakeup (if running) */
+            CGuard::enterCS(m_RecvLock, "receiveMessage before condTimedWaitUS");
             if (m_bTsbPd)
             {
                 HLOGP(tslog.Debug, "recvmsg: KICK tsbpd()");
@@ -5483,6 +5500,8 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
                     HLOGP(tslog.Debug, "recvmsg: DATA COND: KICKED.");
                 }
             } while (stillConnected() && !timeout && (!m_pRcvBuffer->isRcvDataReady()));
+
+            CGuard::leaveCS(m_RecvLock, "receiveMessage after condTimedWaitUS");
         }
 
         /* XXX DEBUG STUFF - enable when required
@@ -5491,7 +5510,9 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
                 << " NMSG " << m_pRcvBuffer->getRcvMsgNum());
                 */
 
+        CGuard::enterCS(m_RecvLock, "receiveMessage before readMsg 2");
         res = m_pRcvBuffer->readMsg(data, len, r_mctrl);
+        CGuard::leaveCS(m_RecvLock, "receiveMessage after readMsg 2");
 
         if (m_bBroken || m_bClosing)
         {

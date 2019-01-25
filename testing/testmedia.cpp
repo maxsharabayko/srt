@@ -932,7 +932,7 @@ public:
 
     void Write(const bytevector& data) override
     {
-        cout.write(data.data(), data.size());
+        //cout.write(data.data(), data.size());
     }
 
     bool IsOpen() override { return cout.good(); }

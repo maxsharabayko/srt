@@ -313,10 +313,12 @@ int CTimer::condTimedWaitUS(pthread_cond_t* cond, pthread_mutex_t* mutex, uint64
 
 
 // Automatically lock in constructor
-CGuard::CGuard(pthread_mutex_t& lock, bool shouldwork):
+CGuard::CGuard(pthread_mutex_t& lock, bool shouldwork, const std::string &info):
     m_Mutex(lock),
-    m_iLocked(-1)
+    m_iLocked(-1),
+    m_Info(info)
 {
+    //std::cerr << "Locking " << info << "\n";
     if (shouldwork)
         m_iLocked = pthread_mutex_lock(&m_Mutex);
 }
@@ -324,6 +326,7 @@ CGuard::CGuard(pthread_mutex_t& lock, bool shouldwork):
 // Automatically unlock in destructor
 CGuard::~CGuard()
 {
+    //std::cerr << "Unlocking (dtor) " << m_Info << "\n";
     if (m_iLocked == 0)
         pthread_mutex_unlock(&m_Mutex);
 }
@@ -335,18 +338,21 @@ void CGuard::forceUnlock()
 {
     if (m_iLocked == 0)
     {
+        //std::cerr << "Force Unlocking " << m_Info << "\n";
         pthread_mutex_unlock(&m_Mutex);
         m_iLocked = -1;
     }
 }
 
-int CGuard::enterCS(pthread_mutex_t& lock)
+int CGuard::enterCS(pthread_mutex_t& lock, const std::string &info)
 {
+    //std::cerr << "Locking " << info << "\n";
     return pthread_mutex_lock(&lock);
 }
 
-int CGuard::leaveCS(pthread_mutex_t& lock)
+int CGuard::leaveCS(pthread_mutex_t& lock, const std::string &info)
 {
+    //std::cerr << "Unlocking " << info << "\n";
     return pthread_mutex_unlock(&lock);
 }
 
