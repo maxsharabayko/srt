@@ -4269,6 +4269,8 @@ void* CUDT::tsbpd(void* param)
          */
          if (self->m_bSynRecving)
          {
+             LOGP(tslog.Note, "signal RecvDataCond");
+             //std::cerr << logging::FormatTime(CTimer::getTime()) << " signal RecvDataCond\n";
              pthread_cond_signal(&self->m_RecvDataCond);
          }
          /*
@@ -4289,11 +4291,17 @@ void* CUDT::tsbpd(void* param)
          CGuard::enterCS(self->m_RecvLock, "tsbpd condTimedWaitUS");
           self->m_bTsbPdAckWakeup = false;
           THREAD_PAUSED();
+          LOGC(tslog.Note, log << "tsbpd: FUTURE PACKET seq=" << current_pkt_seq
+                  << " T=" << logging::FormatTime(tsbpdtime) << " - waiting " << (timediff) << "us");
+          //std::cerr << logging::FormatTime(CTimer::getTime()) << " tsbpd: FUTURE PACKET seq=" << current_pkt_seq
+          //    << " T=" << logging::FormatTime(tsbpdtime) << " - waiting " << (timediff) << "us\n";
+
           HLOGC(tslog.Debug, log << self->CONID() << "tsbpd: FUTURE PACKET seq=" << current_pkt_seq
               << " T=" << logging::FormatTime(tsbpdtime) << " - waiting " << (timediff/1000.0) << "ms");
           CTimer::condTimedWaitUS(&self->m_RcvTsbPdCond, &self->m_RecvLock, timediff);
           THREAD_RESUMED();
           CGuard::leaveCS(self->m_RecvLock, "tsbpd condTimedWaitUS");
+          LOGP(tslog.Note, " tsbpd: finished waiting");
       }
       else
       {
@@ -4308,11 +4316,16 @@ void* CUDT::tsbpd(void* param)
          * - Closing the connection
          */
           CGuard::enterCS(self->m_RecvLock, "tsbpd pthread_cond_wait(&self->m_RcvTsbPdCond");
+          //std::cerr << logging::FormatTime(CTimer::getTime()) << " tsbpd: no data, scheduling wake up\n";
+          LOGC(tslog.Note, log << "tsbpd: no data, scheduling wake up");
+
          HLOGC(tslog.Debug, log << self->CONID() << "tsbpd: no data, scheduling wakeup at ack");
          self->m_bTsbPdAckWakeup = true;
          THREAD_PAUSED();
          pthread_cond_wait(&self->m_RcvTsbPdCond, &self->m_RecvLock);
          THREAD_RESUMED();
+         LOGC(tslog.Note, log << "tsbpd: wake up");
+         //std::cerr << logging::FormatTime(CTimer::getTime()) << " tsbpd: wake up\n";
          CGuard::leaveCS(self->m_RecvLock, "tsbpd pthread_cond_wait(&self->m_RcvTsbPdCond");
       }
    }
@@ -7786,6 +7799,7 @@ int CUDT::processData(CUnit* unit)
        }
    }
 
+
    // Now review the list of FreshLoss to see if there's any "old enough" to send UMSG_LOSSREPORT to it.
 
    // PERFORMANCE CONSIDERATIONS:
@@ -7859,6 +7873,19 @@ int CUDT::processData(CUnit* unit)
    {
        CTimer::rdtsc(m_ullNextACKTime_tk);
    }
+   else if (m_bTsbPd)
+   {
+       /* Newly acknowledged data, signal TsbPD thread */
+       pthread_mutex_lock(&m_RecvLock);
+       if (m_bTsbPdAckWakeup)
+       {
+           LOGP(tslog.Note, "require QuickACK");
+           //std::cerr << logging::FormatTime(CTimer::getTime()) << " require QuickACK\n";
+           CTimer::rdtsc(m_ullNextACKTime_tk);
+       }
+       pthread_mutex_unlock(&m_RecvLock);
+   }
+   
 
    // Update the current largest sequence number that has been received.
    // Or it is a retransmitted packet, remove it from receiver loss list.

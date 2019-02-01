@@ -1135,9 +1135,28 @@ bool CRcvBuffer::isRcvDataReady(ref_t<uint64_t> tsbpdtime, ref_t<int32_t> curpkt
             * Report the timestamp, ready or not.
             */
             *curpktseq = pkt->getSeqNo();
-            *tsbpdtime = getPktTsbPdTime(pkt->getMsgTimeStamp());
-            if (*tsbpdtime <= CTimer::getTime())
+            const uint32_t timestamp = pkt->getMsgTimeStamp();
+            *tsbpdtime = getPktTsbPdTime(timestamp);
+            const uint64_t cur_time = CTimer::getTime();
+
+            LOGC(tslog.Note, log << "SEQNO: " << *curpktseq << ", packets: " << setfill(' ') << setw(10) << getRcvDataSize()
+                    << ", TSBPD time: " << logging::FormatTime(*tsbpdtime)
+                    << " (" << setfill(' ') << setw(6) << (int64_t)(*tsbpdtime - cur_time) << " us)"
+                    << ", timestamp: " << logging::FormatTime(timestamp) << ", TsbPdTimeBase " << logging::FormatTime(getTsbPdTimeBase(timestamp))
+                    << ", m_uTsbPdDelay " << m_uTsbPdDelay << " us, drift: " << m_DriftTracer.drift() << " us");
+            //std::cerr << logging::FormatTime(cur_time) << ", seqno: " << *curpktseq << ", packets: " << setw(10) << getRcvDataSize()
+            //    << ", TSBPD time: " << logging::FormatTime(*tsbpdtime)
+            //    << " (" << setw(6) << (int64_t)(*tsbpdtime - cur_time) << " us)";
+            //std::cerr << ", timestamp: " << logging::FormatTime(timestamp) << ", TsbPdTimeBase " << logging::FormatTime(getTsbPdTimeBase(timestamp))
+            //    << ", m_uTsbPdDelay " << m_uTsbPdDelay << " us, drift: " << m_DriftTracer.drift() << " us\n";
+
+            if (*tsbpdtime <= cur_time)
                return true;
+            /*std::cerr << "Packet " << *curpktseq << " TSBPD time " << logging::FormatTime(*tsbpdtime)
+                      << " cur time " << logging::FormatTime(cur_time) << " (" << (*tsbpdtime - cur_time) << " ms)\n";
+            std::cerr << "Timestamp: " << logging::FormatTime(timestamp) << " TsbPdTimeBase " << logging::FormatTime(getTsbPdTimeBase(timestamp))
+                      << " m_uTsbPdDelay " << m_uTsbPdDelay << " ms, drift: " << m_DriftTracer.drift() << " ms\n";*/
+            //m_iLastAckPos
        }
        return false;
    }
