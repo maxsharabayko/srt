@@ -5011,11 +5011,16 @@ int CUDT::receiveBuffer(char* data, int len)
         pthread_cond_signal(&m_RcvTsbPdCond);
     }
 
-
+    cerr << "After reading epoll is: ";
     if (!m_pRcvBuffer->isRcvDataReady(m_bMessageAPI))
     {
         // read is not available any more
         s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, UDT_EPOLL_IN, false);
+        cerr << "false\n";
+    }
+    else
+    {
+        cerr << "true\n";
     }
 
     if ((res <= 0) && (m_iRcvTimeOut >= 0))
@@ -5421,7 +5426,7 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
 
     if (!m_bSynRecving)
     {
-
+        cerr << "receiveMessage. After reading epoll is: ";
         int res = m_pRcvBuffer->readMsg(data, len, r_mctrl);
         if (res == 0)
         {
@@ -5430,7 +5435,7 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
             // Kick TsbPd thread to schedule next wakeup (if running)
             if (m_bTsbPd)
                 pthread_cond_signal(&m_RcvTsbPdCond);
-
+            cerr << "false2\n";
             // Shut up EPoll if no more messages in non-blocking mode
             s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, UDT_EPOLL_IN, false);
             throw CUDTException(MJ_AGAIN, MN_RDAVAIL, 0);
@@ -5443,12 +5448,17 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
                 if (m_bTsbPd)
                     pthread_cond_signal(&m_RcvTsbPdCond);
 
+                cerr << "false\n";
                 // Shut up EPoll if no more messages in non-blocking mode
                 s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, UDT_EPOLL_IN, false);
 
                 // After signaling the tsbpd for ready data, report the bandwidth.
                 double bw SRT_ATR_UNUSED = Bps2Mbps( m_iBandwidth * m_iMaxSRTPayloadSize );
                 HLOGC(mglog.Debug, log << CONID() << "CURRENT BANDWIDTH: " << bw << "Mbps (" << m_iBandwidth << " buffers per second)");
+            }
+            else
+            {
+                cerr << "true\n";
             }
             return res;
         }
@@ -5503,6 +5513,7 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
             throw CUDTException(MJ_CONNECTION, MN_NOCONN, 0);
     } while ((res == 0) && !timeout);
 
+    cerr << "receiveMessage. After reading epoll is: ";
     if (!m_pRcvBuffer->isRcvDataReady(m_bMessageAPI))
     {
         // Falling here means usually that res == 0 && timeout == true.
@@ -5519,9 +5530,11 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
             pthread_cond_signal(&m_RcvTsbPdCond);
         }
 
+        cerr << "false\n";
         // Shut up EPoll if no more messages in non-blocking mode
         s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, UDT_EPOLL_IN, false);
     }
+    cerr << "true\n";
 
     // Unblock when required
     //LOGC(tslog.Debug, "RECVMSG/EXIT RES " << res << " RCVTIMEOUT");
@@ -6358,6 +6371,7 @@ void CUDT::sendCtrl(UDTMessageType pkttype, void* lparam, void* rparam, int size
              }
              // acknowledge any waiting epolls to read
 
+             pthread_mutex_lock(&m_RecvLock);
              cerr << "sendCtrl: ACK " << ack;
              if (!m_bMessageAPI || m_pRcvBuffer->isRcvDataReady(true))
              {
@@ -6365,6 +6379,7 @@ void CUDT::sendCtrl(UDTMessageType pkttype, void* lparam, void* rparam, int size
                  s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, UDT_EPOLL_IN, true);
                  CTimer::triggerEvent();
              }
+             pthread_mutex_unlock(&m_RecvLock);
              cerr << endl;
          }
          CGuard::enterCS(m_AckLock);
