@@ -74,6 +74,7 @@ modified by
 #include "common.h"
 #include "epoll.h"
 #include "udt.h"
+#include "logging.h"
 
 using namespace std;
 
@@ -525,7 +526,10 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
       CGuard::leaveCS(m_EPollLock);
 
       if (total > 0)
-         return total;
+      {
+          cerr << "CEpoll::wait(): total > 0 " << logging::FormatTime(CTimer::getTime()) << endl;
+          return total;
+      }
 
       if ((msTimeOut >= 0) && (int64_t(CTimer::getTime() - entertime) >= msTimeOut * int64_t(1000)))
          throw CUDTException(MJ_AGAIN, MN_XMTIMEOUT, 0);

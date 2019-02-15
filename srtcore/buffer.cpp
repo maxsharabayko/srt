@@ -485,8 +485,8 @@ void CSndBuffer::ackData(int offset)
    CGuard bufferguard(m_BufLock);
 
    bool move = false;
-    cerr << "CSndBuffer::ackData() -" << offset << " bytes (";
-    cerr << m_iBytesCount;
+    cerr << "CSndBuffer::ackData() -" << offset << " packets (";
+    const int prev_bytes = m_iBytesCount;
    for (int i = 0; i < offset; ++ i)
    {
       m_iBytesCount -= m_pFirstBlock->m_iLength;
@@ -494,7 +494,7 @@ void CSndBuffer::ackData(int offset)
           move = true;
       m_pFirstBlock = m_pFirstBlock->m_pNext;
    }
-    cerr << " -> " << m_iBytesCount << ")" << endl;
+    cerr << prev_bytes << " bytes, still in buffer: " << m_iBytesCount << ")" << endl;
    if (move)
        m_pCurrBlock = m_pFirstBlock;
 

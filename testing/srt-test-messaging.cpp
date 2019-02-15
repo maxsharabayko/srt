@@ -100,7 +100,7 @@ void receive_message(const char *uri)
 
     vector<char> message_rcvd(message_size);
 
-    this_thread::sleep_for(chrono::seconds(5));
+    //this_thread::sleep_for(chrono::seconds(5));
 
     try
     {
