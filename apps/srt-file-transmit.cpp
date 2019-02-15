@@ -334,7 +334,7 @@ bool DoUpload(UriParser& ut, string path, string filename)
             size_t shift = 0;
             while (n > 0)
             {
-                int st = srt_send(s, buf.data() + shift, n);
+                int st = tar->Write(buf.data() + shift, n);
                 Verb() << "Upload: " << n << " --> " << st
                     << (!shift ? string() : "+" + Sprint(shift));
                 if (st == SRT_ERROR)

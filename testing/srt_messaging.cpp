@@ -102,6 +102,7 @@ int srt_msgn_send(const char *buffer, size_t buffer_len)
         return -1;
 
     const int n = srt_send(s_snd_srt_model->Socket(), buffer, (int) buffer_len);
+
     return n;
 }
 
@@ -140,8 +141,10 @@ int srt_msgn_destroy()
             if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
                 break;
 
-            if (blocks)
+            cerr << "srt_msgn_destroy() blocks=" << blocks << endl;
+            if (blocks) {
                 this_thread::sleep_for(chrono::milliseconds(5));
+            }
         } while (blocks != 0);
     }
     s_snd_srt_model.reset();

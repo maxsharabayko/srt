@@ -21,7 +21,7 @@ SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> pa
     , m_port(port)
     , m_options(par)
 {
-    //Verbose::on = true;
+    Verbose::on = true;
     srt_startup();
 
     m_epoll_accept  = srt_epoll_create();
@@ -258,6 +258,11 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len)
         // Update m_read_fifo based on sockets in m_epoll_read_fds
         UpdateReadFIFO(rnum, wnum);
 
+        Verb() << "   m_read_fifo: " << VerbNoEOL;
+        copy(m_read_fifo.begin(), m_read_fifo.end(),
+            ostream_iterator<int>(*Verbose::cverb, ", "));
+        Verb();
+
         auto sock_it = m_read_fifo.begin();
         while (sock_it != m_read_fifo.end())
         {
@@ -271,11 +276,22 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len)
                 return recv_res;
 
             const int srt_err = srt_getlasterror(nullptr);
-            if (srt_err == SRT_ECONNLOST)
+            if (srt_err == SRT_ECONNLOST)   // Broken || Closing
             {
                 Verb() << "Socket " << sock << " lost connection. Remove from epoll.";
                 srt_close(sock);
                 continue;
+            }
+            else if (srt_err == SRT_EINVSOCK)
+            {
+                Verb() << "Socket state " << srt_getsockstate(sock);
+                Verb() << "Socket " << sock << " is no longer valid. Remove from epoll.";
+                srt_epoll_remove_usock(m_epoll_receive, sock);
+                continue;
+            }
+            else
+            {
+                Verb() << "Socket state " << srt_getsockstate(sock);
             }
 
             // An error happened. Notify the caller of the function.

@@ -772,7 +772,7 @@ if ( ENABLE_CXX11 )
 
 		srt_add_testprogram(srt-test-folder)
 		target_include_directories(srt-test-folder PRIVATE
-			"${CMAKE_SOURCE_DIR}/submodules/json/single_include/",
+			"${CMAKE_SOURCE_DIR}/submodules/json/single_include/"
 			"${CMAKE_SOURCE_DIR}/submodules/date/include/"
 		)
 		srt_make_application(srt-test-folder)

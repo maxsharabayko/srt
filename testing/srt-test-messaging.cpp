@@ -100,7 +100,7 @@ void receive_message(const char *uri)
 
     vector<char> message_rcvd(message_size);
 
-    this_thread::sleep_for(chrono::seconds(5));
+    //this_thread::sleep_for(chrono::seconds(5));
 
     try
     {
@@ -110,14 +110,22 @@ void receive_message(const char *uri)
             if (recv_res <= 0)
             {
                 cerr << "ERROR: Receiving message. Result: " << recv_res << "\n";
-                cerr << srt_msgn_getlasterror_str();
+                cerr << srt_msgn_getlasterror_str() << endl;
 
                 srt_msgn_destroy();
                 return;
             }
 
-            cout << "RECEIVED MESSAGE:\n";
-            cout << string(message_rcvd.data(), recv_res).c_str() << endl;
+            if (recv_res < 50)
+            {
+                cout << "RECEIVED MESSAGE:\n";
+                cout << string(message_rcvd.data(), recv_res).c_str() << endl;
+            }
+            else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
+            {
+                cout << "RECEIVED MESSAGE (first character):";
+                cout << message_rcvd[0] << endl;
+            }
 
             if (int_state)
             {
@@ -128,9 +136,9 @@ void receive_message(const char *uri)
     }
     catch (std::exception &ex)
     {
-        cout << ex.what() << endl;
+        cerr<< "EXCEPTION: " << ex.what() << endl;
     }
-
+    cout << "DESTROY\n";
     srt_msgn_destroy();
 }
 
@@ -150,7 +158,7 @@ void send_message(const char *uri, const char* message, size_t length)
     if (sent_res != (int) length)
     {
         cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
-        cerr << srt_msgn_getlasterror_str();
+        cerr << srt_msgn_getlasterror_str() << endl;
         srt_msgn_destroy();
         return;
     }
@@ -158,22 +166,24 @@ void send_message(const char *uri, const char* message, size_t length)
     cout << "SENT MESSAGE:\n";
     cout << message << endl;
 
-    sent_res = srt_msgn_send(message, length);
-    if (sent_res != (int) length)
+    vector<char> message_to_send(message_size);
+    char c = 0;
+    for (size_t i = 0; i < message_to_send.size(); ++i)
     {
-        cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
-        cerr << srt_msgn_getlasterror_str();
-        srt_msgn_destroy();
-        return;
+        message_to_send[i] = c++;
     }
 
-    sent_res = srt_msgn_send(message, length);
-    if (sent_res != (int) length)
+    for (int i = 0; i < 5; ++i)
     {
-        cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
-        cerr << srt_msgn_getlasterror_str();
-        srt_msgn_destroy();
-        return;
+        message_to_send[0] = '0' + i;
+        sent_res = srt_msgn_send(message_to_send.data(), message_to_send.size());
+        if (sent_res != (int)message_size)
+        {
+            cerr << "ERROR: Sending " << message_size << ", sent " << sent_res << "\n";
+            cerr << srt_msgn_getlasterror_str() << endl;
+            break;
+        }
+        cout << "SENT MESSAGE #" << i << "\n";
     }
 
     //this_thread::sleep_for(10s);

@@ -58,6 +58,7 @@ public:
 class Target: public Location
 {
 public:
+    virtual int Write(const char* data, size_t size) = 0;
     virtual bool Write(const bytevector& portion) = 0;
     virtual bool IsOpen() = 0;
     virtual bool Broken() = 0;

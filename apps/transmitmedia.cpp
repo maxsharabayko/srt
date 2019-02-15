@@ -38,7 +38,7 @@ using namespace std;
 bool transmit_total_stats = false;
 bool clear_stats = false;
 unsigned long transmit_bw_report = 0;
-unsigned long transmit_stats_report = 0;
+unsigned long transmit_stats_report = 1000;
 unsigned long transmit_chunk_size = SRT_LIVE_DEF_PLSIZE;
 bool printformat_json = false;
 
@@ -88,6 +88,12 @@ public:
     {
         ofile.write(data.data(), data.size());
         return !(ofile.bad());
+    }
+
+    int Write(const char* data, size_t size) override
+    {
+        ofile.write(data, size);
+        return !(ofile.bad()) ? size : false;
     }
 
     bool IsOpen() override { return !!ofile; }
@@ -648,24 +654,24 @@ int SrtTarget::ConfigurePre(SRTSOCKET sock)
     return 0;
 }
 
-bool SrtTarget::Write(const bytevector& data) 
+int SrtTarget::Write(const char* data, size_t size)
 {
     static unsigned long counter = 1;
 
-    int stat = srt_sendmsg2(m_sock, data.data(), data.size(), nullptr);
-    if ( stat == SRT_ERROR )
+    int stat = srt_sendmsg2(m_sock, data, size, nullptr);
+    if (stat == SRT_ERROR)
     {
-        return false;
+        return stat;
     }
 
     CBytePerfMon perf;
     srt_bstats(m_sock, &perf, clear_stats);
     clear_stats = false;
-    if ( transmit_bw_report && (counter % transmit_bw_report) == transmit_bw_report - 1 )
+    if (transmit_bw_report && (counter % transmit_bw_report) == transmit_bw_report - 1)
     {
         PrintSrtBandwidth(perf.mbpsBandwidth);
     }
-    if ( transmit_stats_report && (counter % transmit_stats_report) == transmit_stats_report - 1)
+    if (transmit_stats_report && (counter % transmit_stats_report) == transmit_stats_report - 1)
     {
         PrintSrtStats(m_sock, perf);
         clear_stats = !transmit_total_stats;
@@ -673,7 +679,12 @@ bool SrtTarget::Write(const bytevector& data)
 
     ++counter;
 
-    return true;
+    return stat;
+}
+
+bool SrtTarget::Write(const bytevector& data) 
+{
+    return -1 != Write(data.data(), data.size());
 }
 
 SrtModel::SrtModel(string host, int port, map<string,string> par)
@@ -815,10 +826,15 @@ public:
 #endif
     }
 
+    int Write(const char* data, size_t len) override
+    {
+        cout.write(data, len);
+        return len;
+    }
+
     bool Write(const bytevector& data) override
     {
-        cout.write(data.data(), data.size());
-        return true;
+        return 0 != Write(data.data(), data.size());
     }
 
     bool IsOpen() override { return cout.good(); }
@@ -1077,16 +1093,21 @@ public:
         Setup(host, port, attr);
     }
 
-    bool Write(const bytevector& data) override
+    int Write(const char* data, size_t len) override
     {
-        int stat = sendto(m_sock, data.data(), data.size(), 0, (sockaddr*)&sadr, sizeof sadr);
+        int stat = sendto(m_sock, data, len, 0, (sockaddr*)&sadr, sizeof sadr);
         if ( stat == -1 )
         {
             if ((false))
                 Error(SysError(), "UDP Write/sendto");
-            return false;
+            return stat;
         }
-        return true;
+        return stat;
+    }
+
+    bool Write(const bytevector& data) override
+    {
+        return -1 != Write(data.data(), data.size());
     }
 
     bool IsOpen() override { return m_sock != -1; }
