@@ -121,6 +121,10 @@ void receive_message(const char *uri)
                 cout << "RECEIVED MESSAGE:\n";
                 cout << string(message_rcvd.data(), recv_res).c_str() << endl;
             }
+            else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
+            {
+                cout << message_rcvd[0] << endl;
+            }
 
             if (int_state)
             {
@@ -170,6 +174,7 @@ void send_message(const char *uri, const char* message, size_t length)
 
     for (int i = 0; i < 5; ++i)
     {
+        message_to_send[0] = '0' + i;
         sent_res = srt_msgn_send(message_to_send.data(), message_to_send.size());
         if (sent_res != (int)message_size)
         {
