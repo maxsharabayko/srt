@@ -141,8 +141,8 @@ int srt_msgn_destroy()
             if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
                 break;
 
+            cerr << "srt_msgn_destroy() blocks=" << blocks << endl;
             if (blocks) {
-                cerr << "srt_msgn_destroy() blocks=" << blocks << endl;
                 this_thread::sleep_for(chrono::milliseconds(5));
             }
         } while (blocks != 0);

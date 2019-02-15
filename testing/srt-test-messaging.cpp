@@ -123,6 +123,7 @@ void receive_message(const char *uri)
             }
             else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
             {
+                cout << "RECEIVED MESSAGE (first character):";
                 cout << message_rcvd[0] << endl;
             }
 
@@ -135,9 +136,9 @@ void receive_message(const char *uri)
     }
     catch (std::exception &ex)
     {
-        cout << ex.what() << endl;
+        cerr<< "EXCEPTION: " << ex.what() << endl;
     }
-
+    cout << "DESTROY\n";
     srt_msgn_destroy();
 }
 
