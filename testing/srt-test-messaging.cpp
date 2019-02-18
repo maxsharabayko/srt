@@ -138,7 +138,7 @@ void receive_message(const char *uri)
     {
         cerr<< "EXCEPTION: " << ex.what() << endl;
     }
-    cout << "DESTROY\n";
+
     srt_msgn_destroy();
 }
 

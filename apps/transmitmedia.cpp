@@ -38,7 +38,7 @@ using namespace std;
 bool transmit_total_stats = false;
 bool clear_stats = false;
 unsigned long transmit_bw_report = 0;
-unsigned long transmit_stats_report = 1000;
+unsigned long transmit_stats_report = 0;
 unsigned long transmit_chunk_size = SRT_LIVE_DEF_PLSIZE;
 bool printformat_json = false;
 
