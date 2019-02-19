@@ -19,10 +19,15 @@ written by
 
 
 #ifdef _WIN32
-#define SRT_MSGN_API extern "C" __declspec(dllexport)
+#define SRT_MSGN_API __declspec(dllexport)
 #else
 #define SRT_MSGN_API __attribute__ ((visibility("default")))
 #endif  // _WIN32
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 /**
@@ -83,6 +88,11 @@ SRT_MSGN_API extern int         srt_msgn_getlasterror(void);
 
 
 SRT_MSGN_API extern int         srt_msgn_destroy();
+
+
+#ifdef __cplusplus
+}   // extern "C"
+#endif
 
 
 #endif // INC__SRT_MESSENGER_H
