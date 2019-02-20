@@ -37,7 +37,7 @@ extern "C" {
  *                      (e.g. "srt://192.168.0.12:4200")
  * @param messahe_size  payload size of one message to send
  */
-SRT_MSGN_API extern int         srt_msgn_connect(const char *uri, size_t message_size);
+SRT_MSGN_API int         srt_msgn_connect(const char *uri, size_t message_size);
 
 
 /**
@@ -51,7 +51,7 @@ SRT_MSGN_API extern int         srt_msgn_connect(const char *uri, size_t message
  * @return               0 on success
  *                      -1 on error
  */
-SRT_MSGN_API extern int         srt_msgn_listen (const char *uri, size_t message_size);
+SRT_MSGN_API int         srt_msgn_listen (const char *uri, size_t message_size);
 
 
 /**
@@ -64,7 +64,7 @@ SRT_MSGN_API extern int         srt_msgn_listen (const char *uri, size_t message
  *                      -1 in case of error
  *                       0 in case all the connection are closed
  */
-SRT_MSGN_API extern int         srt_msgn_send(const char *buffer, size_t buffer_len);
+SRT_MSGN_API int         srt_msgn_send(const char *buffer, size_t buffer_len);
 
 
 /**
@@ -77,17 +77,17 @@ SRT_MSGN_API extern int         srt_msgn_send(const char *buffer, size_t buffer_
  *                      -1 in case of error
  *                       0 in case all the connections are closed
  */
-SRT_MSGN_API extern int         srt_msgn_recv(char *buffer, size_t buffer_len);
+SRT_MSGN_API int         srt_msgn_recv(char *buffer, size_t buffer_len);
 
 
 
-SRT_MSGN_API extern const char* srt_msgn_getlasterror_str(void);
+SRT_MSGN_API const char* srt_msgn_getlasterror_str(void);
 
 
-SRT_MSGN_API extern int         srt_msgn_getlasterror(void);
+SRT_MSGN_API int         srt_msgn_getlasterror(void);
 
 
-SRT_MSGN_API extern int         srt_msgn_destroy();
+SRT_MSGN_API int         srt_msgn_destroy();
 
 
 #ifdef __cplusplus
