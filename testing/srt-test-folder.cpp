@@ -47,11 +47,12 @@
 #include "verbose.hpp"
 #include "testmedia.hpp"
 
+#if ENABLE_JSON_INPUT
 #include "nlohmann/json.hpp"
-
 #include "date/date.h"
-
 using json = nlohmann::json;
+#endif
+
 using namespace std;
 
 #ifndef S_ISDIR
@@ -301,7 +302,7 @@ bool TransmitFile(const string &filename, const string &upload_name, const SRTSO
 
     for (;;)
     {
-        const int n = ifile.read(buf.data() + hdr_size, buf.size() - hdr_size).gcount();
+        const int n = (int) ifile.read(buf.data() + hdr_size, streamsize (buf.size() - hdr_size)).gcount();
         const bool is_eof = ifile.eof();
         const bool is_start = hdr_size > 1;
         buf[0] = (is_eof ? 2 : 0) | (is_start ? 1 : 0);
@@ -429,7 +430,7 @@ bool DoUploadFolderContents(UriParser& ut, string path)
 }
 
 
-//#define SRT_EMUL
+#if ENABLE_JSON_INPUT
 bool DoUploadJSONSeq(UriParser& ut, string path, const string &dir)
 {
 #ifndef SRT_EMUL
@@ -517,6 +518,7 @@ bool DoUploadJSONSeq(UriParser& ut, string path, const string &dir)
 
     return true;
 }
+#endif
 
 
 bool DoDownload(UriParser& us, string directory)
@@ -622,15 +624,19 @@ bool DoDownload(UriParser& us, string directory)
             const auto delta_us = chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
             const size_t rate_kbps = (file_size * 1000) / (delta_us ? delta_us : 1) * 8;
-            //Verb() << "--> done (" << file_size / 1024 << " kbytes transfered at " << rate_kbps << " kbps, took "
-            //       << chrono::duration_cast<chrono::minutes>(time_end - time_start).count() << " minute(s))";
+#if ENABLE_JSON_INPUT
             Verb() << "--> done (" << file_size / 1024 << " kbytes transfered at " << rate_kbps << " kbps, took "
                 << delta_ms / 1000.0 << " sec)";
+#else
+            Verb() << "--> done (" << file_size / 1024 << " kbytes transfered at " << rate_kbps << " kbps, took "
+                   << chrono::duration_cast<chrono::minutes>(time_end - time_start).count() << " minute(s))";
+#endif
         }
     }
 
     return true;
 }
+
 
 bool Upload(UriParser& srt_target_uri, UriParser& fileuri)
 {
@@ -656,9 +662,13 @@ bool Upload(UriParser& srt_target_uri, UriParser& fileuri)
     // Add some extra parameters.
     srt_target_uri["transtype"] = "file";
 
+#if ENABLE_JSON_INPUT
+    return DoUploadJSONSeq(srt_target_uri, path, directory);
+#else
     return DoUploadFolderContents(srt_target_uri, path);
-    //return DoUploadJSONSeq(srt_target_uri, path, directory);
+#endif
 }
+
 
 bool Download(UriParser& srt_source_uri, UriParser& fileuri)
 {
