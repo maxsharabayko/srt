@@ -131,11 +131,11 @@ int main(int argc, char** argv)
     if (args.size() < 2)
     {
         cerr << "Usage: " << argv[0] << " <source> <target>\n";
-        cerr << "Example (receiver):\n   srt_test_folder srt://:4200 file://.\n";
-        cerr << "      will receive the streaming on port 4200 of the localhost and wtire to the current forder.\n";
-        cerr << "Example (sender):\n   srt_test_folder file://folder_to_send srt://192.168.0.102:4200\n";
+        cerr << "Example (receiver):\n   srt_test_folder srt://:4200 ./\n";
+        cerr << "      will receive the streaming on port 4200 of the localhost and write to the current folder.\n";
+        cerr << "Example (sender):\n   srt_test_folder ./folder_to_send srt://192.168.0.102:4200\n";
         cerr << "      will send the contents of the folder_to_send on port 4200 of the 192.168.0.102.\n";
-        cerr << "Example (sender with bandwidth limit):\n   srt_test_folder file://folder_to_send srt://192.168.0.102:4200?maxbw=625000\n";
+        cerr << "Example (sender with bandwidth limit):\n   srt_test_folder ./folder_to_send srt://192.168.0.102:4200?maxbw=625000\n";
         cerr << "      will send the contents of the folder_to_send on port 4200 of the 192.168.0.102\n";
         cerr << "      with a bitrate limit of 5 Mbps (625000 bytes/s).\n";
 
@@ -457,6 +457,23 @@ bool DoUploadFolderContents(UriParser& ut, string path)
         processing_list.pop_front();
         free(ent);
     };
+
+    // We have to check if the sending buffer is empty.
+    // Or we will loose this data, because SRT is not waiting
+    // for all the data to be sent in a general live streaming use case,
+    // as it might be not something it is expected to do, and may lead to
+    // to unnesessary waits on destroy.
+    // srt_getsndbuffer() is designed to handle such cases.
+    const SRTSOCKET sock = m.Socket();
+    size_t blocks = 0;
+    do
+    {
+        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
+            break;
+
+        if (blocks)
+            this_thread::sleep_for(chrono::milliseconds(5));
+    } while (blocks != 0);
 
     return true;
 }
