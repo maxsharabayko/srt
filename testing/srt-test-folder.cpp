@@ -70,6 +70,38 @@ static bool g_skip_flushing = false;
 
 using namespace std;
 
+
+void CheckURIParser(const string &uri)
+{
+    UriParser parser(uri);
+    cout << "PARSING URL: " << uri << endl;
+    cerr << "SCHEME INDEX: " << int(parser.type()) << endl;
+    cout << "PROTOCOL: " << parser.proto() << endl;
+    cout << "HOST: " << parser.host() << endl;
+    cout << "PORT: " << parser.portno() << endl;
+    cout << "PATH: " << parser.path() << endl;
+    cout << "PARAMETERS:\n";
+    for (auto p : parser.parameters())
+        cout << "\t" << p.first << " = " << p.second << endl;
+    cout << endl;
+}
+
+
+
+void TestURIParser()
+{
+    CheckURIParser(string("file://folder_name/"));
+    CheckURIParser(string("file://folder_name/file_name"));
+    CheckURIParser(string("file://file_name"));
+    CheckURIParser(string("."));
+    CheckURIParser(string("./"));
+    CheckURIParser(string("./folder"));
+    CheckURIParser(string("file://./folder"));
+    CheckURIParser(string("C:\\folder\\"));
+    CheckURIParser(string("C://folder/"));
+}
+
+
 int main(int argc, char** argv)
 {
     set<string>
