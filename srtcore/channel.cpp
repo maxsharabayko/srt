@@ -91,9 +91,7 @@ modified by
 #endif
 
 using namespace std;
-
-
-extern logging::Logger mglog;
+using namespace srt_logging;
 
 CChannel::CChannel():
 m_iIPversion(AF_INET),
@@ -366,7 +364,7 @@ void CChannel::getPeerAddr(sockaddr* addr) const
 
 int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
 {
-#if ENABLE_LOGGING
+#if ENABLE_HEAVY_LOGGING
     std::ostringstream spec;
 
     if (packet.isControl())
