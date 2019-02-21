@@ -126,9 +126,10 @@ int srt_msgn_getlasterror(void)
 }
 
 
-int srt_msgn_destroy()
+int srt_msgn_destroy(int instance_type)
 {
-    if (s_snd_srt_model)
+    const bool destroy_sender = instance_type == 0 || instance_type == 1;
+    if (s_snd_srt_model && destroy_sender)
     {
         // We have to check if the sending buffer is empty.
         // Or we will loose this data.
@@ -142,9 +143,13 @@ int srt_msgn_destroy()
             if (blocks)
                 this_thread::sleep_for(chrono::milliseconds(5));
         } while (blocks != 0);
+
+        s_snd_srt_model.reset();
     }
-    s_snd_srt_model.reset();
-    s_rcv_srt_model.reset();
+
+    const bool destroy_receiver = instance_type == 0 || instance_type == 2;
+    if (destroy_receiver)
+        s_rcv_srt_model.reset();
     return 0;
 }
 

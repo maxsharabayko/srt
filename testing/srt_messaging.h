@@ -87,7 +87,14 @@ SRT_MSGN_API const char* srt_msgn_getlasterror_str(void);
 SRT_MSGN_API int         srt_msgn_getlasterror(void);
 
 
-SRT_MSGN_API int         srt_msgn_destroy();
+/**
+ * Destroy the messaging service
+ *
+ * @param instance_type 1 - sender; 2 - receiver; 0 - both
+ *
+ * @return              0
+ */
+SRT_MSGN_API int         srt_msgn_destroy(int instance_type);
 
 
 #ifdef __cplusplus

@@ -17,7 +17,7 @@ void OnINT_ForceExit(int)
 {
     cerr << "\n-------- REQUESTED INTERRUPT!\n";
     int_state = true;
-    srt_msgn_destroy();
+    srt_msgn_destroy(0);
 }
 
 
@@ -81,7 +81,7 @@ void test_messaging_localhost()
     if (!mismatch_found)
         cerr << "Check passed\n";
 
-    srt_msgn_destroy();
+    srt_msgn_destroy(0);
 }
 
 
@@ -94,7 +94,7 @@ void receive_message(const char *uri)
     {
         cerr << "ERROR: Listen failed.\n";
 
-        srt_msgn_destroy();
+        srt_msgn_destroy(0);
         return;
     }
 
@@ -112,7 +112,7 @@ void receive_message(const char *uri)
                 cerr << "ERROR: Receiving message. Result: " << recv_res << "\n";
                 cerr << srt_msgn_getlasterror_str() << endl;
 
-                srt_msgn_destroy();
+                srt_msgn_destroy(0);
                 return;
             }
 
@@ -139,7 +139,7 @@ void receive_message(const char *uri)
         cerr<< "EXCEPTION: " << ex.what() << endl;
     }
 
-    srt_msgn_destroy();
+    srt_msgn_destroy(0);
 }
 
 
@@ -150,7 +150,7 @@ void send_message(const char *uri, const char* message, size_t length)
     if (-1 == srt_msgn_connect(uri, message_size))
     {
         cerr << "ERROR: Connect failed.\n";
-        srt_msgn_destroy();
+        srt_msgn_destroy(0);
         return;
     }
 
@@ -159,7 +159,7 @@ void send_message(const char *uri, const char* message, size_t length)
     {
         cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
         cerr << srt_msgn_getlasterror_str() << endl;
-        srt_msgn_destroy();
+        srt_msgn_destroy(0);
         return;
     }
 
@@ -187,7 +187,7 @@ void send_message(const char *uri, const char* message, size_t length)
     }
 
     //this_thread::sleep_for(10s);
-    srt_msgn_destroy();
+    srt_msgn_destroy(0);
 }
 
 
