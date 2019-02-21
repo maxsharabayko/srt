@@ -33,6 +33,8 @@ extern "C" {
 
 //#pragma comment (lib, "ws2_32.lib")
 
+#if ENABLE_SERIAL_TRANSMISSION_TEST
+
 TEST(Transmission, Serial)
 {
     srt_startup();
@@ -124,3 +126,5 @@ TEST(Transmission, Serial)
 
     (void)srt_cleanup();
 }
+
+#endif
