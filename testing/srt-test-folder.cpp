@@ -669,11 +669,11 @@ bool DoDownload(UriParser& us, string directory)
         {
             ofile.close();
             const chrono::steady_clock::time_point time_end = chrono::steady_clock::now();
-            const auto delta_ms = chrono::duration_cast<chrono::milliseconds>(time_end - time_start).count();
             const auto delta_us = chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
             const size_t rate_kbps = (file_size * 1000) / (delta_us ? delta_us : 1) * 8;
 #if ENABLE_JSON_INPUT
+            const auto delta_ms = chrono::duration_cast<chrono::milliseconds>(time_end - time_start).count();
             Verb() << "--> done (" << file_size / 1024 << " kbytes transfered at " << rate_kbps << " kbps, took "
                 << delta_ms / 1000.0 << " sec)";
 #else
