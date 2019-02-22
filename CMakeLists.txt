@@ -86,6 +86,7 @@ option(ENABLE_STATIC "Should libsrt be built as a static library" ON)
 option(ENABLE_RELATIVE_LIBPATH "Should application contain relative library paths, like ../lib" OFF)
 option(ENABLE_SUFLIP "Should suflip tool be built" OFF)
 option(ENABLE_GETNAMEINFO "In-logs sockaddr-to-string should do rev-dns" OFF)
+option(ENABLE_MESSAGING_LIB "Enable SRT messaging wrapper library" OFF)
 option(ENABLE_UNITTESTS "Enable unit tests" OFF)
 option(USE_GNUTLS "Should use gnutls instead of openssl" OFF)
 option(ENABLE_CXX_DEPS "Extra library dependencies in srt.pc for the CXX libraries useful with C language" ON)
@@ -93,7 +94,8 @@ option(USE_STATIC_LIBSTDCXX "Should use static rather than shared libstdc++" OFF
 option(ENABLE_INET_PTON "Set to OFF to prevent usage of inet_pton when building against modern SDKs while still requiring compatibility with older Windows versions, such as Windows XP, Windows Server 2003 etc." ON)
 option(USE_OPENSSL_PC "Use pkg-config to find OpenSSL libraries" ON)
 
-set(TARGET_srt "srt" CACHE STRING "The name for the haisrt library")
+set(TARGET_srt "srt" CACHE STRING "The name for the SRT library")
+set(TARGET_srt_messaging "srt_messaging" CACHE STRING "The name for the SRT messaging library")
 
 if (NOT ENABLE_LOGGING)
 	set (ENABLE_HEAVY_LOGGING OFF)
@@ -569,25 +571,6 @@ if (MICROSOFT)
 endif()
 endif()
 
-# Cygwin installs the *.dll libraries in bin directory and uses PATH.
-
-set (INSTALL_SHARED_DIR ${CMAKE_INSTALL_LIBDIR})
-if (CYGWIN)
-	set (INSTALL_SHARED_DIR ${CMAKE_INSTALL_BINDIR})
-endif()
-
-message(STATUS "INSTALL DIRS: bin=${CMAKE_INSTALL_BINDIR} lib=${CMAKE_INSTALL_LIBDIR} shlib=${INSTALL_SHARED_DIR} include=${CMAKE_INSTALL_INCLUDEDIR}")
-
-install(TARGETS ${INSTALL_TARGETS}
-		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-		LIBRARY DESTINATION ${INSTALL_SHARED_DIR}
-)
-install(FILES ${HEADERS_srt} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/srt)
-if (WIN32)
-	install(FILES ${HEADERS_srt_win32} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/srt/win)
-endif()
-
 # ---
 # That's all for target definition
 # ---
@@ -786,7 +769,7 @@ endif()
 
 if (ENABLE_MESSAGING_LIB AND ENABLE_CXX11)
 
-	add_library(srt_messaging SHARED
+	add_library(${TARGET_srt_messaging} SHARED
 		${CMAKE_SOURCE_DIR}/testing/srt_receiver.hpp
 		${CMAKE_SOURCE_DIR}/testing/srt_receiver.cpp
 		${CMAKE_SOURCE_DIR}/testing/srt_messaging.h
@@ -802,18 +785,45 @@ if (ENABLE_MESSAGING_LIB AND ENABLE_CXX11)
 		${CMAKE_SOURCE_DIR}/apps/verbose.hpp
 	)
 
-	target_compile_options(srt_messaging PRIVATE ${CFLAGS_CXX_STANDARD})
-	target_include_directories(srt_messaging PRIVATE common)
-	target_include_directories(srt_messaging PRIVATE apps)
-	target_link_libraries(srt_messaging ${srt_link_library})
+	target_compile_options(${TARGET_srt_messaging} PRIVATE ${CFLAGS_CXX_STANDARD})
+	target_include_directories(${TARGET_srt_messaging} PRIVATE common)
+	target_include_directories(${TARGET_srt_messaging} PRIVATE apps)
+	set_property(TARGET ${TARGET_srt_messaging} PROPERTY OUTPUT_NAME ${TARGET_srt_messaging})
+	set_target_properties (${TARGET_srt_messaging} PROPERTIES VERSION ${SRT_VERSION} SOVERSION ${SRT_VERSION_MAJOR})
+	list (APPEND INSTALL_TARGETS ${TARGET_srt_messaging})
+	target_link_libraries(${TARGET_srt_messaging} PUBLIC ${srt_link_library})
+
+	configure_file(scripts/srt_messaging.pc.in srt_messaging.pc @ONLY)
+	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/srt_messaging.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+	install(FILES ${CMAKE_SOURCE_DIR}/testing/srt_messaging.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/srt)
 
 	srt_add_testprogram(srt-test-messaging)
 	target_include_directories(srt-test-messaging PRIVATE common)
 	target_include_directories(srt-test-messaging PRIVATE apps)
 
-	target_link_libraries(srt-test-messaging srt_messaging)
+	target_link_libraries(srt-test-messaging ${TARGET_srt_messaging})
 	srt_make_application(srt-test-messaging)
 
+endif()
+
+
+# Cygwin installs the *.dll libraries in bin directory and uses PATH.
+
+set (INSTALL_SHARED_DIR ${CMAKE_INSTALL_LIBDIR})
+if (CYGWIN)
+	set (INSTALL_SHARED_DIR ${CMAKE_INSTALL_BINDIR})
+endif()
+
+message(STATUS "INSTALL DIRS: bin=${CMAKE_INSTALL_BINDIR} lib=${CMAKE_INSTALL_LIBDIR} shlib=${INSTALL_SHARED_DIR} include=${CMAKE_INSTALL_INCLUDEDIR}")
+
+install(TARGETS ${INSTALL_TARGETS}
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		LIBRARY DESTINATION ${INSTALL_SHARED_DIR}
+)
+install(FILES ${HEADERS_srt} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/srt)
+if (WIN32)
+	install(FILES ${HEADERS_srt_win32} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/srt/win)
 endif()
 
 if (ENABLE_EXAMPLES)
