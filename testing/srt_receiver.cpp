@@ -1,6 +1,3 @@
-#ifndef _DEBUG
-#define NDEBUG
-#endif
 #include <assert.h>
 #include <iostream>
 #include <iterator>
