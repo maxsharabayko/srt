@@ -101,16 +101,25 @@ int srt_msgn_send(const char *buffer, size_t buffer_len)
     if (!s_snd_srt_model)
         return -1;
 
-    return srt_send(s_snd_srt_model->Socket(), buffer, (int) buffer_len);
+    return srt_sendmsg(s_snd_srt_model->Socket(), buffer, (int) buffer_len, -1, true);
 }
 
 
-int srt_msgn_recv(char *buffer, size_t buffer_len)
+int srt_msgn_send_on_conn(const char *buffer, size_t buffer_len, int connection_id)
 {
     if (!s_rcv_srt_model)
         return -1;
 
-    return s_rcv_srt_model->Receive(buffer, buffer_len);
+    return s_rcv_srt_model->Send(buffer, buffer_len, connection_id);
+}
+
+
+int srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id)
+{
+    if (!s_rcv_srt_model)
+        return -1;
+
+    return s_rcv_srt_model->Receive(buffer, buffer_len, connection_id);
 }
 
 

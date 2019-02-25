@@ -31,10 +31,12 @@ void test_messaging_localhost()
 
     auto rcv_thread = std::thread([&message_rcvd, &rcv_error, &message_size]
     {
-        const int recv_res = srt_msgn_recv(message_rcvd.data(), message_rcvd.size());
+        int connection_id = 0;
+        const int recv_res = srt_msgn_recv(message_rcvd.data(), message_rcvd.size(), &connection_id);
         if (recv_res != (int) message_size)
         {
-            cerr << "ERROR: Receiving " << message_size << ", received " << recv_res << "\n";
+            cerr << "ERROR: Receiving " << message_size << ", received " << recv_res;
+            cerr << " on conn ID " << connection_id << "\n";
             cerr << srt_msgn_getlasterror_str();
             rcv_error = true;
         }
@@ -106,10 +108,12 @@ void receive_message(const char *uri)
     {
         while (true)
         {
-            const int recv_res = srt_msgn_recv(message_rcvd.data(), message_rcvd.size());
+            int connection_id = 0;
+            const int recv_res = srt_msgn_recv(message_rcvd.data(), message_rcvd.size(), &connection_id);
             if (recv_res <= 0)
             {
-                cerr << "ERROR: Receiving message. Result: " << recv_res << "\n";
+                cerr << "ERROR: Receiving message. Result: " << recv_res;
+                cerr << " on conn ID " << connection_id << "\n";
                 cerr << srt_msgn_getlasterror_str() << endl;
 
                 srt_msgn_destroy(0);
@@ -118,12 +122,12 @@ void receive_message(const char *uri)
 
             if (recv_res < 50)
             {
-                cout << "RECEIVED MESSAGE:\n";
+                cout << "RECEIVED MESSAGE on conn ID " << connection_id << ":\n";
                 cout << string(message_rcvd.data(), recv_res).c_str() << endl;
             }
             else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
             {
-                cout << "RECEIVED MESSAGE (first character):";
+                cout << "RECEIVED MESSAGE on conn ID " << connection_id << " (first character):";
                 cout << message_rcvd[0] << endl;
             }
 

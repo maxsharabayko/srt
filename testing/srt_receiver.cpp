@@ -107,7 +107,8 @@ int SrtReceiver::ConfigureAcceptedSocket(SRTSOCKET sock)
 
 int SrtReceiver::ConfigurePre(SRTSOCKET sock)
 {
-    const int no = 0;
+    const int no  = 0;
+    const int yes = 1;
 
     int result = 0;
     result = srt_setsockopt(sock, 0, SRTO_TSBPDMODE, &no, sizeof no);
@@ -116,6 +117,11 @@ int SrtReceiver::ConfigurePre(SRTSOCKET sock)
 
     // Non-blocking receiving mode
     result = srt_setsockopt(sock, 0, SRTO_RCVSYN, &no, sizeof no);
+    if (result == -1)
+        return result;
+
+    // Blocking sending mode
+    result = srt_setsockopt(sock, 0, SRTO_SNDSYN, &yes, sizeof yes);
     if (result == -1)
         return result;
 
@@ -213,7 +219,7 @@ void SrtReceiver::UpdateReadFIFO(const int rnum, const int wnum)
 
 
 
-int SrtReceiver::Receive(char * buffer, size_t buffer_len)
+int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
 {
     const int wait_ms = 3000;
     while (!m_stop_accept)
@@ -248,7 +254,7 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len)
             Verb();
         }
 
-        // If this is tru, it is really unexpected.
+        // If this is true, it is really unexpected.
         if (rnum <= 0 && wnum <= 0)
             return -2;
 
@@ -265,7 +271,11 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len)
             Verb() << "Read from socket " << sock << " resulted with " << recv_res;
 
             if (recv_res > 0)
+            {
+                if (srt_socket_id != nullptr)
+                    *srt_socket_id = sock;
                 return recv_res;
+            }
 
             const int srt_err = srt_getlasterror(nullptr);
             if (srt_err == SRT_ECONNLOST)   // Broken || Closing
@@ -283,9 +293,19 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len)
             }
 
             // An error happened. Notify the caller of the function.
+            if (srt_socket_id != nullptr)
+                *srt_socket_id = sock;
             return recv_res;
         }
     }
 
     return 0;
 }
+
+
+
+int SrtReceiver::Send(const char *buffer, size_t buffer_len, int srt_socket_id)
+{
+    return srt_sendmsg(srt_socket_id, buffer, (int)buffer_len, -1, true);
+}
+

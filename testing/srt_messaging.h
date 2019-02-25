@@ -55,29 +55,44 @@ SRT_MSGN_API int         srt_msgn_listen (const char *uri, size_t message_size);
 
 
 /**
- * Receive a message.
+ * Send a message.
  *
- * @param buffer        a buffer to send (has be less then the `message_size` used in srt_msngr_listen())
- * @param buffer_len    length of the buffer
+ * @param[in] buffer        a buffer to send (has be less then the `message_size` used in srt_msngr_listen())
+ * @param[in] buffer_len    length of the buffer
  *
- * @return              number of bytes actually sent
- *                      -1 in case of error
- *                       0 in case all the connection are closed
+ * @return                  number of bytes actually sent
+ *                           0 in case of canceled send
+ *                          -1 in case of error
  */
 SRT_MSGN_API int         srt_msgn_send(const char *buffer, size_t buffer_len);
 
 
 /**
- * Send a message.
+ * Send a message on a specified connection ID.
  *
- * @param buffer        a buffer to send (has be less then the `message_size` used in srt_msngr_connect())
- * @param buffer_len    length of the buffer
+ * @param[in] buffer        a buffer to send (has be less then the `message_size` used in srt_msngr_listen())
+ * @param[in] buffer_len    length of the buffer
+ *
+ * @return                  number of bytes actually sent
+ *                           0 in case of canceled send
+ *                          -1 in case of error
+ */
+SRT_MSGN_API int         srt_msgn_send_on_conn(const char *buffer, size_t buffer_len, int connection_id);
+
+
+/**
+ * Receive a message.
+ *
+ * @param[in,out]  buffer     a buffer to receive a message
+ * @param[in]  buffer_len     length of the buffer
+ * @param[out] connection_id  ID of the connection, for which the receive operation has hapened
  *
  * @return              number of bytes actually received
+ *                       0 in case of canceled receive
  *                      -1 in case of error
- *                       0 in case all the connections are closed
+ *                      -2 in case of unexpected error
  */
-SRT_MSGN_API int         srt_msgn_recv(char *buffer, size_t buffer_len);
+SRT_MSGN_API int         srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id);
 
 
 

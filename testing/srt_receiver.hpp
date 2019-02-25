@@ -24,7 +24,10 @@ public:
     // return     -2 unexpected error
     //            -1 SRT error
     //
-    int Receive(char *buffer, size_t buffer_len);
+    int Receive(char *buffer, size_t buffer_len, int *srt_socket_id);
+
+
+    int Send(const char *buffer, size_t buffer_len, int srt_socket_id);
 
 
 private:
