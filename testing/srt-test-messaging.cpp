@@ -131,6 +131,9 @@ void receive_message(const char *uri)
                 cout << message_rcvd[0] << endl;
             }
 
+            const string out_message("Message received");
+            const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
+
             if (int_state)
             {
                 cerr << "\n (interrupted on request)\n";
@@ -188,6 +191,18 @@ void send_message(const char *uri, const char* message, size_t length)
             break;
         }
         cout << "SENT MESSAGE #" << i << "\n";
+    }
+
+    for (int i = 0; i < 6; ++i)
+    {
+        const int rcv_res = srt_msgn_recv(message_to_send.data(), message_to_send.size(), nullptr);
+        if (sent_res <= 0)
+        {
+            cerr << "ERROR: Receiving message. Result: " << rcv_res << "\n";
+            cerr << srt_msgn_getlasterror_str() << endl;
+            srt_msgn_destroy();
+            return;
+        }
     }
 
     //this_thread::sleep_for(10s);
