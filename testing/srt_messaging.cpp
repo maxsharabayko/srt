@@ -8,7 +8,7 @@
 using namespace std;
 
 static unique_ptr<SrtReceiver> s_rcv_srt_model;
-static unique_ptr<SrtModel>    s_snd_srt_model;
+//static unique_ptr<SrtModel>    s_snd_srt_model;
 
 static list<SRTSOCKET> s_rcv_sockets;
 static list<SRTSOCKET> s_snd_socket;
@@ -35,20 +35,16 @@ int srt_msgn_connect(const char *uri, size_t message_size)
         ut["sndbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
     }
 
-    s_snd_srt_model = unique_ptr<SrtModel>(new SrtModel(ut.host(), ut.portno(), ut.parameters()));
+    s_rcv_srt_model = unique_ptr<SrtReceiver>(new SrtReceiver(ut.host(), ut.portno(), ut.parameters()));
 
-    try
+    const int res = s_rcv_srt_model->Connect();
+    if (res == SRT_INVALID_SOCK)
     {
-        string connection_id;
-        s_snd_srt_model->Establish(Ref(connection_id));
-    }
-    catch (TransmissionError &err)
-    {
-        cerr << "ERROR! While setting up a listener: " << err.what() << endl;
-        return -1;
+        cerr << "ERROR! While setting up a caller\n";
+        return res;
     }
 
-    return s_snd_srt_model->Socket();
+    return 0;
 }
 
 
@@ -98,10 +94,10 @@ int srt_msgn_listen(const char *uri, size_t message_size)
 
 int srt_msgn_send(const char *buffer, size_t buffer_len)
 {
-    if (!s_snd_srt_model)
+    if (!s_rcv_srt_model)
         return -1;
 
-    return srt_sendmsg(s_snd_srt_model->Socket(), buffer, (int) buffer_len, -1, true);
+    return s_rcv_srt_model->Send(buffer, buffer_len);
 }
 
 
@@ -135,30 +131,26 @@ int srt_msgn_getlasterror(void)
 }
 
 
-int srt_msgn_destroy(int instance_type)
+int srt_msgn_destroy()
 {
-    const bool destroy_sender = instance_type == 0 || instance_type == 1;
-    if (s_snd_srt_model && destroy_sender)
+    if (!s_rcv_srt_model)
+        return 0;
+
+    // We have to check if the sending buffer is empty.
+    // Or we will loose this data.
+    const SRTSOCKET sock = s_rcv_srt_model->GetBindSocket();
+    size_t blocks = 0;
+    do
     {
-        // We have to check if the sending buffer is empty.
-        // Or we will loose this data.
-        const SRTSOCKET sock = s_snd_srt_model->Socket();
-        size_t blocks = 0;
-        do
-        {
-            if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
-                break;
+        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
+            break;
 
-            if (blocks)
-                this_thread::sleep_for(chrono::milliseconds(5));
-        } while (blocks != 0);
+        if (blocks)
+            this_thread::sleep_for(chrono::milliseconds(5));
+    } while (blocks != 0);
 
-        s_snd_srt_model.reset();
-    }
+    s_rcv_srt_model.reset();
 
-    const bool destroy_receiver = instance_type == 0 || instance_type == 2;
-    if (destroy_receiver)
-        s_rcv_srt_model.reset();
     return 0;
 }
 

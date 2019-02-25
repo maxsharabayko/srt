@@ -20,6 +20,9 @@ public:
 
     int Listen(int max_conn);
 
+    int Connect();
+
+
     // Receive data
     // return     -2 unexpected error
     //            -1 SRT error
@@ -30,7 +33,17 @@ public:
     int Send(const char *buffer, size_t buffer_len, int srt_socket_id);
 
 
+    int Send(const char *buffer, size_t buffer_len);
+
+
+public:
+
+    SRTSOCKET GetBindSocket() { return m_bindsock; }
+
+
 private:
+
+    int EstablishConnection(bool caller, int max_conn);
 
     void AcceptingThread();
 

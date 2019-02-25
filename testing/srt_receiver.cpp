@@ -18,7 +18,7 @@ SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> pa
     , m_port(port)
     , m_options(par)
 {
-    //Verbose::on = true;
+    Verbose::on = true;
     srt_startup();
 
     m_epoll_accept  = srt_epoll_create();
@@ -33,7 +33,8 @@ SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> pa
 SrtReceiver::~SrtReceiver()
 {
     m_stop_accept = true;
-    m_accepting_thread.join();
+    if (m_accepting_thread.joinable())
+        m_accepting_thread.join();
 }
 
 
@@ -92,7 +93,12 @@ SRTSOCKET SrtReceiver::AcceptNewClient()
 int SrtReceiver::ConfigureAcceptedSocket(SRTSOCKET sock)
 {
     bool no = false;
-    const int result = srt_setsockopt(sock, 0, SRTO_RCVSYN, &no, sizeof no);
+    const int yes = 1;
+    int result = srt_setsockopt(sock, 0, SRTO_RCVSYN, &no, sizeof no);
+    if (result == -1)
+        return result;
+
+    result = srt_setsockopt(sock, 0, SRTO_SNDSYN, &yes, sizeof yes);
     if (result == -1)
         return result;
 
@@ -150,7 +156,7 @@ int SrtReceiver::ConfigurePre(SRTSOCKET sock)
 }
 
 
-int SrtReceiver::Listen(int max_conn)
+int SrtReceiver::EstablishConnection(bool caller, int max_conn)
 {
     m_bindsock = srt_create_socket();
 
@@ -166,28 +172,69 @@ int SrtReceiver::Listen(int max_conn)
 
     sockaddr_in sa = CreateAddrInet(m_host, m_port);
     sockaddr* psa = (sockaddr*)&sa;
-    Verb() << "Binding a server on " << m_host << ":" << m_port << VerbNoEOL;
-    stat = srt_bind(m_bindsock, psa, sizeof sa);
-    if (stat == SRT_ERROR)
-    {
-        srt_close(m_bindsock);
-        return SRT_ERROR;
-    }
-    Verb() << " listening";
 
-    stat = srt_listen(m_bindsock, max_conn);
-    if (stat == SRT_ERROR)
+    if (caller)
     {
-        srt_close(m_bindsock);
-        return SRT_ERROR;
+        const int no = 0;
+        const int yes = 1;
+
+        int result = 0;
+        result = srt_setsockopt(m_bindsock, 0, SRTO_RCVSYN, &yes, sizeof yes);
+        if (result == -1)
+            return result;
+
+        Verb() << "Connecting to " << m_host << ":" << m_port << " ... " << VerbNoEOL;
+        int stat = srt_connect(m_bindsock, psa, sizeof sa);
+        if (stat == SRT_ERROR)
+        {
+            srt_close(m_bindsock);
+            return SRT_ERROR;
+        }
+
+        result = srt_setsockopt(m_bindsock, 0, SRTO_RCVSYN, &no, sizeof no);
+        if (result == -1)
+            return result;
+
+        const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
+        srt_epoll_add_usock(m_epoll_receive, m_bindsock, &events);
+    }
+    else
+    {
+        Verb() << "Binding a server on " << m_host << ":" << m_port << VerbNoEOL;
+        stat = srt_bind(m_bindsock, psa, sizeof sa);
+        if (stat == SRT_ERROR)
+        {
+            srt_close(m_bindsock);
+            return SRT_ERROR;
+        }
+
+        Verb() << " listening";
+        stat = srt_listen(m_bindsock, max_conn);
+        if (stat == SRT_ERROR)
+        {
+            srt_close(m_bindsock);
+            return SRT_ERROR;
+        }
+
+        m_accepting_thread = thread(&SrtReceiver::AcceptingThread, this);
     }
 
     m_epoll_read_fds .assign(max_conn, SRT_INVALID_SOCK);
     m_epoll_write_fds.assign(max_conn, SRT_INVALID_SOCK);
 
-    m_accepting_thread = thread(&SrtReceiver::AcceptingThread, this);
-
     return 0;
+}
+
+
+int SrtReceiver::Listen(int max_conn)
+{
+    return EstablishConnection(false, max_conn);
+}
+
+
+int SrtReceiver::Connect()
+{
+    return EstablishConnection(true, 1);
 }
 
 
@@ -307,5 +354,11 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
 int SrtReceiver::Send(const char *buffer, size_t buffer_len, int srt_socket_id)
 {
     return srt_sendmsg(srt_socket_id, buffer, (int)buffer_len, -1, true);
+}
+
+
+int SrtReceiver::Send(const char *buffer, size_t buffer_len)
+{
+    return srt_sendmsg(m_bindsock, buffer, (int)buffer_len, -1, true);
 }
 

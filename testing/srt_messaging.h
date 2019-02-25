@@ -105,11 +105,9 @@ SRT_MSGN_API int         srt_msgn_getlasterror(void);
 /**
  * Destroy the messaging service
  *
- * @param instance_type 1 - sender; 2 - receiver; 0 - both
- *
  * @return              0
  */
-SRT_MSGN_API int         srt_msgn_destroy(int instance_type);
+SRT_MSGN_API int         srt_msgn_destroy();
 
 
 #ifdef __cplusplus
