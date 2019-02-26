@@ -86,7 +86,7 @@ SRT_MSGN_API int         srt_msgn_send_on_conn(const char *buffer, size_t buffer
  *
  * @param[in] wait_ms       wait timeout in ms
  *                          -1 to wait forever
- *                           0 to check the state and return immidiately
+ *                           0 to check the state and return immediately
  *
  * @return                  number of bytes remain unacknowledged
  *                           0 in case there is no outgoing data unacknowledged

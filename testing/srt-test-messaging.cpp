@@ -133,6 +133,15 @@ void receive_message(const char *uri)
 
             const string out_message("Message received");
             const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
+            if (send_res <= 0)
+            {
+                cerr << "ERROR: Sending reply message. Result: " << send_res;
+                cerr << " on conn ID " << connection_id << "\n";
+                cerr << srt_msgn_getlasterror_str() << endl;
+
+                srt_msgn_destroy();
+                return;
+            }
 
             if (int_state)
             {

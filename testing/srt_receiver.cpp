@@ -18,7 +18,7 @@ SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> pa
     , m_port(port)
     , m_options(par)
 {
-    Verbose::on = true;
+    //Verbose::on = true;
     srt_startup();
 
     m_epoll_accept  = srt_epoll_create();
