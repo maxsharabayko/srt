@@ -8,10 +8,6 @@
 using namespace std;
 
 static unique_ptr<SrtReceiver> s_rcv_srt_model;
-//static unique_ptr<SrtModel>    s_snd_srt_model;
-
-static list<SRTSOCKET> s_rcv_sockets;
-static list<SRTSOCKET> s_snd_socket;
 
 
 int srt_msgn_connect(const char *uri, size_t message_size)
@@ -110,6 +106,35 @@ int srt_msgn_send_on_conn(const char *buffer, size_t buffer_len, int connection_
 }
 
 
+int srt_msgn_wait_delievered(int wait_ms)
+{
+    if (!s_rcv_srt_model)
+        return SRT_ERROR;
+
+    const SRTSOCKET sock = s_rcv_srt_model->GetBindSocket();
+    size_t blocks = 0;
+    size_t bytes  = 0;
+    int ms_passed = 0;
+    do
+    {
+        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, &bytes))
+            return SRT_ERROR;
+
+        if (wait_ms == 0)
+            break;
+
+        if (wait_ms != -1 && ms_passed >= wait_ms)
+            break;
+
+        if (blocks)
+            this_thread::sleep_for(chrono::milliseconds(1));
+        ++ms_passed;
+    } while (blocks != 0);
+
+    return bytes;
+}
+
+
 int srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id)
 {
     if (!s_rcv_srt_model)
@@ -136,21 +161,7 @@ int srt_msgn_destroy()
     if (!s_rcv_srt_model)
         return 0;
 
-    // We have to check if the sending buffer is empty.
-    // Or we will loose this data.
-    const SRTSOCKET sock = s_rcv_srt_model->GetBindSocket();
-    size_t blocks = 0;
-    do
-    {
-        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
-            break;
-
-        if (blocks)
-            this_thread::sleep_for(chrono::milliseconds(5));
-    } while (blocks != 0);
-
     s_rcv_srt_model.reset();
-
     return 0;
 }
 

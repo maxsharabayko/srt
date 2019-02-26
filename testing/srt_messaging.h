@@ -81,6 +81,21 @@ SRT_MSGN_API int         srt_msgn_send_on_conn(const char *buffer, size_t buffer
 
 
 /**
+ * Wait for all the outgoing data to be acknowledged by the receiver.
+ * This ensures that the data is delivered, so the connection can be safely closed.
+ *
+ * @param[in] wait_ms       wait timeout in ms
+ *                          -1 to wait forever
+ *                           0 to check the state and return immidiately
+ *
+ * @return                  number of bytes remain unacknowledged
+ *                           0 in case there is no outgoing data unacknowledged
+ *                          -1 in case of error
+ */
+SRT_MSGN_API int         srt_msgn_wait_delievered(int wait_ms);
+
+
+/**
  * Receive a message.
  *
  * @param[in,out]  buffer     a buffer to receive a message

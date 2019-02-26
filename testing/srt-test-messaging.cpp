@@ -146,6 +146,11 @@ void receive_message(const char *uri)
         cerr<< "EXCEPTION: " << ex.what() << endl;
     }
 
+    const int undelivered = srt_msgn_wait_delievered(5000);
+    if (undelivered)
+    {
+        cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
+    }
     srt_msgn_destroy();
 }
 
@@ -196,16 +201,23 @@ void send_message(const char *uri, const char* message, size_t length)
     for (int i = 0; i < 6; ++i)
     {
         const int rcv_res = srt_msgn_recv(message_to_send.data(), message_to_send.size(), nullptr);
-        if (sent_res <= 0)
+        if (rcv_res <= 0)
         {
             cerr << "ERROR: Receiving message. Result: " << rcv_res << "\n";
             cerr << srt_msgn_getlasterror_str() << endl;
             srt_msgn_destroy();
             return;
         }
+
+        cout << "RECEIVED MESSAGE:\n";
+        cout << string(message_to_send.data(), rcv_res).c_str() << endl;
     }
 
-    //this_thread::sleep_for(10s);
+    const int undelivered = srt_msgn_wait_delievered(5000);
+    if (undelivered)
+    {
+        cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
+    }
     srt_msgn_destroy();
 }
 
