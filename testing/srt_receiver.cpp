@@ -271,6 +271,8 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
     const int wait_ms = 3000;
     while (!m_stop_accept)
     {
+        lock_guard<mutex> lock(m_recv_mutex);
+
         fill(m_epoll_read_fds.begin(),  m_epoll_read_fds.end(),  SRT_INVALID_SOCK);
         fill(m_epoll_write_fds.begin(), m_epoll_write_fds.end(), SRT_INVALID_SOCK);
         int rnum = (int) m_epoll_read_fds .size();

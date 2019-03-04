@@ -2,6 +2,7 @@
 #include <list>
 #include <queue>
 #include <atomic>
+#include <mutex>
 #include "srt.h"
 #include "uriparser.hpp"
 #include "testmedia.hpp"
@@ -70,6 +71,7 @@ private:
 private:
 
     std::atomic<bool> m_stop_accept = { false };
+    std::mutex        m_recv_mutex;
 
     std::thread m_accepting_thread;
 
