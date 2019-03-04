@@ -783,6 +783,20 @@ if (ENABLE_MESSAGING_LIB AND ENABLE_CXX11)
 		${CMAKE_SOURCE_DIR}/apps/verbose.hpp
 	)
 
+	macro(srt_add_testprogram name)
+		# Variables in macros are not local. Clear them forcefully.
+		set (SOURCES_app_indir "")
+		set (SOURCES_app "")
+		# Unlike Silvercat, in cmake you must know the full list
+		# of source files at the moment when defining the target
+		# and it can't be altered later.
+		#
+		# For testing applications, every application has its exclusive
+		# list of source files in its own Manifest file.
+		MafReadDir(testing ${name}.maf SOURCES SOURCES_app)
+		srt_add_program(${name} ${SOURCES_app})
+	endmacro()
+
 	target_compile_options(${TARGET_srt_messaging} PRIVATE ${CFLAGS_CXX_STANDARD})
 	target_include_directories(${TARGET_srt_messaging} PRIVATE common)
 	target_include_directories(${TARGET_srt_messaging} PRIVATE apps)

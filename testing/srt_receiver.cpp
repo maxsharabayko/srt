@@ -21,7 +21,6 @@ std::string print_time()
 
     time_t time = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     tm *tm  = localtime(&time);
-    time_t sec = time / 1000000;
     time_t usec = time % 1000000;
 
     char tmp_buf[512];
@@ -36,21 +35,13 @@ std::string print_time()
 }
 
 
-//auto print_time()
-//{
-//
-//    std::time_t now_c = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-//    return std::put_time(std::localtime(&now_c), "%T ");
-//};
-
-
 
 SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> par)
     : m_host(host)
     , m_port(port)
     , m_options(par)
 {
-    Verbose::on = true;
+    //Verbose::on = true;
     srt_startup();
     //srt_setloglevel(LOG_DEBUG);
 
@@ -320,10 +311,7 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             wait_ms, 0, 0, 0, 0);
 
         if (epoll_res <= 0)    // Wait timeout
-        {
-            Verb() << print_time() << "Receive: epoll_res " << epoll_res;
             continue;
-        }
 
         assert(rnum > 0);
         assert(wnum <= rnum);

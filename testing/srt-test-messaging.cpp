@@ -21,6 +21,8 @@ void OnINT_ForceExit(int)
     if (undelivered)
     {
         cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
+        if (undelivered == -1)
+            cerr << srt_msgn_getlasterror_str() << "\n";
     }
     srt_msgn_destroy();
 }

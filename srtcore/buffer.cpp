@@ -485,7 +485,7 @@ void CSndBuffer::ackData(int offset)
 
    bool move = false;
    //cerr << "CSndBuffer::ackData() -" << offset << " packets (";
-   const int prev_bytes = m_iBytesCount;
+   //const int prev_bytes = m_iBytesCount;
    for (int i = 0; i < offset; ++ i)
    {
       m_iBytesCount -= m_pFirstBlock->m_iLength;
