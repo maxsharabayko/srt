@@ -74,6 +74,7 @@ modified by
 #include "common.h"
 #include "epoll.h"
 #include "udt.h"
+#include "logging.h"
 
 using namespace std;
 
@@ -409,6 +410,10 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
          for (set<SRTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
             readfds->insert(*i);
          total += p->second.m_sUDTReads.size() + p->second.m_sUDTExcepts.size();
+         std::cerr << "Sockets with exceptions are returned to both read and write sets\n";
+         std::cerr << "Total increased to " << total
+                   << ". m_sUDTReads "   << p->second.m_sUDTReads.size()
+                   << ". m_sUDTExcepts " << p->second.m_sUDTExcepts.size() << std::endl;
       }
       if ((NULL != writefds) && (!p->second.m_sUDTWrites.empty() || !p->second.m_sUDTExcepts.empty()))
       {
@@ -416,6 +421,10 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
          for (set<SRTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
             writefds->insert(*i);
          total += p->second.m_sUDTWrites.size() + p->second.m_sUDTExcepts.size();
+         std::cerr << "Sockets in write sets\n";
+         std::cerr << "Total increased to " << total
+             << ". m_sUDTWrites " << p->second.m_sUDTWrites.size()
+             << ". m_sUDTExcepts " << p->second.m_sUDTExcepts.size() << std::endl;
       }
 
       if (lrfds || lwfds)
@@ -513,7 +522,10 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
       CGuard::leaveCS(m_EPollLock);
 
       if (total > 0)
+      {
+          cerr << "CEpoll::wait(): total > 0 " << srt_logging::FormatTime(CTimer::getTime()) << endl;
           return total;
+      }
 
       if ((msTimeOut >= 0) && (int64_t(CTimer::getTime() - entertime) >= msTimeOut * int64_t(1000)))
          throw CUDTException(MJ_AGAIN, MN_XMTIMEOUT, 0);

@@ -1,6 +1,9 @@
 #include <assert.h>
 #include <iostream>
 #include <iterator>
+#include <iomanip>
+#include <ctime>
+#include <chrono>
 #include "apputil.hpp"  // CreateAddrInet
 #include "uriparser.hpp"  // UriParser
 #include "socketoptions.hpp"
@@ -13,12 +16,20 @@ using namespace std;
 
 
 
+auto print_time()
+{
+    std::time_t now_c = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    return std::put_time(std::localtime(&now_c), "%T ");
+};
+
+
+
 SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> par)
     : m_host(host)
     , m_port(port)
     , m_options(par)
 {
-    //Verbose::on = true;
+    Verbose::on = true;
     srt_startup();
 
     m_epoll_accept  = srt_epoll_create();
@@ -35,6 +46,8 @@ SrtReceiver::~SrtReceiver()
     m_stop_accept = true;
     if (m_accepting_thread.joinable())
         m_accepting_thread.join();
+
+    lock_guard<mutex> lock(m_recv_mutex);
 }
 
 
@@ -56,7 +69,8 @@ void SrtReceiver::AcceptingThread()
             if (sock != SRT_INVALID_SOCK)
             {
                 const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-                srt_epoll_add_usock(m_epoll_receive, sock, &events);
+                const int res = srt_epoll_add_usock(m_epoll_receive, sock, &events);
+                Verb() << print_time() << "AcceptingThread: added socket " << sock << " tp epoll res " << res;
             }
         }
     }
@@ -284,7 +298,10 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             wait_ms, 0, 0, 0, 0);
 
         if (epoll_res <= 0)    // Wait timeout
+        {
+            Verb() << print_time() << "Receive: epoll_res " << epoll_res;
             continue;
+        }
 
         assert(rnum > 0);
         assert(wnum <= rnum);
@@ -310,6 +327,11 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
         // Update m_read_fifo based on sockets in m_epoll_read_fds
         UpdateReadFIFO(rnum, wnum);
 
+        Verb() << "   m_read_fifo: " << VerbNoEOL;
+        copy(m_read_fifo.begin(), m_read_fifo.end(),
+            ostream_iterator<int>(*Verbose::cverb, ", "));
+        Verb();
+
         auto sock_it = m_read_fifo.begin();
         while (sock_it != m_read_fifo.end())
         {
@@ -317,7 +339,7 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             m_read_fifo.erase(sock_it++);
 
             const int recv_res = srt_recvmsg2(sock, buffer, (int)buffer_len, nullptr);
-            Verb() << "Read from socket " << sock << " resulted with " << recv_res;
+            Verb() << print_time() << "Read from socket " << sock << " resulted with " << recv_res;
 
             if (recv_res > 0)
             {
@@ -329,13 +351,13 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             const int srt_err = srt_getlasterror(nullptr);
             if (srt_err == SRT_ECONNLOST)   // Broken || Closing
             {
-                Verb() << "Socket " << sock << " lost connection. Remove from epoll.";
+                Verb() << print_time() << "Socket " << sock << " lost connection. Remove from epoll.";
                 srt_close(sock);
                 continue;
             }
             else if (srt_err == SRT_EINVSOCK)
             {
-                Verb() << "Socket " << sock << " is no longer valid (state "
+                Verb() << print_time() << "Socket " << sock << " is no longer valid (state "
                        << srt_getsockstate(sock) << "). Remove from epoll.";
                 srt_epoll_remove_usock(m_epoll_receive, sock);
                 continue;

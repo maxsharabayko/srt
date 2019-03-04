@@ -17,6 +17,11 @@ void OnINT_ForceExit(int)
 {
     cerr << "\n-------- REQUESTED INTERRUPT!\n";
     int_state = true;
+    const int undelivered = srt_msgn_wait_delievered(5000);
+    if (undelivered)
+    {
+        cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
+    }
     srt_msgn_destroy();
 }
 
@@ -142,6 +147,7 @@ void receive_message(const char *uri)
                 srt_msgn_destroy();
                 return;
             }
+            cout << "Reply sent on conn ID " << connection_id << ":\n";
 
             if (int_state)
             {
@@ -155,11 +161,7 @@ void receive_message(const char *uri)
         cerr<< "EXCEPTION: " << ex.what() << endl;
     }
 
-    const int undelivered = srt_msgn_wait_delievered(5000);
-    if (undelivered)
-    {
-        cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
-    }
+
     srt_msgn_destroy();
 }
 
@@ -209,6 +211,7 @@ void send_message(const char *uri, const char* message, size_t length)
 
     for (int i = 0; i < 6; ++i)
     {
+        cout << "WAITING FOR MESSAGE no." << i << "\n";
         const int rcv_res = srt_msgn_recv(message_to_send.data(), message_to_send.size(), nullptr);
         if (rcv_res <= 0)
         {
@@ -218,7 +221,7 @@ void send_message(const char *uri, const char* message, size_t length)
             return;
         }
 
-        cout << "RECEIVED MESSAGE:\n";
+        cout << "RECEIVED MESSAGE no." << i << ":\n";
         cout << string(message_to_send.data(), rcv_res).c_str() << endl;
     }
 

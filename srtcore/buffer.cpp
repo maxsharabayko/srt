@@ -200,7 +200,9 @@ void CSndBuffer::addBuffer(const char* data, int len, int ttl, bool order, uint6
     CGuard::enterCS(m_BufLock);
     m_iCount += size;
 
+    //cerr << "CSndBuffer::addBuffer() m_iBytesCount " << m_iBytesCount << " + " << len;
     m_iBytesCount += len;
+    //cerr << " = " << m_iBytesCount << endl;
     m_ullLastOriginTime_us = time;
 
     updInputRate(time, size, len);
@@ -338,7 +340,9 @@ int CSndBuffer::addBufferFromFile(fstream& ifs, int len)
 
    CGuard::enterCS(m_BufLock);
    m_iCount += size;
+   //cerr << "CSndBuffer::addBufferFromFile() m_iBytesCount " << m_iBytesCount << " + " << total;
    m_iBytesCount += total;
+   //cerr << " = " << m_iBytesCount << endl;
 
    CGuard::leaveCS(m_BufLock);
 
@@ -480,6 +484,8 @@ void CSndBuffer::ackData(int offset)
    CGuard bufferguard(m_BufLock);
 
    bool move = false;
+   //cerr << "CSndBuffer::ackData() -" << offset << " packets (";
+   const int prev_bytes = m_iBytesCount;
    for (int i = 0; i < offset; ++ i)
    {
       m_iBytesCount -= m_pFirstBlock->m_iLength;
@@ -487,6 +493,7 @@ void CSndBuffer::ackData(int offset)
           move = true;
       m_pFirstBlock = m_pFirstBlock->m_pNext;
    }
+   //cerr << prev_bytes << " bytes, still in buffer: " << m_iBytesCount << ")" << endl;
    if (move)
        m_pCurrBlock = m_pFirstBlock;
 
@@ -590,7 +597,9 @@ int CSndBuffer::dropLateData(int &bytes, uint64_t latetime)
    if (move) m_pCurrBlock = m_pFirstBlock;
    m_iCount -= dpkts;
 
+   //cerr << "Dropping " << dbytes << " bytes (" << m_iBytesCount;
    m_iBytesCount -= dbytes;
+   //cout << " -> " << m_iBytesCount << endl;
    bytes = dbytes;
 
 #ifdef SRT_ENABLE_SNDBUFSZ_MAVG
