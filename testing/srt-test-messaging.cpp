@@ -17,7 +17,7 @@ void OnINT_ForceExit(int)
 {
     cerr << "\n-------- REQUESTED INTERRUPT!\n";
     int_state = true;
-    const int undelivered = srt_msgn_wait_delievered(5000);
+    const int undelivered = srt_msgn_wait_undelievered(5000);
     if (undelivered)
     {
         cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
@@ -227,7 +227,7 @@ void send_message(const char *uri, const char* message, size_t length)
         cout << string(message_to_send.data(), rcv_res).c_str() << endl;
     }
 
-    const int undelivered = srt_msgn_wait_delievered(5000);
+    const int undelivered = srt_msgn_wait_undelievered(5000);
     if (undelivered)
     {
         cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";

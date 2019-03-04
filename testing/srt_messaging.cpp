@@ -106,7 +106,7 @@ int srt_msgn_send_on_conn(const char *buffer, size_t buffer_len, int connection_
 }
 
 
-int srt_msgn_wait_delievered(int wait_ms)
+int srt_msgn_wait_undelievered(int wait_ms)
 {
     if (!s_rcv_srt_model)
         return SRT_ERROR;

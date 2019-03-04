@@ -92,7 +92,7 @@ SRT_MSGN_API int         srt_msgn_send_on_conn(const char *buffer, size_t buffer
  *                           0 in case there is no outgoing data unacknowledged
  *                          -1 in case of error
  */
-SRT_MSGN_API int         srt_msgn_wait_delievered(int wait_ms);
+SRT_MSGN_API int         srt_msgn_wait_undelievered(int wait_ms);
 
 
 /**
