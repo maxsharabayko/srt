@@ -16,11 +16,32 @@ using namespace std;
 
 
 
-auto print_time()
+std::string print_time()
 {
-    std::time_t now_c = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    return std::put_time(std::localtime(&now_c), "%T ");
-};
+
+    time_t time = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    tm *tm  = localtime(&time);
+    time_t sec = time / 1000000;
+    time_t usec = time % 1000000;
+
+    char tmp_buf[512];
+#ifdef _WIN32
+    strftime(tmp_buf, 512, "%T.", tm);
+#else
+    strftime(tmp_buf, 512, "%T.", tm);
+#endif
+    ostringstream out;
+    out << tmp_buf << setfill('0') << setw(6) << usec << " ";
+    return out.str();
+}
+
+
+//auto print_time()
+//{
+//
+//    std::time_t now_c = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+//    return std::put_time(std::localtime(&now_c), "%T ");
+//};
 
 
 
@@ -31,6 +52,7 @@ SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> pa
 {
     Verbose::on = true;
     srt_startup();
+    //srt_setloglevel(LOG_DEBUG);
 
     m_epoll_accept  = srt_epoll_create();
     if (m_epoll_accept == -1)
