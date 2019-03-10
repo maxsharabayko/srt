@@ -50,27 +50,27 @@ UriParser::~UriParser(void)
 {
 }
 
-string UriParser::proto(void)
+string UriParser::proto(void) const
 {
     return m_proto;
 }
 
-UriParser::Type UriParser::type()
+UriParser::Type UriParser::type() const
 {
     return m_uriType;
 }
 
-string UriParser::host(void)
+string UriParser::host(void) const
 {
     return m_host;
 }
 
-string UriParser::port(void)
+string UriParser::port(void) const
 {
     return m_port;
 }
 
-unsigned short int UriParser::portno(void)
+unsigned short int UriParser::portno(void) const
 {
     // This returns port in numeric version. Fallback to 0.
     try
@@ -86,7 +86,7 @@ unsigned short int UriParser::portno(void)
     }
 }
 
-string UriParser::path(void)
+string UriParser::path(void) const
 {
     return m_path;
 }

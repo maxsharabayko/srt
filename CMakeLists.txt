@@ -819,6 +819,7 @@ if (ENABLE_UNITTESTS AND ENABLE_CXX11)
 		test_srt
 		${GTEST_BOTH_LIBRARIES}
 		${srt_link_library}
+        srtsupport_virtual
 		${PTHREAD_LIBRARY}
 		)
 
