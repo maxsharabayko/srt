@@ -68,7 +68,7 @@ int srt_msgn_listen(const char *uri, size_t message_size)
     }
     
     // If we have this parameter provided, probably someone knows better
-    if (!ut["rcvbuf"].exists())
+    if (!ut["rcvbuf"].exists() && ut.queryValue("transtype") != "live")
     {
         ut["rcvbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
     }
