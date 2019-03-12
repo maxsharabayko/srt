@@ -134,7 +134,7 @@ void receive_message(const char *uri)
             }
             else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
             {
-                cout << "RECEIVED MESSAGE on conn ID " << connection_id << " (first character):";
+                cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id << " (first character):";
                 cout << message_rcvd[0] << endl;
             }
 

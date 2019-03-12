@@ -54,7 +54,9 @@ int srt_msgn_listen(const char *uri, size_t message_size)
         return -1;
     }
 
-    ut["transtype"]  = string("file");
+    if (!ut["transtype"].exists())
+        ut["transtype"]  = string("file");
+
     ut["messageapi"] = string("true");
     ut["blocking"]   = string("true");
     ut["mode"]       = string("listener");
