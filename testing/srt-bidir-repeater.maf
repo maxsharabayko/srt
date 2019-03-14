@@ -1,0 +1,17 @@
+
+SOURCES
+srt-bidir-repeater.cpp
+srt_receiver.hpp
+srt_receiver.cpp
+srt_messaging.h
+srt_messaging.cpp
+testmedia.cpp
+testmedia.hpp
+testmediabase.hpp
+../apps/uriparser.cpp
+../apps/uriparser.hpp
+../apps/socketoptions.cpp
+../apps/socketoptions.hpp
+../apps/verbose.cpp
+../apps/verbose.hpp
+
