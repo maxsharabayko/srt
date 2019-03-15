@@ -4,22 +4,22 @@
 #include <iomanip>
 #include <ctime>
 #include <chrono>
+#include <array>
+#include <future>
 #include "apputil.hpp"  // CreateAddrInet
 #include "uriparser.hpp"  // UriParser
 #include "socketoptions.hpp"
 #include "logsupport.hpp"
 #include "verbose.hpp"
-#include "srt_receiver.hpp"
-
+#include "srt_node.hpp"
 
 
 using namespace std;
 
 
 
-std::string print_time()
+inline std::string print_ts()
 {
-
     time_t time = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     tm *tm  = localtime(&time);
     time_t usec = time % 1000000;
@@ -37,16 +37,13 @@ std::string print_time()
 
 
 
-SrtReceiver::SrtReceiver(std::string host, int port,
-                         std::map<string, string> params, bool accept_once)
-    : m_host(host)
-    , m_port(port)
-    , m_options(params)
-    , m_accept_once(accept_once)
+SrtNode::SrtNode(const UriParser &src_uri)
+    : m_host(src_uri.host())
+    , m_port(src_uri.portno())
+    , m_options(src_uri.parameters())
 {
-    Verbose::on = true;
     srt_startup();
-    //srt_setloglevel(LOG_DEBUG);
+    //Verbose::on = true;
 
     m_epoll_accept  = srt_epoll_create();
     if (m_epoll_accept == -1)
@@ -57,7 +54,7 @@ SrtReceiver::SrtReceiver(std::string host, int port,
 }
 
 
-SrtReceiver::~SrtReceiver()
+SrtNode::~SrtNode()
 {
     m_stop_accept = true;
     if (m_accepting_thread.joinable())
@@ -67,15 +64,22 @@ SrtReceiver::~SrtReceiver()
 }
 
 
-void SrtReceiver::AcceptingThread()
+std::future<SRTSOCKET> SrtNode::AcceptConnection(const volatile std::atomic_bool& force_break)
+{
+    return async(std::launch::async, &SrtNode::AcceptingThread, this, std::ref(force_break));
+}
+
+
+
+SRTSOCKET SrtNode::AcceptingThread(const volatile std::atomic_bool& force_break)
 {
     int rnum = 2;
     SRTSOCKET read_fds[2] = {};
 
-    while (!m_stop_accept)
+    while (!force_break)
     {
         const int epoll_res 
-            = srt_epoll_wait(m_epoll_accept, read_fds, &rnum, 0, 0, 3000,
+            = srt_epoll_wait(m_epoll_accept, read_fds, &rnum, 0, 0, 500,
                                                     0,     0, 0, 0);
 
         if (epoll_res > 0)
@@ -91,16 +95,18 @@ void SrtReceiver::AcceptingThread()
                 
                 const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
                 const int res = srt_epoll_add_usock(m_epoll_receive, sock, &events);
-                Verb() << print_time() << "AcceptingThread: added socket " << sock << " tp epoll res " << res;
+                Verb() << print_ts() << "AcceptingThread: added socket " << sock << " tp epoll res " << res;
                 Verb() << "m_accepted_sockets: " << m_accepted_sockets.size();
-                m_accept_barrier.set_value();
+                return sock;
             }
         }
     }
+
+    return SRT_ERROR;
 }
 
 
-SRTSOCKET SrtReceiver::AcceptNewClient()
+SRTSOCKET SrtNode::AcceptNewClient()
 {
     sockaddr_in scl;
     int sclen = sizeof scl;
@@ -110,11 +116,11 @@ SRTSOCKET SrtReceiver::AcceptNewClient()
     const SRTSOCKET socket = srt_accept(m_bindsock, (sockaddr*)&scl, &sclen);
     if (socket == SRT_INVALID_SOCK)
     {
-        Verb() << " failed: " << srt_getlasterror_str();
+        Verb() << "Accept failed: " << srt_getlasterror_str();
         return socket;
     }
 
-    Verb() << " connected " << socket;
+    Verb() << "Connected socket " << socket;
 
     // ConfigurePre is done on bindsock, so any possible Pre flags
     // are DERIVED by sock. ConfigurePost is done exclusively on sock.
@@ -127,7 +133,7 @@ SRTSOCKET SrtReceiver::AcceptNewClient()
 
 
 
-int SrtReceiver::ConfigureAcceptedSocket(SRTSOCKET sock)
+int SrtNode::ConfigureAcceptedSocket(SRTSOCKET sock)
 {
     bool no = false;
     const int yes = 1;
@@ -148,7 +154,7 @@ int SrtReceiver::ConfigureAcceptedSocket(SRTSOCKET sock)
 }
 
 
-int SrtReceiver::ConfigurePre(SRTSOCKET sock)
+int SrtNode::ConfigurePre(SRTSOCKET sock)
 {
     const int no  = 0;
     const int yes = 1;
@@ -193,7 +199,7 @@ int SrtReceiver::ConfigurePre(SRTSOCKET sock)
 }
 
 
-int SrtReceiver::EstablishConnection(bool caller, int max_conn)
+int SrtNode::EstablishConnection(bool caller, int max_conn)
 {
     m_bindsock = srt_create_socket();
 
@@ -225,15 +231,20 @@ int SrtReceiver::EstablishConnection(bool caller, int max_conn)
         if (stat == SRT_ERROR)
         {
             srt_close(m_bindsock);
+            Verb() << " failed: " << srt_getlasterror_str();
             return SRT_ERROR;
         }
 
         result = srt_setsockopt(m_bindsock, 0, SRTO_RCVSYN, &no, sizeof no);
         if (result == -1)
+        {
+            Verb() << " failed while setting socket options: " << srt_getlasterror_str();
             return result;
+        }
 
         const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
         srt_epoll_add_usock(m_epoll_receive, m_bindsock, &events);
+        Verb() << " suceeded";
     }
     else
     {
@@ -245,79 +256,52 @@ int SrtReceiver::EstablishConnection(bool caller, int max_conn)
             return SRT_ERROR;
         }
 
-        Verb() << " listening";
         stat = srt_listen(m_bindsock, max_conn);
         if (stat == SRT_ERROR)
         {
             srt_close(m_bindsock);
+            Verb() << ", but listening failed with " << srt_getlasterror_str();
             return SRT_ERROR;
         }
 
-        m_accepting_thread = thread(&SrtReceiver::AcceptingThread, this);
-    }
+        Verb() << " and listening";
 
-    m_epoll_read_fds .assign(max_conn, SRT_INVALID_SOCK);
-    m_epoll_write_fds.assign(max_conn, SRT_INVALID_SOCK);
+        //m_accepting_thread = thread(&SrtNode::AcceptingThread, this);
+    }
 
     return 0;
 }
 
 
-int SrtReceiver::Listen(int max_conn)
+int SrtNode::Listen(int max_conn)
 {
     return EstablishConnection(false, max_conn);
 }
 
 
-int SrtReceiver::Connect()
+int SrtNode::Connect()
 {
     return EstablishConnection(true, 1);
 }
 
 
-void SrtReceiver::UpdateReadFIFO(const int rnum, const int wnum)
-{
-    if (rnum == 0 && wnum == 0)
-    {
-        m_read_fifo.clear();
-        return;
-    }
 
-    if (m_read_fifo.empty())
-    {
-        m_read_fifo.insert(m_read_fifo.end(), m_epoll_read_fds.begin(), next(m_epoll_read_fds.begin(), rnum));
-        return;
-    }
-
-    for (auto sock_id : m_epoll_read_fds)
-    {
-        if (sock_id == SRT_INVALID_SOCK)
-            break;
-
-        if (m_read_fifo.end() != std::find(m_read_fifo.begin(), m_read_fifo.end(), sock_id))
-            continue;
-
-        m_read_fifo.push_back(sock_id);
-    }
-}
-
-
-
-int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
+int SrtNode::Receive(char *buffer, size_t buffer_len, int *srt_socket_id)
 {
     const int wait_ms = 3000;
     while (!m_stop_accept)
     {
         lock_guard<mutex> lock(m_recv_mutex);
 
-        fill(m_epoll_read_fds.begin(),  m_epoll_read_fds.end(),  SRT_INVALID_SOCK);
-        fill(m_epoll_write_fds.begin(), m_epoll_write_fds.end(), SRT_INVALID_SOCK);
-        int rnum = (int) m_epoll_read_fds .size();
-        int wnum = (int) m_epoll_write_fds.size();
+        array< SRTSOCKET, 2 > read_fds  = { SRT_INVALID_SOCK, SRT_INVALID_SOCK };
+        array< SRTSOCKET, 2 > write_fds = { SRT_INVALID_SOCK, SRT_INVALID_SOCK };
+
+        int rnum = (int) read_fds .size();
+        int wnum = (int) write_fds.size();
 
         const int epoll_res = srt_epoll_wait(m_epoll_receive,
-            m_epoll_read_fds.data(),  &rnum,
-            m_epoll_write_fds.data(), &wnum,
+            read_fds.data(),  &rnum,
+            write_fds.data(), &wnum,
             wait_ms, 0, 0, 0, 0);
 
         if (epoll_res <= 0)    // Wait timeout
@@ -326,16 +310,16 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
         assert(rnum > 0);
         assert(wnum <= rnum);
 
-        if (Verbose::on)
+        if (false/*Verbose::on*/)
         {
             // Verbose info:
             Verb() << "Received epoll_res " << epoll_res;
             Verb() << "   to read  " << rnum << ": " << VerbNoEOL;
-            copy(m_epoll_read_fds.begin(), next(m_epoll_read_fds.begin(), rnum),
+            copy(read_fds.begin(), next(read_fds.begin(), rnum),
                 ostream_iterator<int>(*Verbose::cverb, ", "));
             Verb();
             Verb() << "   to write " << wnum << ": " << VerbNoEOL;
-            copy(m_epoll_write_fds.begin(), next(m_epoll_write_fds.begin(), wnum),
+            copy(write_fds.begin(), next(write_fds.begin(), wnum),
                 ostream_iterator<int>(*Verbose::cverb, ", "));
             Verb();
         }
@@ -344,58 +328,45 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
         if (rnum <= 0 && wnum <= 0)
             return -2;
 
-        // Update m_read_fifo based on sockets in m_epoll_read_fds
-        UpdateReadFIFO(rnum, wnum);
+        const SRTSOCKET sock = read_fds[0];
 
-        Verb() << "   m_read_fifo: " << VerbNoEOL;
-        copy(m_read_fifo.begin(), m_read_fifo.end(),
-            ostream_iterator<int>(*Verbose::cverb, ", "));
-        Verb();
+        const int recv_res = srt_recvmsg2(sock, buffer, (int)buffer_len, nullptr);
+        Verb() << print_ts() << "Read from socket " << sock << " resulted with " << recv_res;
 
-        auto sock_it = m_read_fifo.begin();
-        while (sock_it != m_read_fifo.end())
+        if (recv_res > 0)
         {
-            const SRTSOCKET sock = *sock_it;
-            m_read_fifo.erase(sock_it++);
-
-            const int recv_res = srt_recvmsg2(sock, buffer, (int)buffer_len, nullptr);
-            Verb() << print_time() << "Read from socket " << sock << " resulted with " << recv_res;
-
-            if (recv_res > 0)
-            {
-                if (srt_socket_id != nullptr)
-                    *srt_socket_id = sock;
-                return recv_res;
-            }
-
-            const int srt_err = srt_getlasterror(nullptr);
-            if (srt_err == SRT_ECONNLOST)   // Broken || Closing
-            {
-                Verb() << print_time() << "Socket " << sock << " lost connection. Remove from epoll.";
-                srt_close(sock);
-                m_accepted_sockets_mutex.lock();
-                if (1 != m_accepted_sockets.erase(sock))
-                    cerr << "WARN. During erasure of sock " << sock << endl;
-                m_accepted_sockets_mutex.unlock();
-                continue;
-            }
-            else if (srt_err == SRT_EINVSOCK)
-            {
-                Verb() << print_time() << "Socket " << sock << " is no longer valid (state "
-                       << srt_getsockstate(sock) << "). Remove from epoll.";
-                srt_epoll_remove_usock(m_epoll_receive, sock);
-                m_accepted_sockets_mutex.lock();
-                if (1 != m_accepted_sockets.erase(sock))
-                    cerr << "WARN. During erasure of sock " << sock << endl;
-                m_accepted_sockets_mutex.unlock();
-                continue;
-            }
-
-            // An error happened. Notify the caller of the function.
             if (srt_socket_id != nullptr)
                 *srt_socket_id = sock;
             return recv_res;
         }
+
+        const int srt_err = srt_getlasterror(nullptr);
+        if (srt_err == SRT_ECONNLOST)   // Broken || Closing
+        {
+            Verb() << print_ts() << "Socket " << sock << " lost connection. Remove from epoll.";
+            srt_close(sock);
+            m_accepted_sockets_mutex.lock();
+            if (1 != m_accepted_sockets.erase(sock))
+                cerr << "WARN. During erasure of sock " << sock << endl;
+            m_accepted_sockets_mutex.unlock();
+            return 0;
+        }
+        else if (srt_err == SRT_EINVSOCK)
+        {
+            Verb() << print_ts() << "Socket " << sock << " is no longer valid (state "
+                    << srt_getsockstate(sock) << "). Remove from epoll.";
+            srt_epoll_remove_usock(m_epoll_receive, sock);
+            m_accepted_sockets_mutex.lock();
+            if (1 != m_accepted_sockets.erase(sock))
+                cerr << "WARN. During erasure of sock " << sock << endl;
+            m_accepted_sockets_mutex.unlock();
+            return 0;
+        }
+
+        // An error happened. Notify the caller of the function.
+        if (srt_socket_id != nullptr)
+            *srt_socket_id = sock;
+        return recv_res;
     }
 
     return 0;
@@ -403,7 +374,7 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
 
 
 
-int SrtReceiver::WaitUndelivered(int wait_ms)
+int SrtNode::WaitUndelivered(int wait_ms)
 {
     const SRTSOCKET sock = GetBindSocket();
     size_t blocks = 0;
@@ -430,28 +401,16 @@ int SrtReceiver::WaitUndelivered(int wait_ms)
 
 
 
-int SrtReceiver::Send(const char *buffer, size_t buffer_len, int srt_socket_id)
+int SrtNode::Send(const char *buffer, size_t buffer_len, int srt_socket_id)
 {
     return srt_sendmsg(srt_socket_id, buffer, (int)buffer_len, -1, true);
 }
 
 
-int SrtReceiver::Send(const char *buffer, size_t buffer_len)
+int SrtNode::Send(const char *buffer, size_t buffer_len)
 {
     return srt_sendmsg(m_bindsock, buffer, (int)buffer_len, -1, true);
 }
 
 
-std::set<SRTSOCKET> SrtReceiver::GetAcceptedSockets()
-{
-    lock_guard<mutex> lock(m_accepted_sockets_mutex);
-    return m_accepted_sockets;
-}
-
-
-void SrtReceiver::WaitUntilSocketAccepted()
-{
-    std::future<void> barrier_future = m_accept_barrier.get_future();
-    barrier_future.wait();
-}
 

@@ -1,8 +1,10 @@
 
 SOURCES
-srt-bidir-repeater.cpp
+srt-forwarder.cpp
 srt_receiver.hpp
 srt_receiver.cpp
+srt_node.hpp
+srt_node.cpp
 srt_messaging.h
 srt_messaging.cpp
 testmedia.cpp

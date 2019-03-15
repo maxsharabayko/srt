@@ -816,10 +816,10 @@ if (ENABLE_MESSAGING_LIB AND ENABLE_CXX11)
 	target_link_libraries(srt-test-messaging ${TARGET_srt_messaging})
 	srt_make_application(srt-test-messaging)
 
-	srt_add_testprogram(srt-bidir-repeater)
-	target_include_directories(srt-bidir-repeater PRIVATE common)
-	target_include_directories(srt-bidir-repeater PRIVATE apps)
-	srt_make_application(srt-bidir-repeater)
+	srt_add_testprogram(srt-forwarder)
+	target_include_directories(srt-forwarder PRIVATE common)
+	target_include_directories(srt-forwarder PRIVATE apps)
+	srt_make_application(srt-forwarder)
 
 endif()
 
