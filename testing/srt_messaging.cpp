@@ -114,6 +114,10 @@ int srt_msgn_wait_undelievered(int wait_ms)
         return SRT_ERROR;
 
     const SRTSOCKET sock = s_rcv_srt_model->GetBindSocket();
+    const SRT_SOCKSTATUS status = srt_getsockstate(sock);
+    if (status != SRTS_CONNECTED && status != SRTS_CLOSING)
+        return 0;
+
     size_t blocks = 0;
     size_t bytes  = 0;
     int ms_passed = 0;
