@@ -377,6 +377,11 @@ int SrtNode::Receive(char *buffer, size_t buffer_len, int *srt_socket_id)
 int SrtNode::WaitUndelivered(int wait_ms)
 {
     const SRTSOCKET sock = GetBindSocket();
+
+    const SRT_SOCKSTATUS status = srt_getsockstate(sock);
+    if (status != SRTS_CONNECTED && status != SRTS_CLOSING)
+        return 0;
+
     size_t blocks = 0;
     size_t bytes = 0;
     int ms_passed = 0;

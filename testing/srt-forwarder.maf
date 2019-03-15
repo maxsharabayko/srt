@@ -10,6 +10,8 @@ srt_messaging.cpp
 testmedia.cpp
 testmedia.hpp
 testmediabase.hpp
+../apps/logsupport.hpp
+../apps/logsupport.cpp
 ../apps/uriparser.cpp
 ../apps/uriparser.hpp
 ../apps/socketoptions.cpp
