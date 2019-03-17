@@ -43,7 +43,6 @@ SrtNode::SrtNode(const UriParser &src_uri)
     , m_options(src_uri.parameters())
 {
     srt_startup();
-    //Verbose::on = true;
 
     m_epoll_accept  = srt_epoll_create();
     if (m_epoll_accept == -1)

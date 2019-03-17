@@ -36,7 +36,7 @@ void OnINT_ForceExit(int)
 
 
 
-SrtNode* create_node(const char *uri, bool is_caller)
+unique_ptr<SrtNode> create_node(const char *uri, bool is_caller)
 {
     UriParser urlp(uri);
     urlp["transtype"]  = string("file");
@@ -49,7 +49,7 @@ SrtNode* create_node(const char *uri, bool is_caller)
     if (!urlp["rcvbuf"].exists())
         urlp["rcvbuf"] = to_string(3 * (s_message_size * 1472 / 1456 + 1472));
 
-    return new SrtNode(urlp);
+    return unique_ptr<SrtNode>(new SrtNode(urlp));
 }
 
 
@@ -59,14 +59,14 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
     srt_startup();
 
     // Create dst connection
-    unique_ptr<SrtNode> dst = unique_ptr<SrtNode>(create_node(dst_uri, true));
+    unique_ptr<SrtNode> dst = create_node(dst_uri, true);
     if (!dst)
     {
         g_applog.Error() << "ERROR! Failed to create destination node.\n";
         return 1;
     }
 
-    unique_ptr<SrtNode> src = unique_ptr<SrtNode>(create_node(src_uri, false));
+    unique_ptr<SrtNode> src = create_node(src_uri, false);
     if (!src)
     {
         g_applog.Error() << "ERROR! Failed to create source node.\n";

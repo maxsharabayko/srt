@@ -3,8 +3,6 @@ SOURCES
 srt-forwarder.cpp
 srt_node.hpp
 srt_node.cpp
-srt_messaging.h
-srt_messaging.cpp
 testmedia.cpp
 testmedia.hpp
 testmediabase.hpp
