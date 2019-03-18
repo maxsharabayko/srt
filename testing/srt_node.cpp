@@ -60,6 +60,8 @@ SrtNode::~SrtNode()
         m_accepting_thread.join();
 
     lock_guard<mutex> lock(m_recv_mutex);
+    Verb() << "[SrtNode] Desctuctor: closing socket " << m_bindsock;
+    srt_close(m_bindsock);
 }
 
 

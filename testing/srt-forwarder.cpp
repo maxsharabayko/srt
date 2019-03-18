@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <thread>
+#include <functional>
 #include <signal.h>
 
 #include "apputil.hpp"
@@ -26,12 +27,14 @@ srt_logging::Logger g_applog(SRT_LOGFA_FORWARDER, srt_logger_config, "SRT.fwd");
 const size_t s_message_size = 8 * 1024 * 1024;
 
 volatile std::atomic_bool force_break = false;
+volatile std::atomic_bool interrup_break = false;
 
 
 void OnINT_ForceExit(int)
 {
     cerr << "\n-------- REQUESTED INTERRUPT!\n";
     force_break = true;
+    interrup_break = true;
 }
 
 
@@ -106,14 +109,14 @@ void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_s
 
         if (force_break)
         {
-            g_applog.Debug() << description << "Interrupted on request";
+            g_applog.Debug() << description << "Breaking on request";
             break;
         }
     }
 
     if (!force_break)
     {
-        g_applog.Debug() << description << "Signal interrupt";
+        g_applog.Debug() << description << "Force reconnection";
         force_break = true;
     }
 
@@ -125,20 +128,18 @@ void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_s
 
 int start_forwarding(const char *src_uri, const char *dst_uri)
 {
-    srt_startup();
-
     // Create dst connection
     shared_ptr<SrtNode> dst = create_node(dst_uri, true);
     if (!dst)
     {
-        g_applog.Error() << "ERROR! Failed to create destination node.\n";
+        g_applog.Error() << "ERROR! Failed to create destination node.";
         return 1;
     }
 
     shared_ptr<SrtNode> src = create_node(src_uri, false);
     if (!src)
     {
-        g_applog.Error() << "ERROR! Failed to create source node.\n";
+        g_applog.Error() << "ERROR! Failed to create source node.";
         return 1;
     }
 
@@ -147,7 +148,7 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
     const int sock_dst = dst->Connect();
     if (sock_dst == SRT_INVALID_SOCK)
     {
-        g_applog.Error() << "ERROR! While setting up a caller\n";
+        g_applog.Error() << "ERROR! While setting up a caller.";
         return 1;
     }
 
@@ -159,11 +160,10 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
     }
 
     auto future_src_socket = src->AcceptConnection(force_break);
-    //future_src_socket.wait();
     const SRTSOCKET sock_src = future_src_socket.get();
     if (sock_src == SRT_ERROR)
     {
-        g_applog.Error() << "Wait for source connection canceled\n";
+        g_applog.Error() << "Wait for source connection canceled";
         return 0;
     }
 
@@ -174,32 +174,27 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
     th_src_to_dst.join();
     th_dst_to_src.join();
 
-    if (src)
-    {
-        const int undelivered = src->WaitUndelivered(3000);
+
+    auto wait_undelivered = [](shared_ptr<SrtNode> node, int wait_ms, const string&& desc) {
+        const int undelivered = node->WaitUndelivered(3000);
+        if (undelivered == -1)
+        {
+            g_applog.Error() << desc.c_str() << "ERROR: waiting undelivered data resulted with " << srt_getlasterror_str();
+        }
         if (undelivered)
         {
-            g_applog.Error() << "ERROR: src Still has undelivered bytes " << undelivered << "\n";
-            if (undelivered == -1)
-                g_applog.Error() << srt_getlasterror_str() << "\n";
+            g_applog.Error() << desc.c_str() << "ERROR: still has " << undelivered << " bytes undelivered";
         }
 
-        src.reset();
-    }
+        node.reset();
+        return undelivered;
+    };
 
-    if (dst)
-    {
-        const int undelivered = dst->WaitUndelivered(3000);
-        if (undelivered)
-        {
-            g_applog.Error() << "ERROR:  dst Still has undelivered bytes " << undelivered << "\n";
-            if (undelivered == -1)
-                g_applog.Error() << srt_getlasterror_str() << "\n";
-        }
+    std::future<int> src_undelivered = async(launch::async, wait_undelivered, src, 3000, string("[SRC] "));
+    std::future<int> dst_undelivered = async(launch::async, wait_undelivered, dst, 3000, string("[DST] "));
 
-        dst.reset();
-    }
-
+    src_undelivered.wait();
+    dst_undelivered.wait();
 
     return 0;
 }
@@ -211,11 +206,8 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
 
 void print_help()
 {
-    cout << "The CLI syntax is\n"
-         << "    Run autotest: no arguments required\n"
-         << "  Two peers test:\n"
-         << "    Send:    srt-test-messaging \"srt://ip:port\" \"message\"\n"
-         << "    Receive: srt-test-messaging \"srt://ip:port\"\n";
+    cout << "Forward messages between source and destination both ways.\n"
+         << "    srt-forwarder srt://:<src_port> srt://<dst_ip>:<dst:port>\n";
 }
 
 
@@ -274,6 +266,14 @@ int main(int argc, char** argv)
     if (params.count("v"))
         Verbose::on = true;
 
-    return start_forwarding(params[""][0].c_str(), params[""][1].c_str());
+    srt_startup();
+
+    while (!interrup_break)
+    {
+        force_break = false;
+        start_forwarding(params[""][0].c_str(), params[""][1].c_str());
+    }
+
+    return 0;
 }
 
