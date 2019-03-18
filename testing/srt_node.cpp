@@ -312,7 +312,7 @@ int SrtNode::Receive(char *buffer, size_t buffer_len, int *srt_socket_id)
         if (false/*Verbose::on*/)
         {
             // Verbose info:
-            Verb() << "Received epoll_res " << epoll_res;
+            Verb() << "[SrNode] Received epoll_res " << epoll_res;
             Verb() << "   to read  " << rnum << ": " << VerbNoEOL;
             copy(read_fds.begin(), next(read_fds.begin(), rnum),
                 ostream_iterator<int>(*Verbose::cverb, ", "));
@@ -330,7 +330,7 @@ int SrtNode::Receive(char *buffer, size_t buffer_len, int *srt_socket_id)
         const SRTSOCKET sock = read_fds[0];
 
         const int recv_res = srt_recvmsg2(sock, buffer, (int)buffer_len, nullptr);
-        Verb() << print_ts() << "Read from socket " << sock << " resulted with " << recv_res;
+        Verb() << print_ts() << "[SrNode] Read from socket " << sock << " resulted with " << recv_res;
 
         if (recv_res > 0)
         {
@@ -342,7 +342,7 @@ int SrtNode::Receive(char *buffer, size_t buffer_len, int *srt_socket_id)
         const int srt_err = srt_getlasterror(nullptr);
         if (srt_err == SRT_ECONNLOST)   // Broken || Closing
         {
-            Verb() << print_ts() << "Socket " << sock << " lost connection. Remove from epoll.";
+            Verb() << print_ts() << "[SrNode] Socket " << sock << " lost connection. Remove from epoll.";
             srt_close(sock);
             m_accepted_sockets_mutex.lock();
             if (1 != m_accepted_sockets.erase(sock))
@@ -352,12 +352,12 @@ int SrtNode::Receive(char *buffer, size_t buffer_len, int *srt_socket_id)
         }
         else if (srt_err == SRT_EINVSOCK)
         {
-            Verb() << print_ts() << "Socket " << sock << " is no longer valid (state "
+            Verb() << print_ts() << "[SrNode] Socket " << sock << " is no longer valid (state "
                     << srt_getsockstate(sock) << "). Remove from epoll.";
             srt_epoll_remove_usock(m_epoll_receive, sock);
             m_accepted_sockets_mutex.lock();
             if (1 != m_accepted_sockets.erase(sock))
-                cerr << "WARN. During erasure of sock " << sock << endl;
+                cerr << "[SrNode] WARN. During erasure of sock " << sock << endl;
             m_accepted_sockets_mutex.unlock();
             return 0;
         }

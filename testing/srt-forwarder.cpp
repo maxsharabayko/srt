@@ -20,7 +20,7 @@ using namespace std;
 
 
 const srt_logging::LogFA SRT_LOGFA_FORWARDER = 10;
-srt_logging::Logger g_applog(SRT_LOGFA_FORWARDER, srt_logger_config, "srt-fwd");
+srt_logging::Logger g_applog(SRT_LOGFA_FORWARDER, srt_logger_config, "SRT.fwd");
 
 
 const size_t s_message_size = 8 * 1024 * 1024;
@@ -36,7 +36,7 @@ void OnINT_ForceExit(int)
 
 
 
-unique_ptr<SrtNode> create_node(const char *uri, bool is_caller)
+shared_ptr<SrtNode> create_node(const char *uri, bool is_caller)
 {
     UriParser urlp(uri);
     urlp["transtype"]  = string("file");
@@ -49,7 +49,76 @@ unique_ptr<SrtNode> create_node(const char *uri, bool is_caller)
     if (!urlp["rcvbuf"].exists())
         urlp["rcvbuf"] = to_string(3 * (s_message_size * 1472 / 1456 + 1472));
 
-    return unique_ptr<SrtNode>(new SrtNode(urlp));
+    return shared_ptr<SrtNode>(new SrtNode(urlp));
+}
+
+
+void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_sock, const string&& description)
+{
+    vector<char> message_rcvd(s_message_size);
+
+    while (!force_break)
+    {
+        int connection_id = 0;
+        const int recv_res = src->Receive(message_rcvd.data(), message_rcvd.size(), &connection_id);
+        if (recv_res <= 0)
+        {
+            if (recv_res == 0 && connection_id == 0)
+                break;
+
+            g_applog.Error() << description << "ERROR: Receiving message resulted with " << recv_res
+                << " on conn ID " << connection_id << "\n";
+            g_applog.Error() << srt_getlasterror_str();
+
+            break;
+        }
+
+        if (recv_res > message_rcvd.size())
+        {
+            g_applog.Error() << description << "ERROR: Size of the received message " << recv_res
+                << " exeeds the buffer size " << message_rcvd.size();
+            g_applog.Error() << " on connection: " << connection_id << "\n";
+            break;
+        }
+
+        if (recv_res < 50)
+        {
+            g_applog.Debug() << description << "RECEIVED MESSAGE on conn ID " << connection_id << ": "
+                             << string(message_rcvd.data(), recv_res).c_str();
+        }
+        else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
+        {
+            g_applog.Debug() << description << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id << " (first character): "
+                             << message_rcvd[0];
+        }
+
+
+        g_applog.Debug() << description << "Forwarding message to: " << dst->GetBindSocket();
+        const int send_res = dst->Send(message_rcvd.data(), recv_res, dst_sock);
+        if (send_res <= 0)
+        {
+            g_applog.Error() << description << "ERROR: Sending message resulted with " << send_res
+                << " on conn ID " << dst->GetBindSocket() << ". Error message: "
+                << srt_getlasterror_str();
+
+            break;
+        }
+
+        if (force_break)
+        {
+            g_applog.Debug() << description << "Interrupted on request";
+            break;
+        }
+    }
+
+    if (!force_break)
+    {
+        g_applog.Debug() << description << "Signal interrupt";
+        force_break = true;
+    }
+
+    src->Close();
+    dst->Close();
 }
 
 
@@ -59,14 +128,14 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
     srt_startup();
 
     // Create dst connection
-    unique_ptr<SrtNode> dst = create_node(dst_uri, true);
+    shared_ptr<SrtNode> dst = create_node(dst_uri, true);
     if (!dst)
     {
         g_applog.Error() << "ERROR! Failed to create destination node.\n";
         return 1;
     }
 
-    unique_ptr<SrtNode> src = create_node(src_uri, false);
+    shared_ptr<SrtNode> src = create_node(src_uri, false);
     if (!src)
     {
         g_applog.Error() << "ERROR! Failed to create source node.\n";
@@ -99,141 +168,8 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
     }
 
 
-    auto th_src_to_dst = std::thread([&src, &dst]
-    {
-        vector<char> message_rcvd(s_message_size);
-
-        while (!force_break)
-        {
-            int connection_id = 0;
-            const int recv_res = src->Receive(message_rcvd.data(), message_rcvd.size(), &connection_id);
-            if (recv_res <= 0)
-            {
-                if (recv_res == 0 && connection_id == 0)
-                    break;
-
-                g_applog.Error() << "ERROR: SRC->DST Receiving message. Result: " << recv_res
-                                 << " on conn ID " << connection_id << "\n";
-                g_applog.Error() << srt_getlasterror_str();
-
-                break;
-            }
-
-            if (recv_res > message_rcvd.size())
-            {
-                g_applog.Error() << "ERROR: SRC->DST Received message size " << recv_res
-                                 << " exeeds the buffer size " << message_rcvd.size();
-                g_applog.Error() << " on connection: " << connection_id << "\n";
-                break;
-            }
-
-            if (recv_res < 50)
-            {
-                g_applog.Debug() << "SRC->DST: RECEIVED MESSAGE on conn ID " << connection_id << ":\n";
-                g_applog.Debug() << string(message_rcvd.data(), recv_res).c_str();
-            }
-            else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
-            {
-                g_applog.Debug() << "SRC->DST: RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id << " (first character):";
-                g_applog.Debug() << message_rcvd[0];
-            }
-
-
-            g_applog.Debug() << "SRC->DST Forwarding message to: " << dst->GetBindSocket();
-            const int send_res = dst->Send(message_rcvd.data(), recv_res);
-            if (send_res <= 0)
-            {
-                g_applog.Error() << "ERROR: SRC->DST Forwarding message. Result: " << send_res
-                                 << " on conn ID " << dst->GetBindSocket() << "\n";
-                g_applog.Error() << srt_getlasterror_str();
-
-                break;
-            }
-
-            if (force_break)
-            {
-                g_applog.Debug() << "\n SRC->DST (interrupted on request)\n";
-                break;
-            }
-        }
-
-        src->Close();
-        dst->Close();
-        if (!force_break)
-        {
-            g_applog.Debug() << "SRC->DST set int \n (interrupted on request)\n";
-            force_break = true;
-        }
-    });
-
-
-    auto th_dst_to_src = std::thread([&src, &dst, &sock_src]
-    {
-        vector<char> message_rcvd(s_message_size);
-
-        while (!force_break)
-        {
-            int connection_id = 0;
-            const int recv_res = dst->Receive(message_rcvd.data(), message_rcvd.size(), &connection_id);
-
-            if (recv_res <= 0)
-            {
-                if (recv_res == 0 && connection_id == 0)
-                    break;
-
-                g_applog.Error() << "ERROR: DST->SRC Receiving message. Result: " << recv_res
-                                 << " on conn ID " << connection_id << "\n";
-                g_applog.Error() << srt_getlasterror_str();
-
-                break;
-            }
-
-            if (recv_res > message_rcvd.size())
-            {
-                g_applog.Error() << "ERROR: DST->SRC Received message size " << recv_res
-                                 << " exeeds the buffer size " << message_rcvd.size();
-                g_applog.Error() << " on connection: " << connection_id << "\n";
-                break;
-            }
-
-            if (recv_res < 50)
-            {
-                g_applog.Debug() << "DST->SRC: RECEIVED MESSAGE on conn ID " << connection_id << ":\n";
-                g_applog.Debug() << string(message_rcvd.data(), recv_res).c_str();
-            }
-            else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
-            {
-                g_applog.Debug() << "DST->SRC: RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id << " (first character):";
-                g_applog.Debug() << message_rcvd[0];
-            }
-
-            g_applog.Debug() << "SRC->DST Forwarding message to: " << dst->GetBindSocket();
-
-            const int send_res = src->Send(message_rcvd.data(), recv_res, sock_src);
-            if (send_res <= 0)
-            {
-                g_applog.Error() << "ERROR: DST->SRC Forwarding message. Result: " << send_res
-                                 << " on conn ID " << connection_id << "\n";
-                g_applog.Error() << srt_getlasterror_str();
-
-                break;
-            }
-
-            if (force_break)
-            {
-                g_applog.Debug() << "\n DST->SRC (interrupted on request)\n";
-                break;
-            }
-        }
-
-        src->Close();
-        dst->Close();
-        if (!force_break)
-        {
-            g_applog.Debug() << "\n DST->SRC (interrupted on request)\n";
-            force_break = true;
-        }
-    });
+    thread th_src_to_dst(fwd_route, src, dst, dst->GetBindSocket(), string("[SRC->DST] "));
+    thread th_dst_to_src(fwd_route, dst, src, sock_src, string("[DST->SRC] "));
 
     th_src_to_dst.join();
     th_dst_to_src.join();
@@ -266,8 +202,6 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
 
 
     return 0;
-
-
 }
 
 
