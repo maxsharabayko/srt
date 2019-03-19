@@ -8,6 +8,7 @@
 using namespace std;
 
 static unique_ptr<SrtReceiver> s_rcv_srt_model;
+std::mutex        g_rcv_srt_mutex;
 
 
 int srt_msgn_connect(const char *uri, size_t message_size)
@@ -31,6 +32,7 @@ int srt_msgn_connect(const char *uri, size_t message_size)
         ut["sndbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
     }
 
+    lock_guard<mutex> lock(g_rcv_srt_mutex);
     s_rcv_srt_model = unique_ptr<SrtReceiver>(new SrtReceiver(ut.host(), ut.portno(), ut.parameters()));
 
     const int res = s_rcv_srt_model->Connect();
@@ -72,6 +74,8 @@ int srt_msgn_listen(const char *uri, size_t message_size)
     {
         ut["rcvbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
     }
+
+    lock_guard<mutex> lock(g_rcv_srt_mutex);
     s_rcv_srt_model = std::unique_ptr<SrtReceiver>(new SrtReceiver(ut.host(), ut.portno(), ut.parameters()));
 
     if (!s_rcv_srt_model)
@@ -92,6 +96,7 @@ int srt_msgn_listen(const char *uri, size_t message_size)
 
 int srt_msgn_send(const char *buffer, size_t buffer_len)
 {
+    lock_guard<mutex> lock(g_rcv_srt_mutex);
     if (!s_rcv_srt_model)
         return -1;
 
@@ -101,6 +106,7 @@ int srt_msgn_send(const char *buffer, size_t buffer_len)
 
 int srt_msgn_send_on_conn(const char *buffer, size_t buffer_len, int connection_id)
 {
+    lock_guard<mutex> lock(g_rcv_srt_mutex);
     if (!s_rcv_srt_model)
         return -1;
 
@@ -110,35 +116,17 @@ int srt_msgn_send_on_conn(const char *buffer, size_t buffer_len, int connection_
 
 int srt_msgn_wait_undelievered(int wait_ms)
 {
+    lock_guard<mutex> lock(g_rcv_srt_mutex);
     if (!s_rcv_srt_model)
         return SRT_ERROR;
 
-    const SRTSOCKET sock = s_rcv_srt_model->GetBindSocket();
-    size_t blocks = 0;
-    size_t bytes  = 0;
-    int ms_passed = 0;
-    do
-    {
-        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, &bytes))
-            return SRT_ERROR;
-
-        if (wait_ms == 0)
-            break;
-
-        if (wait_ms != -1 && ms_passed >= wait_ms)
-            break;
-
-        if (blocks)
-            this_thread::sleep_for(chrono::milliseconds(1));
-        ++ms_passed;
-    } while (blocks != 0);
-
-    return bytes;
+    return s_rcv_srt_model->WaitUndelivered(wait_ms);
 }
 
 
 int srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id)
 {
+    lock_guard<mutex> lock(g_rcv_srt_mutex);
     if (!s_rcv_srt_model)
         return -1;
 
@@ -163,6 +151,9 @@ int srt_msgn_destroy()
     if (!s_rcv_srt_model)
         return 0;
 
+    s_rcv_srt_model->Close();
+
+    lock_guard<mutex> lock(g_rcv_srt_mutex);
     s_rcv_srt_model.reset();
     return 0;
 }

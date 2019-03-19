@@ -10,7 +10,6 @@
 
 
 class SrtReceiver
-    //: public SrtCommon
 {
 
 public:
@@ -22,6 +21,8 @@ public:
     int Listen(int max_conn);
 
     int Connect();
+
+    int Close();
 
 
     // Receive data
@@ -41,6 +42,7 @@ public:
 
     SRTSOCKET GetBindSocket() { return m_bindsock; }
 
+    int WaitUndelivered(int wait_ms);
 
 private:
 
@@ -52,6 +54,7 @@ private:
 
     int ConfigurePre(SRTSOCKET sock);
     int ConfigureAcceptedSocket(SRTSOCKET sock);
+
 
 
 private:    // Reading manipulation helper functions

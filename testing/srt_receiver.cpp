@@ -56,12 +56,19 @@ SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> pa
 
 SrtReceiver::~SrtReceiver()
 {
+    Close();
+}
+
+
+int SrtReceiver::Close()
+{
     m_stop_accept = true;
     if (m_accepting_thread.joinable())
         m_accepting_thread.join();
 
-    lock_guard<mutex> lock(m_recv_mutex);
+    return srt_close(m_bindsock);
 }
+
 
 
 void SrtReceiver::AcceptingThread()
@@ -296,10 +303,9 @@ void SrtReceiver::UpdateReadFIFO(const int rnum, const int wnum)
 int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
 {
     const int wait_ms = 3000;
+    lock_guard<mutex> lock(m_recv_mutex);
     while (!m_stop_accept)
     {
-        lock_guard<mutex> lock(m_recv_mutex);
-
         fill(m_epoll_read_fds.begin(),  m_epoll_read_fds.end(),  SRT_INVALID_SOCK);
         fill(m_epoll_write_fds.begin(), m_epoll_write_fds.end(), SRT_INVALID_SOCK);
         int rnum = (int) m_epoll_read_fds .size();
@@ -382,6 +388,37 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
 
     return 0;
 }
+
+
+int SrtReceiver::WaitUndelivered(int wait_ms)
+{
+    const SRTSOCKET sock = GetBindSocket();
+
+    const SRT_SOCKSTATUS status = srt_getsockstate(sock);
+    if (status != SRTS_CONNECTED && status != SRTS_CLOSING)
+        return 0;
+
+    size_t blocks = 0;
+    size_t bytes = 0;
+    int ms_passed = 0;
+    do
+    {
+        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, &bytes))
+            return SRT_ERROR;
+
+        if (wait_ms == 0)
+            break;
+
+        if (wait_ms != -1 && ms_passed >= wait_ms)
+            break;
+
+        if (blocks)
+            this_thread::sleep_for(chrono::milliseconds(1));
+        ++ms_passed;
+    } while (blocks != 0);
+
+    return bytes;
+};
 
 
 
