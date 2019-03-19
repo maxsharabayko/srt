@@ -47,58 +47,54 @@ void receive_message(const char *uri)
 
     //this_thread::sleep_for(chrono::seconds(5));
 
-    try
+    while (!int_state)
     {
-        while (true)
+        int connection_id = 0;
+        const int recv_res = srt_msgn_recv(message_rcvd.data(), message_rcvd.size(), &connection_id);
+
+        if (recv_res == 0)
         {
-            int connection_id = 0;
-            const int recv_res = srt_msgn_recv(message_rcvd.data(), message_rcvd.size(), &connection_id);
-            if (recv_res <= 0)
-            {
-                cerr << "ERROR: Receiving message. Result: " << recv_res;
-                cerr << " on conn ID " << connection_id << "\n";
-                cerr << srt_msgn_getlasterror_str() << endl;
-
-                srt_msgn_destroy();
-                return;
-            }
-
-            if (recv_res < 50)
-            {
-                cout << "RECEIVED MESSAGE on conn ID " << connection_id << ":\n";
-                cout << string(message_rcvd.data(), recv_res).c_str() << endl;
-            }
-            else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
-            {
-                cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id << " (first character):";
-                cout << message_rcvd[0] << endl;
-            }
-
-            const string out_message("Message received");
-            const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
-            if (send_res <= 0)
-            {
-                cerr << "ERROR: Sending reply message. Result: " << send_res;
-                cerr << " on conn ID " << connection_id << "\n";
-                cerr << srt_msgn_getlasterror_str() << endl;
-
-                srt_msgn_destroy();
-                return;
-            }
-            cout << "Reply sent on conn ID " << connection_id << ":\n";
-
-            if (int_state)
-            {
-                cerr << "\n (interrupted on request)\n";
-                break;
-            }
+            continue;
         }
-    }
-    catch (std::exception &ex)
-    {
-        cerr<< "EXCEPTION: " << ex.what() << endl;
+        else if (recv_res < 0)
+        {
+            cerr << "ERROR: Receiving message. Result: " << recv_res;
+            cerr << " on conn ID " << connection_id << "\n";
+            cerr << srt_msgn_getlasterror_str() << endl;
+
+            srt_msgn_destroy();
+            return;
+        }
+
+        if (recv_res < 50)
+        {
+            cout << "RECEIVED MESSAGE on conn ID " << connection_id << ":\n";
+            cout << string(message_rcvd.data(), recv_res).c_str() << endl;
+        }
+        else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
+        {
+            cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id << " (first character):";
+            cout << message_rcvd[0] << endl;
+        }
+
+        const string out_message("Message received");
+        const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
+        if (send_res <= 0)
+        {
+            cerr << "ERROR: Sending reply message. Result: " << send_res;
+            cerr << " on conn ID " << connection_id << "\n";
+            cerr << srt_msgn_getlasterror_str() << endl;
+
+            srt_msgn_destroy();
+            return;
+        }
+        cout << "Reply sent on conn ID " << connection_id << ":\n";
     }
 
+    if (int_state)
+    {
+        cerr << "\n (interrupted on request)\n";
+    }
 
     srt_msgn_destroy();
 }
@@ -136,6 +132,9 @@ void send_message(const char *uri, const char* message, size_t length)
 
     for (int i = 0; i < 5; ++i)
     {
+        if (int_state)
+            break;
+
         message_to_send[0] = '0' + i;
         sent_res = srt_msgn_send(message_to_send.data(), message_to_send.size());
         if (sent_res != (int)message_size)
@@ -149,6 +148,9 @@ void send_message(const char *uri, const char* message, size_t length)
 
     for (int i = 0; i < 6; ++i)
     {
+        if (int_state)
+            break;
+
         cout << "WAITING FOR MESSAGE no." << i << "\n";
         const int rcv_res = srt_msgn_recv(message_to_send.data(), message_to_send.size(), nullptr);
         if (rcv_res <= 0)
