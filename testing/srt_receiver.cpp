@@ -12,7 +12,6 @@
 #include "srt_receiver.hpp"
 
 
-
 using namespace std;
 
 
@@ -21,7 +20,7 @@ std::string print_time()
 {
 
     time_t time = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    tm *tm  = localtime(&time);
+    tm *tm = localtime(&time);
     time_t usec = time % 1000000;
 
     char tmp_buf[512];
@@ -37,18 +36,16 @@ std::string print_time()
 
 
 
-SrtReceiver::SrtReceiver(std::string host, int port,
-                         std::map<string, string> params, bool accept_once)
+SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> par)
     : m_host(host)
     , m_port(port)
-    , m_options(params)
-    , m_accept_once(accept_once)
+    , m_options(par)
 {
-    Verbose::on = true;
+    //Verbose::on = true;
     srt_startup();
     //srt_setloglevel(LOG_DEBUG);
 
-    m_epoll_accept  = srt_epoll_create();
+    m_epoll_accept = srt_epoll_create();
     if (m_epoll_accept == -1)
         throw std::runtime_error("Can't create epoll in nonblocking mode");
     m_epoll_receive = srt_epoll_create();
@@ -74,9 +71,9 @@ void SrtReceiver::AcceptingThread()
 
     while (!m_stop_accept)
     {
-        const int epoll_res 
+        const int epoll_res
             = srt_epoll_wait(m_epoll_accept, read_fds, &rnum, 0, 0, 3000,
-                                                    0,     0, 0, 0);
+                             0, 0, 0, 0);
 
         if (epoll_res > 0)
         {
@@ -84,16 +81,9 @@ void SrtReceiver::AcceptingThread()
             const SRTSOCKET sock = AcceptNewClient();
             if (sock != SRT_INVALID_SOCK)
             {
-                m_accepted_sockets_mutex.lock();
-                if (m_accepted_sockets.insert(sock).second == false)
-                    cerr << "WARN. Socket " << sock << " is already in the list. Unexpected.\n";
-                m_accepted_sockets_mutex.unlock();
-                
                 const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
                 const int res = srt_epoll_add_usock(m_epoll_receive, sock, &events);
                 Verb() << print_time() << "AcceptingThread: added socket " << sock << " tp epoll res " << res;
-                Verb() << "m_accepted_sockets: " << m_accepted_sockets.size();
-                m_accept_barrier.set_value();
             }
         }
     }
@@ -373,21 +363,13 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             {
                 Verb() << print_time() << "Socket " << sock << " lost connection. Remove from epoll.";
                 srt_close(sock);
-                m_accepted_sockets_mutex.lock();
-                if (1 != m_accepted_sockets.erase(sock))
-                    cerr << "WARN. During erasure of sock " << sock << endl;
-                m_accepted_sockets_mutex.unlock();
                 continue;
             }
             else if (srt_err == SRT_EINVSOCK)
             {
                 Verb() << print_time() << "Socket " << sock << " is no longer valid (state "
-                       << srt_getsockstate(sock) << "). Remove from epoll.";
+                    << srt_getsockstate(sock) << "). Remove from epoll.";
                 srt_epoll_remove_usock(m_epoll_receive, sock);
-                m_accepted_sockets_mutex.lock();
-                if (1 != m_accepted_sockets.erase(sock))
-                    cerr << "WARN. During erasure of sock " << sock << endl;
-                m_accepted_sockets_mutex.unlock();
                 continue;
             }
 
@@ -403,33 +385,6 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
 
 
 
-int SrtReceiver::WaitUndelivered(int wait_ms)
-{
-    const SRTSOCKET sock = GetBindSocket();
-    size_t blocks = 0;
-    size_t bytes = 0;
-    int ms_passed = 0;
-    do
-    {
-        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, &bytes))
-            return SRT_ERROR;
-
-        if (wait_ms == 0)
-            break;
-
-        if (wait_ms != -1 && ms_passed >= wait_ms)
-            break;
-
-        if (blocks)
-            this_thread::sleep_for(chrono::milliseconds(1));
-        ++ms_passed;
-    } while (blocks != 0);
-
-    return bytes;
-};
-
-
-
 int SrtReceiver::Send(const char *buffer, size_t buffer_len, int srt_socket_id)
 {
     return srt_sendmsg(srt_socket_id, buffer, (int)buffer_len, -1, true);
@@ -440,18 +395,3 @@ int SrtReceiver::Send(const char *buffer, size_t buffer_len)
 {
     return srt_sendmsg(m_bindsock, buffer, (int)buffer_len, -1, true);
 }
-
-
-std::set<SRTSOCKET> SrtReceiver::GetAcceptedSockets()
-{
-    lock_guard<mutex> lock(m_accepted_sockets_mutex);
-    return m_accepted_sockets;
-}
-
-
-void SrtReceiver::WaitUntilSocketAccepted()
-{
-    std::future<void> barrier_future = m_accept_barrier.get_future();
-    barrier_future.wait();
-}
-
