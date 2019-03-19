@@ -88,7 +88,7 @@ void receive_message(const char *uri)
             srt_msgn_destroy();
             return;
         }
-        cout << "Reply sent on conn ID " << connection_id << ":\n";
+        cout << "Reply sent on conn ID " << connection_id << "\n";
     }
 
     if (int_state)
