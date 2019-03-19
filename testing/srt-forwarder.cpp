@@ -26,8 +26,8 @@ srt_logging::Logger g_applog(SRT_LOGFA_FORWARDER, srt_logger_config, "SRT.fwd");
 
 const size_t s_message_size = 8 * 1024 * 1024;
 
-volatile std::atomic_bool force_break = false;
-volatile std::atomic_bool interrup_break = false;
+volatile atomic_bool force_break(false);
+volatile atomic_bool interrup_break(false);
 
 
 void OnINT_ForceExit(int)
@@ -76,7 +76,7 @@ void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_s
             break;
         }
 
-        if (recv_res > message_rcvd.size())
+        if (recv_res > (int) message_rcvd.size())
         {
             g_applog.Error() << description << "ERROR: Size of the received message " << recv_res
                 << " exeeds the buffer size " << message_rcvd.size();
@@ -176,7 +176,7 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
 
 
     auto wait_undelivered = [](shared_ptr<SrtNode> node, int wait_ms, const string&& desc) {
-        const int undelivered = node->WaitUndelivered(3000);
+        const int undelivered = node->WaitUndelivered(wait_ms);
         if (undelivered == -1)
         {
             g_applog.Error() << desc.c_str() << "ERROR: waiting undelivered data resulted with " << srt_getlasterror_str();
