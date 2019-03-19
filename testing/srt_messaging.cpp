@@ -8,7 +8,7 @@
 
 using namespace std;
 
-SrtReceiver g_rcv_srt_model;
+unique_ptr<SrtReceiver> g_rcv_srt_model;
 
 
 int srt_msgn_connect(const char *uri, size_t message_size)
@@ -32,7 +32,10 @@ int srt_msgn_connect(const char *uri, size_t message_size)
         ut["sndbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
     }
 
-    const int res = g_rcv_srt_model.Connect(ut.host(), ut.portno(), ut.parameters());
+    if (!g_rcv_srt_model)
+        g_rcv_srt_model = unique_ptr<SrtReceiver>(new SrtReceiver());
+
+    const int res = g_rcv_srt_model->Connect(ut.host(), ut.portno(), ut.parameters());
     if (res == SRT_INVALID_SOCK)
     {
         cerr << "ERROR! While setting up a caller\n";
@@ -72,7 +75,10 @@ int srt_msgn_listen(const char *uri, size_t message_size)
         ut["rcvbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
     }
 
-    if (g_rcv_srt_model.Listen(ut.host(), ut.portno(), ut.parameters(), maxconn) != 0)
+    if (!g_rcv_srt_model)
+        g_rcv_srt_model = unique_ptr<SrtReceiver>(new SrtReceiver());
+
+    if (g_rcv_srt_model->Listen(ut.host(), ut.portno(), ut.parameters(), maxconn) != 0)
     {
         cerr << "ERROR! While setting up a listener: " <<srt_getlasterror_str() << endl;
         return -1;
@@ -84,25 +90,37 @@ int srt_msgn_listen(const char *uri, size_t message_size)
 
 int srt_msgn_send(const char *buffer, size_t buffer_len)
 {
-    return g_rcv_srt_model.Send(buffer, buffer_len);
+    if (!g_rcv_srt_model)
+        return -1;
+
+    return g_rcv_srt_model->Send(buffer, buffer_len);
 }
 
 
 int srt_msgn_send_on_conn(const char *buffer, size_t buffer_len, int connection_id)
 {
-    return g_rcv_srt_model.Send(buffer, buffer_len, connection_id);
+    if (!g_rcv_srt_model)
+        return -1;
+
+    return g_rcv_srt_model->Send(buffer, buffer_len, connection_id);
 }
 
 
 int srt_msgn_wait_undelievered(int wait_ms)
 {
-    return g_rcv_srt_model.WaitUndelivered(wait_ms);
+    if (!g_rcv_srt_model)
+        return -1;
+
+    return g_rcv_srt_model->WaitUndelivered(wait_ms);
 }
 
 
 int srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id)
 {
-    return g_rcv_srt_model.Receive(buffer, buffer_len, connection_id);
+    if (!g_rcv_srt_model)
+        return -1;
+
+    return g_rcv_srt_model->Receive(buffer, buffer_len, connection_id);
 }
 
 
@@ -120,7 +138,10 @@ int srt_msgn_getlasterror(void)
 
 int srt_msgn_destroy()
 {
-    return g_rcv_srt_model.Close();
+    if (!g_rcv_srt_model)
+        return -1;
+
+    return g_rcv_srt_model->Close();
 }
 
 
