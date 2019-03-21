@@ -337,10 +337,13 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
         // Update m_read_fifo based on sockets in m_epoll_read_fds
         UpdateReadFIFO(rnum, wnum);
 
-        Verb() << "   m_read_fifo: " << VerbNoEOL;
-        copy(m_read_fifo.begin(), m_read_fifo.end(),
-            ostream_iterator<int>(*Verbose::cverb, ", "));
-        Verb();
+        if (Verbose::on)
+        {
+            Verb() << "   m_read_fifo: " << VerbNoEOL;
+            copy(m_read_fifo.begin(), m_read_fifo.end(),
+                ostream_iterator<int>(*Verbose::cverb, ", "));
+            Verb();
+        }
 
         auto sock_it = m_read_fifo.begin();
         while (sock_it != m_read_fifo.end())
