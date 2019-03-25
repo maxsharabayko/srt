@@ -73,16 +73,18 @@ void receive_message(const char *uri)
             return;
         }
 
+        cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id;
         if (recv_res < 50)
         {
-            cout << "RECEIVED MESSAGE on conn ID " << connection_id << ":\n";
-            cout << string(message_rcvd.data(), recv_res).c_str() << endl;
+            cout << ":\n";
+            cout << string(message_rcvd.data(), recv_res).c_str();
         }
         else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
         {
-            cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id << " (first character):";
-            cout << message_rcvd[0] << endl;
+            cout << " (first character):";
+            cout << message_rcvd[0];
         }
+        cout << endl;
 
         const string out_message("Message received");
         const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
@@ -155,7 +157,7 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out,
         output << mon.byteRcvLoss << ",";
         output << mon.byteRcvDrop << ",";
         output << mon.mbpsRecvRate << ",";
-        output << mon.msRcvTsbPdDelay << "0,";
+        output << mon.msRcvTsbPdDelay;
 
         output << endl;
     }
@@ -260,7 +262,7 @@ void send_message(const char *uri, const char* message, size_t length,
         if (int_state)
             break;
 
-        message_to_send[0] = '0' + i;
+        message_to_send[0] = '0' + i % 74;
         sent_res = srt_msgn_send(message_to_send.data(), message_to_send.size());
         if (sent_res != (int)message_size)
         {
