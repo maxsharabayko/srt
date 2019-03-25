@@ -111,17 +111,19 @@ void receive_message(const char *uri)
 static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out, bool print_csv)
 {
     std::ostringstream output;
+    static bool print_header = true;
 
     if (print_csv)
     {
-        if (true)
+        if (print_header)
         {
             output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
             output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
             output << "pktRetrans,byteSent,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
             output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
-            output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,RCVLATENCYms";
+            output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
             output << endl;
+            print_header = false;
         }
 
         output << mon.msTimeStamp << ",";
@@ -153,7 +155,7 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out,
         output << mon.byteRcvLoss << ",";
         output << mon.byteRcvDrop << ",";
         output << mon.mbpsRecvRate << ",";
-        output << /*rcv_latency <<*/ "0,";
+        output << mon.msRcvTsbPdDelay << "0,";
 
         output << endl;
     }
