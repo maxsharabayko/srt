@@ -2,12 +2,16 @@
 #include <string.h>
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <thread>
 #include <signal.h>
 #include <mutex>
 
+#include "apputil.hpp"
+#include "utilities.h"
+#include "logsupport.hpp"
 #include "srt_messaging.h"
 
 using namespace std;
@@ -172,7 +176,8 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out,
 }
 
 
-void send_message(const char *uri, const char* message, size_t length)
+void send_message(const char *uri, const char* message, size_t length,
+    int num_repeats, ostream &out_stats, chrono::seconds stats_freq)
 {
     cout << "Connect to " << uri << "\n";
     const size_t message_size = 8 * 1024 * 1024;
@@ -183,7 +188,7 @@ void send_message(const char *uri, const char* message, size_t length)
         return;
     }
 
-    const int num_messages = 60;
+    const int num_messages = num_repeats;
 
     auto rcvth = std::thread([&message_size, &num_messages]
     {
@@ -206,6 +211,26 @@ void send_message(const char *uri, const char* message, size_t length)
 
             cout << "RECEIVED MESSAGE no." << i << ":\n";
             cout << string(message_rcv.data(), rcv_res).c_str() << endl;
+        }
+    });
+
+    auto statsth = std::thread([&out_stats, &stats_freq]
+    {
+        while (!int_state)
+        {
+            this_thread::sleep_for(stats_freq);
+
+            SRTPerformanceStats stats;
+            if (-1 == srt_msgn_bstats(&stats, -1, 1))
+            {
+                cerr << "ERROR: Failed to get the stats. ";
+                cerr << srt_msgn_getlasterror_str() << endl;
+                break;
+            }
+            else
+            {
+                PrintSrtStats(-1, stats, out_stats, true);
+            }
         }
     });
 
@@ -245,23 +270,15 @@ void send_message(const char *uri, const char* message, size_t length)
     }
 
     rcvth.join();
+
     const int undelivered = srt_msgn_wait_undelievered(5000);
     if (undelivered)
     {
         cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
     }
 
-
-    SRTPerformanceStats stats;
-    if (-1 == srt_msgn_bstats(&stats, -1, 1))
-    {
-        cerr << "ERROR: Failed to get the stats. ";
-        cerr << srt_msgn_getlasterror_str() << endl;
-    }
-    else
-    {
-        PrintSrtStats(-1, stats, cout, true);
-    }
+    int_state = true;
+    statsth.join();
 
     srt_msgn_destroy();
 }
@@ -277,34 +294,76 @@ void print_help()
 
 int main(int argc, char** argv)
 {
-    if (argc == 1)
+    // Check options
+    vector<OptionScheme> optargs = {
+        { {"ll", "loglevel"}, OptionScheme::ARG_ONE },
+        { {"statsfile"},      OptionScheme::ARG_ONE },
+        { {"statsfreq"},      OptionScheme::ARG_ONE },
+        { {"repeat"},         OptionScheme::ARG_ONE },
+    };
+    map<string, vector<string>> params = ProcessOptions(argv, argc, optargs);
+
+    if (params.count("-help") || params.count("-h"))
     {
         print_help();
-        return 0;
+        return 1;
     }
 
-    // The message part can contain 'help' substring,
-    // but it is expected to be in argv[2].
-    // So just search for a substring.
-    if (nullptr != strstr(argv[1], "help"))
+    if (params[""].empty())
     {
         print_help();
-        return 0;
+        return 1;
     }
 
-    if (argc > 3)
+    if (params[""].size() > 2)
     {
+        cerr << "Extra parameter after the first one: " << Printable(params[""]) << endl;
         print_help();
-        return 0;
+        return 1;
     }
 
     signal(SIGINT, OnINT_ForceExit);
     signal(SIGTERM, OnINT_ForceExit);
 
-    if (argc == 2)
-        receive_message(argv[1]);
-    else
-        send_message(argv[1], argv[2], strnlen(argv[2], s_message_size));
+
+    const string loglevel = Option<OutString>(params, "error", "ll", "loglevel");
+    srt_logging::LogLevel::type lev = SrtParseLogLevel(loglevel);
+    srt_msgn_set_loglevel(lev, params.count("v") != 0);
+
+    std::ofstream logfile_stats; // leave unused if not set
+    const string statsfile = Option<OutString>(params, "stdout", "statsfile");
+    if (statsfile != "" && statsfile != "stdout")
+    {
+        logfile_stats.open(statsfile.c_str());
+        if (!logfile_stats)
+        {
+            cerr << "ERROR: Can't open '" << statsfile << "' for writing stats. Fallback to cout.\n";
+            logfile_stats.close();
+        }
+    }
+    ostream &out_stats = logfile_stats.is_open() ? logfile_stats : cout;
+
+
+    const int statsfreq = stoi(Option<OutString>(params, "0", "statsfreq"));
+
+
+    if (params[""].size() == 1)
+    {
+        receive_message(params[""][0].c_str());
+        return 0;
+    }
+
+
+    if (params[""][1].size() > s_message_size)
+    {
+        cerr << "ERROR. Message size exceeds maximum size of " << s_message_size << endl;
+        return 1;
+    }
+
+    const int repeat = stoi(Option<OutString>(params, "60", "repeat"));
+
+    send_message(params[""][0].c_str(), params[""][1].c_str(), params[""][1].size(),
+        repeat, out_stats, chrono::seconds(statsfreq));
 
     return 0;
 }

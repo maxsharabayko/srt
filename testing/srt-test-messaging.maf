@@ -1,5 +1,6 @@
 
 SOURCES
 srt-test-messaging.cpp
-
+../apps/logsupport.hpp
+../apps/logsupport.cpp
 

@@ -5,6 +5,7 @@
 #include "srt_receiver.hpp"
 #include "uriparser.hpp"
 #include "testmedia.hpp"
+#include "verbose.hpp"
 
 using namespace std;
 
@@ -142,6 +143,18 @@ int srt_msgn_bstats(SRTPerformanceStats *stats, int connection_id, int clear)
 
     memcpy(stats, &stats_srt, sizeof(SRT_TRACEBSTATS));
     return res;
+}
+
+
+int srt_msgn_set_loglevel(int loglevel, int verbose)
+{
+    srt_logging::LogLevel::type lev = (srt_logging::LogLevel::type) loglevel;
+    UDT::setloglevel(lev);
+
+    if (verbose)
+        Verbose::on = true;
+
+    return 0;
 }
 
 
