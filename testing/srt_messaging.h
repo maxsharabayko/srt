@@ -110,6 +110,92 @@ SRT_MSGN_API int         srt_msgn_wait_undelievered(int wait_ms);
 SRT_MSGN_API int         srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id);
 
 
+struct SRTPerformanceStats
+{
+    int64_t  msTimeStamp;                // time since the UDT entity is started, in milliseconds
+    int64_t  pktSentTotal;               // total number of sent data packets, including retransmissions
+    int64_t  pktRecvTotal;               // total number of received packets
+    int      pktSndLossTotal;            // total number of lost packets (sender side)
+    int      pktRcvLossTotal;            // total number of lost packets (receiver side)
+    int      pktRetransTotal;            // total number of retransmitted packets
+    int      pktSentACKTotal;            // total number of sent ACK packets
+    int      pktRecvACKTotal;            // total number of received ACK packets
+    int      pktSentNAKTotal;            // total number of sent NAK packets
+    int      pktRecvNAKTotal;            // total number of received NAK packets
+    int64_t  usSndDurationTotal;         // total time duration when UDT is sending data (idle time exclusive)
+    //>new
+    int      pktSndDropTotal;            // number of too-late-to-send dropped packets
+    int      pktRcvDropTotal;            // number of too-late-to play missing packets
+    int      pktRcvUndecryptTotal;       // number of undecrypted packets
+    uint64_t byteSentTotal;              // total number of sent data bytes, including retransmissions
+    uint64_t byteRecvTotal;              // total number of received bytes
+
+    uint64_t byteRcvLossTotal;           // total number of lost bytes
+    uint64_t byteRetransTotal;           // total number of retransmitted bytes
+    uint64_t byteSndDropTotal;           // number of too-late-to-send dropped bytes
+    uint64_t byteRcvDropTotal;           // number of too-late-to play missing bytes (estimate based on average packet size)
+    uint64_t byteRcvUndecryptTotal;      // number of undecrypted bytes
+    //<
+
+    // local measurements
+    int64_t  pktSent;                    // number of sent data packets, including retransmissions
+    int64_t  pktRecv;                    // number of received packets
+    int      pktSndLoss;                 // number of lost packets (sender side)
+    int      pktRcvLoss;                 // number of lost packets (receiver side)
+    int      pktRetrans;                 // number of retransmitted packets
+    int      pktRcvRetrans;              // number of retransmitted packets received
+    int      pktSentACK;                 // number of sent ACK packets
+    int      pktRecvACK;                 // number of received ACK packets
+    int      pktSentNAK;                 // number of sent NAK packets
+    int      pktRecvNAK;                 // number of received NAK packets
+    double   mbpsSendRate;               // sending rate in Mb/s
+    double   mbpsRecvRate;               // receiving rate in Mb/s
+    int64_t  usSndDuration;              // busy sending time (i.e., idle time exclusive)
+    int      pktReorderDistance;         // size of order discrepancy in received sequences
+    double   pktRcvAvgBelatedTime;       // average time of packet delay for belated packets (packets with sequence past the ACK)
+    int64_t  pktRcvBelated;              // number of received AND IGNORED packets due to having come too late
+    //>new
+    int      pktSndDrop;                 // number of too-late-to-send dropped packets
+    int      pktRcvDrop;                 // number of too-late-to play missing packets
+    int      pktRcvUndecrypt;            // number of undecrypted packets
+    uint64_t byteSent;                   // number of sent data bytes, including retransmissions
+    uint64_t byteRecv;                   // number of received bytes
+    uint64_t byteRcvLoss;                // number of retransmitted bytes
+    uint64_t byteRetrans;                // number of retransmitted bytes
+    uint64_t byteSndDrop;                // number of too-late-to-send dropped bytes
+    uint64_t byteRcvDrop;                // number of too-late-to play missing bytes (estimate based on average packet size)
+    uint64_t byteRcvUndecrypt;           // number of undecrypted bytes
+    //<
+
+    // instant measurements
+    double   usPktSndPeriod;             // packet sending period, in microseconds
+    int      pktFlowWindow;              // flow window size, in number of packets
+    int      pktCongestionWindow;        // congestion window size, in number of packets
+    int      pktFlightSize;              // number of packets on flight
+    double   msRTT;                      // RTT, in milliseconds
+    double   mbpsBandwidth;              // estimated bandwidth, in Mb/s
+    int      byteAvailSndBuf;            // available UDT sender buffer size
+    int      byteAvailRcvBuf;            // available UDT receiver buffer size
+    //>new
+    double   mbpsMaxBW;                  // Transmit Bandwidth ceiling (Mbps)
+    int      byteMSS;                    // MTU
+
+    int      pktSndBuf;                  // UnACKed packets in UDT sender
+    int      byteSndBuf;                 // UnACKed bytes in UDT sender
+    int      msSndBuf;                   // UnACKed timespan (msec) of UDT sender
+    int      msSndTsbPdDelay;            // Timestamp-based Packet Delivery Delay
+
+    int      pktRcvBuf;                  // Undelivered packets in UDT receiver
+    int      byteRcvBuf;                 // Undelivered bytes of UDT receiver
+    int      msRcvBuf;                   // Undelivered timespan (msec) of UDT receiver
+    int      msRcvTsbPdDelay;            // Timestamp-based Packet Delivery Delay
+    //<
+};
+
+
+SRT_MSGN_API int         srt_msgn_bstats(SRTPerformanceStats *stats, int connection_id, int clear);
+
+
 
 SRT_MSGN_API const char* srt_msgn_getlasterror_str(void);
 

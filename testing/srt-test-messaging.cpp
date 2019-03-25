@@ -2,9 +2,12 @@
 #include <string.h>
 #include <vector>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <thread>
 #include <signal.h>
 #include <mutex>
+
 #include "srt_messaging.h"
 
 using namespace std;
@@ -100,6 +103,75 @@ void receive_message(const char *uri)
 }
 
 
+
+static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out, bool print_csv)
+{
+    std::ostringstream output;
+
+    if (print_csv)
+    {
+        if (true)
+        {
+            output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
+            output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
+            output << "pktRetrans,byteSent,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
+            output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+            output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,RCVLATENCYms";
+            output << endl;
+        }
+
+        output << mon.msTimeStamp << ",";
+        output << sid << ",";
+        output << mon.pktFlowWindow << ",";
+        output << mon.pktCongestionWindow << ",";
+        output << mon.pktFlightSize << ",";
+
+        output << mon.msRTT << ",";
+        output << mon.mbpsBandwidth << ",";
+        output << mon.mbpsMaxBW << ",";
+        output << mon.pktSent << ",";
+        output << mon.pktSndLoss << ",";
+        output << mon.pktSndDrop << ",";
+
+        output << mon.pktRetrans << ",";
+        output << mon.byteSent << ",";
+        output << mon.byteSndDrop << ",";
+        output << mon.mbpsSendRate << ",";
+        output << mon.usPktSndPeriod << ",";
+
+        output << mon.pktRecv << ",";
+        output << mon.pktRcvLoss << ",";
+        output << mon.pktRcvDrop << ",";
+        output << mon.pktRcvRetrans << ",";
+        output << mon.pktRcvBelated << ",";
+
+        output << mon.byteRecv << ",";
+        output << mon.byteRcvLoss << ",";
+        output << mon.byteRcvDrop << ",";
+        output << mon.mbpsRecvRate << ",";
+        output << /*rcv_latency <<*/ "0,";
+
+        output << endl;
+    }
+    else
+    {
+        output << "======= SRT STATS: sid=" << sid << endl;
+        output << "PACKETS     SENT: " << setw(11) << mon.pktSent << "  RECEIVED:   " << setw(11) << mon.pktRecv << endl;
+        output << "LOST PKT    SENT: " << setw(11) << mon.pktSndLoss << "  RECEIVED:   " << setw(11) << mon.pktRcvLoss << endl;
+        output << "REXMIT      SENT: " << setw(11) << mon.pktRetrans << "  RECEIVED:   " << setw(11) << mon.pktRcvRetrans << endl;
+        output << "DROP PKT    SENT: " << setw(11) << mon.pktSndDrop << "  RECEIVED:   " << setw(11) << mon.pktRcvDrop << endl;
+        output << "RATE     SENDING: " << setw(11) << mon.mbpsSendRate << "  RECEIVING:  " << setw(11) << mon.mbpsRecvRate << endl;
+        output << "BELATED RECEIVED: " << setw(11) << mon.pktRcvBelated << "  AVG TIME:   " << setw(11) << mon.pktRcvAvgBelatedTime << endl;
+        output << "REORDER DISTANCE: " << setw(11) << mon.pktReorderDistance << endl;
+        output << "WINDOW      FLOW: " << setw(11) << mon.pktFlowWindow << "  CONGESTION: " << setw(11) << mon.pktCongestionWindow << "  FLIGHT: " << setw(11) << mon.pktFlightSize << endl;
+        output << "LINK         RTT: " << setw(9) << mon.msRTT << "ms  BANDWIDTH:  " << setw(7) << mon.mbpsBandwidth << "Mb/s " << endl;
+        output << "BUFFERLEFT:  SND: " << setw(11) << mon.byteAvailSndBuf << "  RCV:        " << setw(11) << mon.byteAvailRcvBuf << endl;
+    }
+
+    out << output.str() << std::flush;
+}
+
+
 void send_message(const char *uri, const char* message, size_t length)
 {
     cout << "Connect to " << uri << "\n";
@@ -110,6 +182,32 @@ void send_message(const char *uri, const char* message, size_t length)
         srt_msgn_destroy();
         return;
     }
+
+    const int num_messages = 60;
+
+    auto rcvth = std::thread([&message_size, &num_messages]
+    {
+        vector<char> message_rcv(message_size);
+
+        for (int i = 0; i < num_messages + 1; ++i)
+        {
+            if (int_state)
+                break;
+
+            cout << "WAITING FOR MESSAGE no." << i << "\n";
+            const int rcv_res = srt_msgn_recv(message_rcv.data(), message_rcv.size(), nullptr);
+            if (rcv_res <= 0)
+            {
+                cerr << "ERROR: Receiving message. Result: " << rcv_res << "\n";
+                cerr << srt_msgn_getlasterror_str() << endl;
+                srt_msgn_destroy();
+                return;
+            }
+
+            cout << "RECEIVED MESSAGE no." << i << ":\n";
+            cout << string(message_rcv.data(), rcv_res).c_str() << endl;
+        }
+    });
 
     int sent_res = srt_msgn_send(message, length);
     if (sent_res != (int) length)
@@ -130,7 +228,7 @@ void send_message(const char *uri, const char* message, size_t length)
         message_to_send[i] = c++;
     }
 
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < num_messages; ++i)
     {
         if (int_state)
             break;
@@ -146,30 +244,25 @@ void send_message(const char *uri, const char* message, size_t length)
         cout << "SENT MESSAGE #" << i << "\n";
     }
 
-    for (int i = 0; i < 6; ++i)
-    {
-        if (int_state)
-            break;
-
-        cout << "WAITING FOR MESSAGE no." << i << "\n";
-        const int rcv_res = srt_msgn_recv(message_to_send.data(), message_to_send.size(), nullptr);
-        if (rcv_res <= 0)
-        {
-            cerr << "ERROR: Receiving message. Result: " << rcv_res << "\n";
-            cerr << srt_msgn_getlasterror_str() << endl;
-            srt_msgn_destroy();
-            return;
-        }
-
-        cout << "RECEIVED MESSAGE no." << i << ":\n";
-        cout << string(message_to_send.data(), rcv_res).c_str() << endl;
-    }
-
+    rcvth.join();
     const int undelivered = srt_msgn_wait_undelievered(5000);
     if (undelivered)
     {
         cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
     }
+
+
+    SRTPerformanceStats stats;
+    if (-1 == srt_msgn_bstats(&stats, -1, 1))
+    {
+        cerr << "ERROR: Failed to get the stats. ";
+        cerr << srt_msgn_getlasterror_str() << endl;
+    }
+    else
+    {
+        PrintSrtStats(-1, stats, cout, true);
+    }
+
     srt_msgn_destroy();
 }
 

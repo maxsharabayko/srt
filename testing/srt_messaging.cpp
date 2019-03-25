@@ -124,6 +124,27 @@ int srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id)
 }
 
 
+int srt_msgn_bstats(SRTPerformanceStats *stats, int connection_id, int clear)
+{
+    if (stats == nullptr)
+        return -1;
+
+    if (!g_rcv_srt_model)
+        return -1;
+
+    SRT_TRACEBSTATS stats_srt;
+
+    SRTSOCKET sock = connection_id != SRT_INVALID_SOCK
+        ? connection_id
+        : g_rcv_srt_model->GetBindSocket();
+
+    const int res = srt_bstats(sock, &stats_srt, clear);
+
+    memcpy(stats, &stats_srt, sizeof(SRT_TRACEBSTATS));
+    return res;
+}
+
+
 const char* srt_msgn_getlasterror_str(void)
 {
     return srt_getlasterror_str();
