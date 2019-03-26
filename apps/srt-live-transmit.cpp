@@ -339,6 +339,8 @@ int main( int argc, char** argv )
                             << src->GetSRTSocket() << endl;
                         return 1;
                     }
+                    cerr << "Added SRT source to poll, "
+                        << src->GetSRTSocket() << endl;
                     break;
                 case UriParser::UDP:
                     if (srt_epoll_add_ssock(pollid,
@@ -387,6 +389,8 @@ int main( int argc, char** argv )
                             << tar->GetSRTSocket() << endl;
                         return 1;
                     }
+                    cerr << "Added SRT target to poll, "
+                        << tar->GetSRTSocket() << endl;
                     break;
                 default:
                     break;
@@ -410,9 +414,17 @@ int main( int argc, char** argv )
                 if ((false))
                 {
                     cerr << "Event:"
-                        << " srtrfdslen " << srtrfdslen
-                        << " sysrfdslen " << sysrfdslen
-                        << endl;
+                        << " srtrfdslen " << srtrfdslen << ": ";
+
+                    copy(srtrwfds, srtrwfds + srtrfdslen,
+                        ostream_iterator<int>(cerr, ", "));
+
+                    cerr << "; srtwfdslen " << srtwfdslen << ": ";
+                    copy(srtrwfds + 2, srtrwfds + 2 + srtwfdslen,
+                        ostream_iterator<int>(cerr, ", "));
+                    
+                    cerr << " sysrfdslen " << sysrfdslen
+                         << endl;
                 }
 
                 bool doabort = false;
@@ -429,9 +441,10 @@ int main( int argc, char** argv )
                     }
                     else if (tar && tar->GetSRTSocket() != s)
                     {
-                        cerr << "Unexpected socket poll: " << s;
-                        doabort = true;
-                        break;
+                        cerr << "Unexpected socket poll: " << s << "(i=" << i << ")\n";
+                        continue;
+                        //doabort = true;
+                        //break;
                     }
 
                     const char * dirstring = (issource)? "source" : "target";
@@ -459,6 +472,8 @@ int main( int argc, char** argv )
                             }
 
                             srt_epoll_remove_usock(pollid, s);
+                            cerr << "SRTS_LISTENING: Removed SRT socket from poll, i=" << i << " sock: "
+                                << s << endl;
 
                             SRTSOCKET ns = (issource) ?
                                 src->GetSRTSocket() : tar->GetSRTSocket();
@@ -471,6 +486,8 @@ int main( int argc, char** argv )
                             }
                             else
                             {
+                                cerr << "SRTS_LISTENING: i=" << i << " Added SRT socket to poll, "
+                                    << ns << (issource ? " (SRC)" : " (DST)") << endl;
                                 if (!quiet)
                                 {
                                     cerr << "Accepted SRT "
@@ -524,6 +541,8 @@ int main( int argc, char** argv )
                             {
                                 // force re-connection
                                 srt_epoll_remove_usock(pollid, s);
+                                cerr << "SRTS_BROKEN i=" << i << ": Removed SRT socket from poll, "
+                                    << s << endl;
                                 if (issource)
                                     src.reset();
                                 else
@@ -558,6 +577,8 @@ int main( int argc, char** argv )
                                             << tar->GetSRTSocket() << endl;
                                         return 1;
                                     }
+                                    cerr << "Added SRT target to poll, "
+                                        << tar->GetSRTSocket() << endl;
                                 }
                             }
                         }
