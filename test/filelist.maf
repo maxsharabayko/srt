@@ -6,3 +6,4 @@ test_connection_timeout.cpp
 test_seqno.cpp
 test_strict_encription.cpp
 test_serial_transmission.cpp
+test_window.cpp

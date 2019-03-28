@@ -599,7 +599,7 @@ private:
     int m_iBandwidth;                            // Estimated bandwidth, number of packets per second
     int m_iRTT;                                  // RTT, in microseconds
     int m_iRTTVar;                               // RTT variance
-    int m_iDeliveryRate;                         // Packet arrival rate at the receiver side
+    int m_iDeliveryRate;                         // Packet arrival rate at the receiver side (packets per second)
     int m_iByteDeliveryRate;                     // Byte arrival rate at the receiver side
 
     uint64_t m_ullLingerExpiration;              // Linger expiration time (for GC to close a socket with data in sending buffer)

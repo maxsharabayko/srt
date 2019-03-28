@@ -5250,6 +5250,7 @@ int CUDT::sendmsg2(const char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
         else
         {
             {
+                LOGC(mglog.Debug, log << "sendmsg2: Will wait for the SND buffer to have space.");
                 // wait here during a blocking sending
                 CGuard sendblock_lock(m_SendBlockLock);
 
@@ -7443,7 +7444,7 @@ int CUDT::packData(CPacket& packet, uint64_t& ts_tk)
       }
       else
       {
-          HLOGC(dlog.Debug, log << "packData: CONGESTED: cwnd=min(" << m_iFlowWindowSize << "," << m_dCongestionWindow
+          LOGC(dlog.Debug, log << "packData: CONGESTED: cwnd=min(" << m_iFlowWindowSize << ", " << m_dCongestionWindow
               << ")=" << cwnd << " seqlen=(" << m_iSndLastAck << "-" << m_iSndCurrSeqNo << ")=" << seqdiff);
          m_ullTargetTime_tk = 0;
          m_ullTimeDiff_tk = 0;
@@ -8525,8 +8526,13 @@ void CUDT::checkTimers()
         sendCtrl(UMSG_ACK);
         CTimer::rdtsc(currtime_tk);
 
-        int ack_interval_tk = m_Smoother->ACKPeriod() > 0 ? m_Smoother->ACKPeriod() * m_ullCPUFrequency : m_ullACKInt_tk;
+        uint64_t ack_interval_tk = m_Smoother->ACKPeriod() > 0 ? m_Smoother->ACKPeriod() * m_ullCPUFrequency : m_ullACKInt_tk;
         m_ullNextACKTime_tk = currtime_tk + ack_interval_tk;
+
+        HLOGC(mglog.Debug, log << CONID() << "checkTimers: currtime_tk=" << FormatTime(currtime_tk / m_ullCPUFrequency)
+            << " ack_interval_tk=" << ack_interval_tk
+            << " m_ullNextACKTime_tk=" << FormatTime(m_ullNextACKTime_tk / m_ullCPUFrequency)
+            << " pkt-count=" << m_iPktCount << " liteack-count=" << m_iLightACKCount);
 
         m_iPktCount = 0;
         m_iLightACKCount = 1;

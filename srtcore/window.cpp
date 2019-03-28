@@ -55,6 +55,7 @@ modified by
 #include "common.h"
 #include "window.h"
 #include <algorithm>
+#include <iterator>
 
 using namespace std;
 
@@ -152,7 +153,7 @@ void CPktTimeWindowTools::initializeWindowArrays(int* r_pktWindow, int* r_probeW
 }
 
 
-int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, const int* abytes, size_t asize, int& bytesps)
+int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, const int* abytes, const size_t asize, int& bytesps)
 {
    // get median value, but cannot change the original value order in the window
    std::copy(window, window + asize, replica);
@@ -170,27 +171,37 @@ int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, cons
    const int* bp = abytes;
    // median filtering
    const int* p = window;
-   for (int i = 0, n = asize; i < n; ++ i)
+   for (size_t i = 0; i < asize; ++i)
    {
-      if ((*p < upper) && (*p > lower))
+      if ((*p > lower) && (*p < upper))
       {
-         ++ count;  //packet counter
-         sum += *p; //usec counter
-         bytes += (unsigned long)*bp;   //byte counter
+         ++ count;  // packet counter
+         sum += *p; // usec counter
+         bytes += (unsigned long)*bp;   // byte counter
       }
-      ++ p;     //advance packet pointer
-      ++ bp;    //advance bytes pointer
+      ++ p;     // advance packet pointer
+      ++ bp;    // advance bytes pointer
    }
 
-   // claculate speed, or return 0 if not enough valid value
+   // claculate speed, or return 0 if not enough valid values
    if (count > (asize >> 1))
    {
-      bytes += (CPacket::SRT_DATA_HDR_SIZE * count); //Add protocol headers to bytes received
+       /*cerr << "PktRcvSpeed window: ";
+       copy(window, window + asize,
+           ostream_iterator<int>(cerr, ", "));
+       cerr << " return " << (int)ceil(1000000.0 / (sum / count));
+       cerr << endl;*/
+
+      bytes += (CPacket::SRT_DATA_HDR_SIZE * count); // Add protocol headers to bytes received
       bytesps = (unsigned long)ceil(1000000.0 / (double(sum) / double(bytes)));
       return (int)ceil(1000000.0 / (sum / count));
    }
    else
    {
+       /*cerr << "PktRcvSpeed window: ";
+       copy(window, window + asize,
+           ostream_iterator<int>(cerr, ", "));
+       cerr << " return 0" << endl;*/
       bytesps = 0;
       return 0;
    }

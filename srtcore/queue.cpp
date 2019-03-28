@@ -565,6 +565,7 @@ void* CSndQueue::worker(void* param)
             THREAD_PAUSED();
             if (currtime < ts) 
             {
+                //LOGC(mglog.Debug, log << self->CONID() << "CSndQueue::worker sleepto " << FormatTime(CTimer::getTime() + (ts - currtime) / CTimer::getCPUFrequency()));
                 self->m_pTimer->sleepto(ts);
 
 #if         defined(HAI_DEBUG_SNDQ_HIGHRATE)
@@ -604,6 +605,7 @@ void* CSndQueue::worker(void* param)
             self->m_WorkerStats.lNotReadyTs++;
 #endif   /* SRT_DEBUG_SNDQ_HIGHRATE */
 
+            LOGC(mglog.Debug, log << self->CONID() << "CSndQueue::worker ts <= 0 ");
             // wait here if there is no sockets with data to be sent
             THREAD_PAUSED();
             pthread_mutex_lock(&self->m_WindowLock);

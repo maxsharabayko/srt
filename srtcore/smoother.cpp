@@ -354,7 +354,7 @@ private:
                 if (m_parent->deliveryRate() > 0)
                 {
                     m_dPktSndPeriod = 1000000.0 / m_parent->deliveryRate();
-                    HLOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:ENDED) wndsize="
+                    LOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:ENDED) wndsize="
                         << m_dCWndSize << "/" << m_dMaxCWndSize
                         << " sndperiod=" << m_dPktSndPeriod << "us = mega/("
                         << m_parent->deliveryRate() << "B/s)");
@@ -362,7 +362,7 @@ private:
                 else
                 {
                     m_dPktSndPeriod = m_dCWndSize / (m_parent->RTT() + m_iRCInterval);
-                    HLOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:ENDED) wndsize="
+                    LOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:ENDED) wndsize="
                         << m_dCWndSize << "/" << m_dMaxCWndSize
                         << " sndperiod=" << m_dPktSndPeriod << "us = wndsize/(RTT+RCIV) RTT="
                         << m_parent->RTT() << " RCIV=" << m_iRCInterval);
@@ -370,7 +370,7 @@ private:
             }
             else
             {
-                HLOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:KEPT) wndsize="
+                LOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:KEPT) wndsize="
                     << m_dCWndSize << "/" << m_dMaxCWndSize
                     << " sndperiod=" << m_dPktSndPeriod << "us");
             }
@@ -378,6 +378,10 @@ private:
         else
         {
             m_dCWndSize = m_parent->deliveryRate() / 1000000.0 * (m_parent->RTT() + m_iRCInterval) + 16;
+            LOGC(mglog.Debug, log << "FileSmoother: UPD (speed mode) wndsize="
+                << m_dCWndSize << "/" << m_dMaxCWndSize
+                << " sndperiod=" << m_dPktSndPeriod << "us. deliverRate = "
+                    << m_parent->deliveryRate() << " pkts/s)");
         }
 
         // During Slow Start, no rate increase
@@ -442,7 +446,7 @@ RATE_LIMIT:
             if (m_dPktSndPeriod < minSP)
             {
                 m_dPktSndPeriod = minSP;
-                HLOGC(mglog.Debug, log << "FileSmoother: BW limited to " << m_maxSR
+                LOGC(mglog.Debug, log << "FileSmoother: BW limited to " << m_maxSR
                     << " - SLOWDOWN sndperiod=" << m_dPktSndPeriod << "us");
             }
         }
@@ -471,13 +475,13 @@ RATE_LIMIT:
             if (m_parent->deliveryRate() > 0)
             {
                 m_dPktSndPeriod = 1000000.0 / m_parent->deliveryRate();
-                HLOGC(mglog.Debug, log << "FileSmoother: LOSS, SLOWSTART:OFF, sndperiod=" << m_dPktSndPeriod << "us AS mega/rate (rate="
+                LOGC(mglog.Debug, log << "FileSmoother: LOSS, SLOWSTART:OFF, sndperiod=" << m_dPktSndPeriod << "us AS mega/rate (rate="
                     << m_parent->deliveryRate() << ")");
             }
             else
             {
                 m_dPktSndPeriod = m_dCWndSize / (m_parent->RTT() + m_iRCInterval);
-                HLOGC(mglog.Debug, log << "FileSmoother: LOSS, SLOWSTART:OFF, sndperiod=" << m_dPktSndPeriod << "us AS wndsize/(RTT+RCIV) (RTT="
+                LOGC(mglog.Debug, log << "FileSmoother: LOSS, SLOWSTART:OFF, sndperiod=" << m_dPktSndPeriod << "us AS wndsize/(RTT+RCIV) (RTT="
                     << m_parent->RTT() << " RCIV=" << m_iRCInterval << ")");
             }
 
@@ -508,7 +512,7 @@ RATE_LIMIT:
             m_iDecRandom = (int)ceil(m_iAvgNAKNum * (double(rand()) / RAND_MAX));
             if (m_iDecRandom < 1)
                 m_iDecRandom = 1;
-            HLOGC(mglog.Debug, log << "FileSmoother: LOSS:NEW lastseq=" << m_iLastDecSeq
+            LOGC(mglog.Debug, log << "FileSmoother: LOSS:NEW lastseq=" << m_iLastDecSeq
                 << ", rand=" << m_iDecRandom
                 << " avg NAK:" << m_iAvgNAKNum
                 << ", sndperiod=" << m_dPktSndPeriod << "us");
@@ -518,7 +522,7 @@ RATE_LIMIT:
             // 0.875^5 = 0.51, rate should not be decreased by more than half within a congestion period
             m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.125);
             m_iLastDecSeq = m_parent->sndSeqNo();
-            HLOGC(mglog.Debug, log << "FileSmoother: LOSS:PERIOD lseq=" << lossbegin
+            LOGC(mglog.Debug, log << "FileSmoother: LOSS:PERIOD lseq=" << lossbegin
                 << ", dseq=" << m_iLastDecSeq
                 << ", seqdiff=" << CSeqNo::seqoff(m_iLastDecSeq, lossbegin)
                 << ", deccnt=" << m_iDecCount
@@ -527,7 +531,7 @@ RATE_LIMIT:
         }
         else
         {
-            HLOGC(mglog.Debug, log << "FileSmoother: LOSS:STILL lseq=" << lossbegin
+            LOGC(mglog.Debug, log << "FileSmoother: LOSS:STILL lseq=" << lossbegin
                 << ", dseq=" << m_iLastDecSeq
                 << ", seqdiff=" << CSeqNo::seqoff(m_iLastDecSeq, lossbegin)
                 << ", deccnt=" << m_iDecCount
@@ -553,13 +557,13 @@ RATE_LIMIT:
             if (m_parent->deliveryRate() > 0)
             {
                 m_dPktSndPeriod = 1000000.0 / m_parent->deliveryRate();
-                HLOGC(mglog.Debug, log << "FileSmoother: CHKTIMER, SLOWSTART:OFF, sndperiod=" << m_dPktSndPeriod << "us AS mega/rate (rate="
+                LOGC(mglog.Debug, log << "FileSmoother: CHKTIMER, SLOWSTART:OFF, sndperiod=" << m_dPktSndPeriod << "us AS mega/rate (rate="
                     << m_parent->deliveryRate() << ")");
             }
             else
             {
                 m_dPktSndPeriod = m_dCWndSize / (m_parent->RTT() + m_iRCInterval);
-                HLOGC(mglog.Debug, log << "FileSmoother: CHKTIMER, SLOWSTART:OFF, sndperiod=" << m_dPktSndPeriod << "us AS wndsize/(RTT+RCIV) (wndsize="
+                LOGC(mglog.Debug, log << "FileSmoother: CHKTIMER, SLOWSTART:OFF, sndperiod=" << m_dPktSndPeriod << "us AS wndsize/(RTT+RCIV) (wndsize="
                     << setprecision(6) << m_dCWndSize << " RTT=" << m_parent->RTT() << " RCIV=" << m_iRCInterval << ")");
             }
         }

@@ -125,7 +125,7 @@ private:
 class CPktTimeWindowTools
 {
 public:
-   static int getPktRcvSpeed_in(const int* window, int* replica, const int* bytes, size_t asize, int& bytesps);
+   static int getPktRcvSpeed_in(const int* window, int* replica, const int* bytes, const size_t asize, int& bytesps);
    static int getBandwidth_in(const int* window, int* replica, size_t psize);
 
    static void initializeWindowArrays(int* r_pktWindow, int* r_probeWindow, int* r_bytesWindow, size_t asize, size_t psize);
@@ -215,6 +215,8 @@ public:
        CGuard cg(m_lockPktWindow);
 
        m_CurrArrTime = CTimer::getTime();
+       /*cerr << "PktArrival duration=" << int(m_CurrArrTime - m_LastArrTime);
+       cerr << " size=" << pktsz << endl;*/
 
        // record the packet interval between the current and the last one
        m_aPktWindow[m_iPktWindowPtr] = int(m_CurrArrTime - m_LastArrTime);
