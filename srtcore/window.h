@@ -60,6 +60,7 @@ modified by
 #endif
 #include "udt.h"
 #include "packet.h"
+#include "logging.h"
 
 namespace ACKWindowTools
 {
