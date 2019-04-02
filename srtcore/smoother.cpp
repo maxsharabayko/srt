@@ -414,9 +414,10 @@ private:
 
         m_dPktSndPeriod = (m_dPktSndPeriod * m_iRCInterval) / (m_dPktSndPeriod * inc + m_iRCInterval);
 
+
 RATE_LIMIT:
 
-#if ENABLE_HEAVY_LOGGING
+#if 1 //ENABLE_HEAVY_LOGGING
         // Try to do reverse-calculation for m_dPktSndPeriod, as per minSP below
         // sndperiod = mega / (maxbw / MSS)
         // 1/sndperiod = (maxbw/MSS) / mega
@@ -433,7 +434,7 @@ RATE_LIMIT:
         int udp_buffer_free = -1;
 #endif
 
-        HLOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:"
+        LOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:"
             << (m_bSlowStart ? "ON" : "OFF") << ") wndsize=" << m_dCWndSize
             << " sndperiod=" << m_dPktSndPeriod << "us BANDWIDTH USED:" << usedbw << " (limit: " << m_maxSR << ")"
             " SYSTEM BUFFER LEFT: " << udp_buffer_free);

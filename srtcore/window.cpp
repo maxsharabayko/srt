@@ -186,11 +186,13 @@ int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, cons
    // claculate speed, or return 0 if not enough valid values
    if (count > (asize >> 1))
    {
-       /*cerr << "PktRcvSpeed window: ";
+#ifdef LOG_RCVPACKETS
+       cerr << "PktRcvSpeed window: ";
        copy(window, window + asize,
            ostream_iterator<int>(cerr, ", "));
        cerr << " return " << (int)ceil(1000000.0 / (sum / count));
-       cerr << endl;*/
+       cerr << endl;
+#endif
 
       bytes += (CPacket::SRT_DATA_HDR_SIZE * count); // Add protocol headers to bytes received
       bytesps = (unsigned long)ceil(1000000.0 / (double(sum) / double(bytes)));
@@ -198,10 +200,12 @@ int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, cons
    }
    else
    {
-       /*cerr << "PktRcvSpeed window: ";
+#ifdef LOG_RCVPACKETS
+       cerr << "PktRcvSpeed window: ";
        copy(window, window + asize,
            ostream_iterator<int>(cerr, ", "));
-       cerr << " return 0" << endl;*/
+       cerr << " return 0" << endl;
+#endif
       bytesps = 0;
       return 0;
    }

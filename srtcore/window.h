@@ -53,7 +53,7 @@ modified by
 #ifndef __UDT_WINDOW_H__
 #define __UDT_WINDOW_H__
 
-
+#define LOG_RCVPACKETS
 #ifndef _WIN32
    #include <sys/time.h>
    #include <time.h>
@@ -215,8 +215,10 @@ public:
        CGuard cg(m_lockPktWindow);
 
        m_CurrArrTime = CTimer::getTime();
-       /*cerr << "PktArrival duration=" << int(m_CurrArrTime - m_LastArrTime);
-       cerr << " size=" << pktsz << endl;*/
+#ifdef LOG_RCVPACKETS
+       cerr << srt_logging::FormatTime(m_CurrArrTime) << " PktArrival duration=" << int(m_CurrArrTime - m_LastArrTime);
+       cerr << " size=" << pktsz << endl;
+#endif
 
        // record the packet interval between the current and the last one
        m_aPktWindow[m_iPktWindowPtr] = int(m_CurrArrTime - m_LastArrTime);
