@@ -191,7 +191,7 @@ int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, cons
        copy(window, window + asize,
            ostream_iterator<int>(cerr, ", "));
        cerr << " return " << (int)ceil(1000000.0 / (sum / count));
-       cerr << endl;
+       cerr << "\n";
 #endif
 
       bytes += (CPacket::SRT_DATA_HDR_SIZE * count); // Add protocol headers to bytes received
@@ -204,7 +204,7 @@ int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, cons
        cerr << "PktRcvSpeed window: ";
        copy(window, window + asize,
            ostream_iterator<int>(cerr, ", "));
-       cerr << " return 0" << endl;
+       cerr << " return 0" << "\n";
 #endif
       bytesps = 0;
       return 0;

@@ -216,8 +216,8 @@ public:
 
        m_CurrArrTime = CTimer::getTime();
 #ifdef LOG_RCVPACKETS
-       cerr << srt_logging::FormatTime(m_CurrArrTime) << " PktArrival duration=" << int(m_CurrArrTime - m_LastArrTime);
-       cerr << " size=" << pktsz << endl;
+       std::cerr << srt_logging::FormatTime(m_CurrArrTime) << " PktArrival duration=" << int(m_CurrArrTime - m_LastArrTime);
+       std::cerr << " size=" << pktsz << "\n";
 #endif
 
        // record the packet interval between the current and the last one
