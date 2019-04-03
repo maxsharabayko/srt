@@ -53,7 +53,7 @@ modified by
 #ifndef __UDT_WINDOW_H__
 #define __UDT_WINDOW_H__
 
-#define LOG_RCVPACKETS
+//#define LOG_RCVPACKETS
 #ifndef _WIN32
    #include <sys/time.h>
    #include <time.h>

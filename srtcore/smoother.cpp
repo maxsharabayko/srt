@@ -356,8 +356,8 @@ private:
                     m_dPktSndPeriod = 1000000.0 / m_parent->deliveryRate();
                     LOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:ENDED) wndsize="
                         << m_dCWndSize << "/" << m_dMaxCWndSize
-                        << " sndperiod=" << m_dPktSndPeriod << "us = mega/("
-                        << m_parent->deliveryRate() << "B/s)");
+                        << " sndperiod=" << m_dPktSndPeriod << "us = 1M/("
+                        << m_parent->deliveryRate() << " pkts/s)");
                 }
                 else
                 {
