@@ -163,8 +163,8 @@ int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, cons
 
    unsigned count = 0;
    int sum = 0;
-   int upper = median << 3;
-   int lower = median >> 3;
+   int upper = median * 200;
+   int lower = median >> 4;
 
    bytesps = 0;
    unsigned long bytes = 0;

@@ -645,7 +645,7 @@ private: // Receiving related data
     int m_iConsecOrderedDelivery;                //< Increases with every packet coming in order or retransmitted, resets with every out-of-order packet
 
     CACKWindow<1024> m_ACKWindow;                //< ACK history window
-    CPktTimeWindow<16, 64> m_RcvTimeWindow;      //< Packet arrival time window
+    CPktTimeWindow<32, 64> m_RcvTimeWindow;      //< Packet arrival time window
 
     int32_t m_iRcvLastAck;                       //< Last sent ACK
 #ifdef ENABLE_LOGGING
