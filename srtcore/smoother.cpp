@@ -379,7 +379,7 @@ private:
         {
             m_dCWndSize = m_parent->deliveryRate() / 1000000.0 * (m_parent->RTT() + m_iRCInterval) + 16;
             LOGC(mglog.Debug, log << "FileSmoother: UPD (speed mode) wndsize="
-                << m_dCWndSize << "/" << m_dMaxCWndSize
+                << m_dCWndSize << "/" << m_dMaxCWndSize << " RTT = " << m_parent->RTT()
                 << " sndperiod=" << m_dPktSndPeriod << "us. deliverRate = "
                     << m_parent->deliveryRate() << " pkts/s)");
         }
@@ -435,7 +435,7 @@ RATE_LIMIT:
 #endif
 
         LOGC(mglog.Debug, log << "FileSmoother: UPD (slowstart:"
-            << (m_bSlowStart ? "ON" : "OFF") << ") wndsize=" << m_dCWndSize
+            << (m_bSlowStart ? "ON" : "OFF") << ") wndsize=" << m_dCWndSize << " inc = " << inc
             << " sndperiod=" << m_dPktSndPeriod << "us BANDWIDTH USED:" << usedbw << " (limit: " << m_maxSR << ")"
             " SYSTEM BUFFER LEFT: " << udp_buffer_free);
 #endif
