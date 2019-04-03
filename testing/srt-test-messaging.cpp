@@ -220,6 +220,9 @@ void send_message(const char *uri, const char* message, size_t length,
 
     auto statsth = std::thread([&out_stats, &stats_freq]
     {
+        if (stats_freq == chrono::seconds(0))
+            return;
+
         while (!int_state)
         {
             this_thread::sleep_for(stats_freq);
