@@ -37,9 +37,9 @@ void OnINT_ForceExit(int)
 
 
 
-void receive_message(const char *uri)
+void receive_message(const char *uri, bool reply, bool printmsg)
 {
-    cout << "Listen to " << uri << "\n";
+    ::cout << "Listen to " << uri << "\n";
 
     const size_t &message_size = s_message_size;
     if (0 != srt_msgn_listen(uri, message_size))
@@ -73,31 +73,38 @@ void receive_message(const char *uri)
             return;
         }
 
-        cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id;
-        if (recv_res < 50)
+        if (printmsg)
         {
-            cout << ":\n";
-            cout << string(message_rcvd.data(), recv_res).c_str();
+            ::cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id;
+            if (recv_res < 50)
+            {
+                ::cout << ":\n";
+                ::cout << string(message_rcvd.data(), recv_res).c_str();
+            }
+            else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
+            {
+                ::cout << " (first character):";
+                ::cout << message_rcvd[0];
+            }
+            ::cout << endl;
         }
-        else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
-        {
-            cout << " (first character):";
-            cout << message_rcvd[0];
-        }
-        cout << endl;
 
-        const string out_message("Message received");
-        const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
-        if (send_res <= 0)
+        if (reply)
         {
-            cerr << "ERROR: Sending reply message. Result: " << send_res;
-            cerr << " on conn ID " << connection_id << "\n";
-            cerr << srt_msgn_getlasterror_str() << endl;
+            const string out_message("Message received");
+            const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
+            if (send_res <= 0)
+            {
+                cerr << "ERROR: Sending reply message. Result: " << send_res;
+                cerr << " on conn ID " << connection_id << "\n";
+                cerr << srt_msgn_getlasterror_str() << endl;
 
-            srt_msgn_destroy();
-            return;
+                srt_msgn_destroy();
+                return;
+            }
+            if (printmsg)
+                ::cout << "Reply sent on conn ID " << connection_id << "\n";
         }
-        cout << "Reply sent on conn ID " << connection_id << "\n";
     }
 
     if (int_state)
@@ -181,9 +188,10 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out,
 
 
 void send_message(const char *uri, const char* message, size_t length,
+    bool reply, const bool printmsg,
     int num_repeats, ostream &out_stats, chrono::seconds stats_freq)
 {
-    cout << "Connect to " << uri << "\n";
+    ::cout << "Connect to " << uri << "\n";
     const size_t message_size = 8 * 1024 * 1024;
     if (-1 == srt_msgn_connect(uri, message_size))
     {
@@ -194,7 +202,7 @@ void send_message(const char *uri, const char* message, size_t length,
 
     const int num_messages = num_repeats;
 
-    auto rcvth = std::thread([&message_size, &num_messages]
+    auto rcvth = reply ? std::thread([&message_size, &num_messages, &printmsg]
     {
         vector<char> message_rcv(message_size);
 
@@ -203,7 +211,8 @@ void send_message(const char *uri, const char* message, size_t length,
             if (int_state)
                 break;
 
-            cout << "WAITING FOR MESSAGE no." << i << "\n";
+            if (printmsg)
+                ::cout << "WAITING FOR MESSAGE no." << i << "\n";
             const int rcv_res = srt_msgn_recv(message_rcv.data(), message_rcv.size(), nullptr);
             if (rcv_res <= 0)
             {
@@ -213,12 +222,15 @@ void send_message(const char *uri, const char* message, size_t length,
                 return;
             }
 
-            cout << "RECEIVED MESSAGE no." << i << ":\n";
-            cout << string(message_rcv.data(), rcv_res).c_str() << endl;
+            if (printmsg)
+            {
+                ::cout << "RECEIVED MESSAGE no." << i << ":\n";
+                ::cout << string(message_rcv.data(), rcv_res).c_str() << endl;
+            }
         }
-    });
+    }) : std::thread();
 
-    auto statsth = std::thread([&out_stats, &stats_freq]
+    auto statsth = stats_freq != chrono::seconds(0) ? std::thread([&out_stats, &stats_freq]
     {
         if (stats_freq == chrono::seconds(0))
             return;
@@ -239,19 +251,25 @@ void send_message(const char *uri, const char* message, size_t length,
                 PrintSrtStats(-1, stats, out_stats, true);
             }
         }
-    });
+    }) : std::thread();
 
-    int sent_res = srt_msgn_send(message, length);
-    if (sent_res != (int) length)
+    if (length > 0)
     {
-        cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
-        cerr << srt_msgn_getlasterror_str() << endl;
-        srt_msgn_destroy();
-        return;
-    }
+        int sent_res = srt_msgn_send(message, length);
+        if (sent_res != (int)length)
+        {
+            cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
+            cerr << srt_msgn_getlasterror_str() << endl;
+            srt_msgn_destroy();
+            return;
+        }
 
-    cout << "SENT MESSAGE:\n";
-    cout << message << endl;
+        if (printmsg)
+        {
+            ::cout << "SENT MESSAGE:\n";
+            ::cout << message << endl;
+        }
+    }
 
     vector<char> message_to_send(message_size);
     char c = 0;
@@ -266,14 +284,15 @@ void send_message(const char *uri, const char* message, size_t length,
             break;
 
         message_to_send[0] = '0' + i % 74;
-        sent_res = srt_msgn_send(message_to_send.data(), message_to_send.size());
-        if (sent_res != (int)message_size)
+        const int res = srt_msgn_send(message_to_send.data(), message_to_send.size());
+        if (res != (int)message_size)
         {
-            cerr << "ERROR: Sending " << message_size << ", sent " << sent_res << "\n";
+            cerr << "ERROR: Sending " << message_size << ", sent " << res << "\n";
             cerr << srt_msgn_getlasterror_str() << endl;
             break;
         }
-        cout << "SENT MESSAGE #" << i << "\n";
+        if (printmsg)
+            ::cout << "SENT MESSAGE #" << i << "\n";
     }
 
     rcvth.join();
@@ -303,6 +322,8 @@ int main(int argc, char** argv)
 {
     // Check options
     vector<OptionScheme> optargs = {
+        { {"reply"},          OptionScheme::ARG_ONE },
+        { {"printmsg"},       OptionScheme::ARG_ONE },
         { {"ll", "loglevel"}, OptionScheme::ARG_ONE },
         { {"statsfile"},      OptionScheme::ARG_ONE },
         { {"statsfreq"},      OptionScheme::ARG_ONE },
@@ -352,11 +373,13 @@ int main(int argc, char** argv)
 
 
     const int statsfreq = stoi(Option<OutString>(params, "0", "statsfreq"));
+    const bool reply    = stoi(Option<OutString>(params, "1", "reply")) != 0;
+    const bool printmsg = stoi(Option<OutString>(params, "1", "printmsg")) != 0;
 
 
     if (params[""].size() == 1)
     {
-        receive_message(params[""][0].c_str());
+        receive_message(params[""][0].c_str(), reply, printmsg);
         return 0;
     }
 
@@ -370,7 +393,7 @@ int main(int argc, char** argv)
     const int repeat = stoi(Option<OutString>(params, "60", "repeat"));
 
     send_message(params[""][0].c_str(), params[""][1].c_str(), params[""][1].size(),
-        repeat, out_stats, chrono::seconds(statsfreq));
+        reply, printmsg, repeat, out_stats, chrono::seconds(statsfreq));
 
     return 0;
 }
