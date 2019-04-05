@@ -400,7 +400,7 @@ private:
         if ((m_dPktSndPeriod > m_dLastDecPeriod) && ((m_parent->bandwidth() / 9) < B))
             B = m_parent->bandwidth() / 9;
         if (B <= 0)
-            inc = 1.0 / m_parent->MSS();
+            inc = 1.0 / m_parent->MSS();    // was inc = 0.01;
         else
         {
             // inc = max(10 ^ ceil(log10( B * MSS * 8 ) * Beta / MSS, 1/MSS)
@@ -408,7 +408,7 @@ private:
 
             inc = pow(10.0, ceil(log10(B * m_parent->MSS() * 8.0))) * 0.0000015 / m_parent->MSS();
 
-            if (inc < 1.0/m_parent->MSS())
+            if (inc < 1.0/m_parent->MSS())  // was < 0.01 then 0.01
                 inc = 1.0/m_parent->MSS();
         }
 

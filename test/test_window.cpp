@@ -10,6 +10,7 @@ TEST(PktTimeWindowTools, getPktRcvSpeed_in)
 {
     vector<int> window = { 69, 6, 5, 5, 5, 4, 5, 5, 7, 5, 5, 5, 5, 5, 6, 6 };
     //vector<int> window = { 5, 5, 5, 5, 176, 8, 4, 6, 5, 5, 5, 493, 9, 5, 5, 5 };
+    //vector<int> window = { 12, 12, 12, 12, 11, 12, 12, 12, 11, 12, 9982, 12, 11, 12, 12, 14 };
     vector<int> replic(window.size());
     vector<int> bytes(window.size(), 0);
 
