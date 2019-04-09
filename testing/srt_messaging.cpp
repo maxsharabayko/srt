@@ -168,6 +168,7 @@ int srt_msgn_destroy()
         return 0;
 
     s_rcv_srt_model.reset();
+    srt_cleanup();
     return 0;
 }
 
