@@ -1,4 +1,5 @@
 #include "gtest/gtest.h"
+#include <chrono>
 #include "common.h"
 
 
@@ -199,4 +200,83 @@ TEST(CSndQueue, WorkerIntervalsV2)
         cerr << "\n";
     }
 }
+
+
+TEST(CSndQueue, rdtscPenalty)
+{
+    const int num_samples = 5000;
+    uint64_t tk_vals[num_samples] = { };
+
+    const uint64_t freq = CTimer::getCPUFrequency();
+    std::cerr << "CPU Frequency: " << freq << "\n";
+
+    const chrono::steady_clock::time_point chrono_ts_start = chrono::steady_clock::now();
+
+    uint64_t start_time;
+    CTimer::rdtsc(start_time);
+
+    for (int i = 0; i < num_samples; i++)
+    {
+        uint64_t currtime;
+        CTimer::rdtsc(currtime);
+        tk_vals[i] = currtime;
+    }
+
+    uint64_t stop_time;
+    CTimer::rdtsc(stop_time);
+
+    const chrono::steady_clock::time_point chrono_ts_end = chrono::steady_clock::now();
+    const auto delta_us = chrono::duration_cast<chrono::microseconds>(chrono_ts_end - chrono_ts_start).count();
+    cerr << "Chrono time interval: " << delta_us << " us\n";
+    cerr << "rdtsc time interval: " << (stop_time - start_time) / freq << " us\n";
+    cerr << "rdtsc avg time penalty: " << delta_us / num_samples << " us\n";
+}
+
+
+TEST(CSndQueue, SleeptoAccuracy)
+{
+    const int num_samples = 1000;
+    uint64_t tk_vals[num_samples] = { };
+
+    const uint64_t freq = CTimer::getCPUFrequency();
+    std::cerr << "CPU Frequency: " << freq << "\n";
+
+    const uint64_t sleep_intervals_us[] = { 1, 5, 10, 15, 20, 50, 100, 1000, 10000 };
+
+    CTimer timer;
+
+    for (uint64_t interval_us : sleep_intervals_us)
+    {
+        const chrono::steady_clock::time_point chrono_ts_start = chrono::steady_clock::now();
+        uint64_t start_time;
+        CTimer::rdtsc(start_time);
+
+        for (int i = 0; i < num_samples; i++)
+        {
+            uint64_t currtime;
+            CTimer::rdtsc(currtime);
+            tk_vals[i] = currtime;
+            timer.sleepto(currtime + interval_us * freq);
+        }
+
+        uint64_t stop_time;
+        CTimer::rdtsc(stop_time);
+
+        const chrono::steady_clock::time_point chrono_ts_end = chrono::steady_clock::now();
+        const auto delta_us = chrono::duration_cast<chrono::microseconds>(chrono_ts_end - chrono_ts_start).count();
+        cerr << "Target sleep interval: " << interval_us << " us\n";
+        cerr << "Chrono time interval: " << delta_us << " us\n";
+        cerr << "rdtsc time interval: " << (stop_time - start_time) / freq << " us\n";
+        cerr << "sleepto avg time penalty: " << delta_us / num_samples << " us\n";
+    }
+}
+
+
+
+//TEST(CSndQueue, SleeptoMinimalSleep)
+//{
+//    uint64_t currtime;
+//    CTimer::rdtsc(currtime);
+//    timer.sleepto(ts_tk);
+//}
 

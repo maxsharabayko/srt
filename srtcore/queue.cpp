@@ -563,10 +563,13 @@ void* CSndQueue::worker(void* param)
 #endif   /* SRT_DEBUG_SNDQ_HIGHRATE */
 
             THREAD_PAUSED();
-            if (currtime < ts) 
+            if (currtime < ts)
             {
                 //LOGC(mglog.Debug, log << self->CONID() << "CSndQueue::worker sleepto " << FormatTime(CTimer::getTime() + (ts - currtime) / CTimer::getCPUFrequency()));
                 self->m_pTimer->sleepto(ts);
+                //const int64_t delta_us = (int64_t(ts) - int64_t(currtime)) / CTimer::getCPUFrequency();
+                //if (delta_us > 3)
+                //    std::this_thread::sleep_for(chrono::microseconds(delta_us - 1));
 
 #if         defined(HAI_DEBUG_SNDQ_HIGHRATE)
                 self->m_WorkerStats.lSleepTo++;
