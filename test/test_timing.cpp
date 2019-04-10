@@ -241,7 +241,7 @@ TEST(CSndQueue, SleeptoAccuracy)
     const uint64_t freq = CTimer::getCPUFrequency();
     std::cerr << "CPU Frequency: " << freq << "\n";
 
-    const uint64_t sleep_intervals_us[] = { 1, 5, 10, 15, 20, 50, 100, 1000, 10000 };
+    const uint64_t sleep_intervals_us[] = { 1, 5, 10, /*15, 20, 50, 100, 1000, */5000 };
 
     CTimer timer;
 

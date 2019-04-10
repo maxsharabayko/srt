@@ -193,6 +193,18 @@ void CTimer::sleepto(uint64_t nexttime)
 
    uint64_t t;
    rdtsc(t);
+   if (t >= m_ullSchedTime)
+       return;
+
+   const uint64_t freq = CTimer::getCPUFrequency();
+   timeval now;
+   gettimeofday(&now, 0);
+   const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + (m_ullSchedTime - t) * freq;
+   timespec timeout;
+   timeout.tv_sec  = time_us / 1000000;
+   timeout.tv_nsec = (time_us % 1000000) * 1000;
+
+
 
    while (t < m_ullSchedTime)
    {
@@ -205,24 +217,33 @@ void CTimer::sleepto(uint64_t nexttime)
        __asm__ volatile ("nop; nop; nop; nop; nop;");
 #endif
 #else
-       timeval now;
-       timespec timeout;
-       gettimeofday(&now, 0);
-       if (now.tv_usec < 990000)
-       {
-           timeout.tv_sec = now.tv_sec;
-           timeout.tv_nsec = (now.tv_usec + 10000) * 1000;
-       }
-       else
-       {
-           timeout.tv_sec = now.tv_sec + 1;
-           timeout.tv_nsec = (now.tv_usec + 10000 - 1000000) * 1000;
-       }
        THREAD_PAUSED();
        pthread_mutex_lock(&m_TickLock);
        pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
        pthread_mutex_unlock(&m_TickLock);
        THREAD_RESUMED();
+
+
+       //condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) * freq);
+
+       //timeval now;
+       //timespec timeout;
+       //gettimeofday(&now, 0);
+       //if (now.tv_usec < 990000)
+       //{
+       //    timeout.tv_sec = now.tv_sec;
+       //    timeout.tv_nsec = (now.tv_usec + 10000) * 1000;
+       //}
+       //else
+       //{
+       //    timeout.tv_sec = now.tv_sec + 1;
+       //    timeout.tv_nsec = (now.tv_usec + 10000 - 1000000) * 1000;
+       //}
+       //THREAD_PAUSED();
+       //pthread_mutex_lock(&m_TickLock);
+       //pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
+       //pthread_mutex_unlock(&m_TickLock);
+       //THREAD_RESUMED();
 #endif
 
        rdtsc(t);
@@ -307,7 +328,7 @@ int CTimer::condTimedWaitUS(pthread_cond_t* cond, pthread_mutex_t* mutex, uint64
     timespec timeout;
     timeout.tv_sec = time_us / 1000000;
     timeout.tv_nsec = (time_us % 1000000) * 1000;
-    
+
     return pthread_cond_timedwait(cond, mutex, &timeout);
 }
 
