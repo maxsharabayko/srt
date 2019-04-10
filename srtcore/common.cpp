@@ -205,8 +205,7 @@ void CTimer::sleepto(uint64_t nexttime)
    timeout.tv_nsec = (time_us % 1000000) * 1000;
 
 
-
-   while (t < m_ullSchedTime)
+   //while (t < m_ullSchedTime)
    {
 #ifndef NO_BUSY_WAITING
 #ifdef IA32
