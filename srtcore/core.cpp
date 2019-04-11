@@ -7547,6 +7547,9 @@ int CUDT::packData(CPacket& packet, uint64_t& ts_tk)
             ts_tk = entertime_tk + m_ullInterval_tk - m_ullTimeDiff_tk;
             m_ullTimeDiff_tk = 0;
          }
+         const uint64_t min_interval = 13 * CTimer::getCPUFrequency();
+         if (ts_tk - entertime_tk < min_interval)
+            ts_tk = entertime_tk + min_interval;
       #endif
    }
 
