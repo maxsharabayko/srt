@@ -205,7 +205,7 @@ void CTimer::sleepto(uint64_t nexttime)
    timeout.tv_nsec = (time_us % 1000000) * 1000;
 
 
-   //while (t < m_ullSchedTime)
+   while (t < m_ullSchedTime)
    {
 #ifndef NO_BUSY_WAITING
 #ifdef IA32
@@ -216,12 +216,15 @@ void CTimer::sleepto(uint64_t nexttime)
        __asm__ volatile ("nop; nop; nop; nop; nop;");
 #endif
 #else
-       THREAD_PAUSED();
-       pthread_mutex_lock(&m_TickLock);
-       pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
-       pthread_mutex_unlock(&m_TickLock);
-       THREAD_RESUMED();
-
+       if ((m_ullSchedTime - t) > 100 * freq)   // 100 us
+       {
+           THREAD_PAUSED();
+           pthread_mutex_lock(&m_TickLock);
+           pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
+           pthread_mutex_unlock(&m_TickLock);
+           THREAD_RESUMED();
+       }
+       // Else buisy waiting
 
        //condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) * freq);
 

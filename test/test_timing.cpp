@@ -254,12 +254,12 @@ TEST(CSndQueue, SleeptoAccuracy)
 
         for (int i = 0; i < num_samples; i++)
         {
-            //uint64_t currtime;
-            //CTimer::rdtsc(currtime);
-            //tk_vals[i] = currtime;
+            uint64_t currtime;
+            CTimer::rdtsc(currtime);
+            tk_vals[i] = currtime;
 
-            this_thread::sleep_for(chrono::microseconds(interval_us));
-            //timer.sleepto(currtime + interval_us * freq);
+            //this_thread::sleep_for(chrono::microseconds(interval_us));
+            timer.sleepto(currtime + interval_us * freq);
         }
 
         uint64_t stop_time;
