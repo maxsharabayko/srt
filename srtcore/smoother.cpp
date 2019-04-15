@@ -589,26 +589,54 @@ RATE_LIMIT:
 
 #undef SSLOT
 
-template <class Target>
-struct Creator
-{
-    static SmootherBase* Create(CUDT* parent) { return new Target(parent); }
-};
-
-Smoother::NamePtr Smoother::smoothers[N_SMOOTHERS] =
+Smoother::NamePtr Smoother::builtin_smoothers[] =
 {
     {"live", Creator<LiveSmoother>::Create },
     {"file", Creator<FileSmoother>::Create }
 };
 
+bool Smoother::IsBuiltin(const string& s)
+{
+    size_t size = sizeof builtin_smoothers / sizeof(builtin_smoothers[0]);
+    for (size_t i = 0; i < size; ++i)
+        if (s == builtin_smoothers[i].first)
+            return true;
+
+    return false;
+}
+
+Smoother::smoothers_map_t Smoother::smoothers;
+
+void Smoother::globalInit()
+{
+    // Add the builtin smoothers to the global map.
+    // Users may add their smoothers after that.
+    // This function is called from CUDTUnited::startup,
+    // which is guaranteed to run the initializing
+    // procedures only once per process.
+
+    for (size_t i = 0; i < sizeof builtin_smoothers / sizeof(builtin_smoothers[0]); ++i)
+        smoothers[builtin_smoothers[i].first] = builtin_smoothers[i].second;
+
+    // Actually there's no problem with calling this function
+    // multiple times, at worst it will overwrite existing smoothers
+    // with the same builtin.
+}
+
+bool Smoother::select(const std::string& name)
+{
+    selector = smoothers.find(name);
+    return selector != smoothers.end();
+}
+
 
 bool Smoother::configure(CUDT* parent)
 {
-    if (selector == N_SMOOTHERS)
+    if (selector == smoothers.end())
         return false;
 
     // Found a smoother, so call the creation function
-    smoother = (*smoothers[selector].second)(parent);
+    smoother = (*selector->second)(parent);
 
     // The smoother should have pinned in all events
     // that are of its interest. It's stated that
