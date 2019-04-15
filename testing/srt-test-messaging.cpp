@@ -13,6 +13,8 @@
 #include "utilities.h"
 #include "logsupport.hpp"
 #include "srt_messaging.h"
+#include "file-smoother-v2.h"
+
 
 using namespace std;
 
@@ -375,6 +377,10 @@ int main(int argc, char** argv)
     const int statsfreq = stoi(Option<OutString>(params, "0", "statsfreq"));
     const bool reply    = stoi(Option<OutString>(params, "1", "reply")) != 0;
     const bool printmsg = stoi(Option<OutString>(params, "1", "printmsg")) != 0;
+
+    //srt_startup();
+    // Register your own Smoother
+    Smoother::add<FileSmootherV2>("file-v2");
 
 
     if (params[""].size() == 1)

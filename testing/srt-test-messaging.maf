@@ -1,6 +1,8 @@
 
 SOURCES
 srt-test-messaging.cpp
+file-smoother-v2.h
+file-smoother-v2.cpp
 ../apps/logsupport.hpp
 ../apps/logsupport.cpp
 
