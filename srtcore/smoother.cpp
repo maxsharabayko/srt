@@ -605,23 +605,14 @@ bool Smoother::IsBuiltin(const string& s)
     return false;
 }
 
-Smoother::smoothers_map_t Smoother::smoothers;
 
-void Smoother::globalInit()
+Smoother::smoothers_map_t Smoother::smoothers =
 {
-    // Add the builtin smoothers to the global map.
-    // Users may add their smoothers after that.
-    // This function is called from CUDTUnited::startup,
-    // which is guaranteed to run the initializing
-    // procedures only once per process.
+    {"live", Creator<LiveSmoother>::Create },
+    {"file", Creator<FileSmoother>::Create }
+};
 
-    for (size_t i = 0; i < sizeof builtin_smoothers / sizeof(builtin_smoothers[0]); ++i)
-        smoothers[builtin_smoothers[i].first] = builtin_smoothers[i].second;
 
-    // Actually there's no problem with calling this function
-    // multiple times, at worst it will overwrite existing smoothers
-    // with the same builtin.
-}
 
 bool Smoother::select(const std::string& name)
 {

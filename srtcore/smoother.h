@@ -40,7 +40,6 @@ class Smoother
     void Check();
 
 public:
-    static void globalInit();
 
     template <class Target>
     struct Creator

@@ -13,7 +13,6 @@
 #include "utilities.h"
 #include "logsupport.hpp"
 #include "srt_messaging.h"
-#include "file-smoother-v2.h"
 
 
 using namespace std;
@@ -297,7 +296,8 @@ void send_message(const char *uri, const char* message, size_t length,
             ::cout << "SENT MESSAGE #" << i << "\n";
     }
 
-    rcvth.join();
+    if (rcvth.joinable())
+        rcvth.join();
 
     const int undelivered = srt_msgn_wait_undelievered(5000);
     if (undelivered)
@@ -306,7 +306,8 @@ void send_message(const char *uri, const char* message, size_t length,
     }
 
     int_state = true;
-    statsth.join();
+    if (statsth.joinable())
+        statsth.join();
 
     srt_msgn_destroy();
 }
@@ -377,11 +378,6 @@ int main(int argc, char** argv)
     const int statsfreq = stoi(Option<OutString>(params, "0", "statsfreq"));
     const bool reply    = stoi(Option<OutString>(params, "1", "reply")) != 0;
     const bool printmsg = stoi(Option<OutString>(params, "1", "printmsg")) != 0;
-
-    //srt_startup();
-    // Register your own Smoother
-    Smoother::add<FileSmootherV2>("file-v2");
-
 
     if (params[""].size() == 1)
     {

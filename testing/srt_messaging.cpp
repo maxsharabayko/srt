@@ -6,14 +6,29 @@
 #include "uriparser.hpp"
 #include "testmedia.hpp"
 #include "verbose.hpp"
+#include "file-smoother-v2.h"
 
 using namespace std;
 
 unique_ptr<SrtReceiver> g_rcv_srt_model;
+bool g_smoothers_added = false;
+
+
+void add_smoothers()
+{
+    if (g_smoothers_added)
+        return;
+    //srt_startup();
+    // Register your own Smoother
+    Smoother::add<FileSmootherV2>("file-v2");
+    g_smoothers_added = true;
+}
 
 
 int srt_msgn_connect(const char *uri, size_t message_size)
 {
+    add_smoothers();
+
     UriParser ut(uri);
 
     if (ut.port().empty())
@@ -49,6 +64,8 @@ int srt_msgn_connect(const char *uri, size_t message_size)
 
 int srt_msgn_listen(const char *uri, size_t message_size)
 {
+    add_smoothers();
+
     UriParser ut(uri);
 
     if (ut.port().empty())
