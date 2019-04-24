@@ -18,7 +18,6 @@
 using namespace std;
 
 
-const size_t s_message_size = 8 * 1024 * 1024;
 volatile bool int_state = false;
 
 
@@ -38,11 +37,11 @@ void OnINT_ForceExit(int)
 
 
 
-void receive_message(const char *uri, bool reply, bool printmsg)
+void receive_message(const char *uri, size_t msg_size, bool reply, bool printmsg)
 {
     ::cout << "Listen to " << uri << "\n";
 
-    const size_t &message_size = s_message_size;
+    const size_t &message_size = msg_size;
     if (0 != srt_msgn_listen(uri, message_size))
     {
         cerr << "ERROR: Listen failed.\n";
@@ -189,11 +188,11 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out,
 
 
 void send_message(const char *uri, const char* message, size_t length,
-    bool reply, const bool printmsg,
+    size_t msg_size, bool reply, const bool printmsg, int target_bitrate_bps,
     int num_repeats, ostream &out_stats, chrono::seconds stats_freq)
 {
     ::cout << "Connect to " << uri << "\n";
-    const size_t message_size = 8 * 1024 * 1024;
+    const size_t message_size = msg_size;
     if (-1 == srt_msgn_connect(uri, message_size))
     {
         cerr << "ERROR: Connect failed.\n";
@@ -272,6 +271,9 @@ void send_message(const char *uri, const char* message, size_t length,
         }
     }
 
+    const long msgs_per_s = static_cast<long long>(target_bitrate_bps / 8) / message_size;
+    const long msg_interval_us = 1000000 / msgs_per_s;
+
     vector<char> message_to_send(message_size);
     char c = 0;
     for (size_t i = 0; i < message_to_send.size(); ++i)
@@ -279,8 +281,31 @@ void send_message(const char *uri, const char* message, size_t length,
         message_to_send[i] = c++;
     }
 
+    auto time_prev = chrono::steady_clock::now();
+    long time_dev_us = 0;
+
     for (int i = 0; i < num_messages; ++i)
     {
+        if (int_state)
+            break;
+
+        if (target_bitrate_bps)
+        {
+            const long duration_us = time_dev_us > msg_interval_us ? 0 : (msg_interval_us - time_dev_us);
+            const auto next_time = time_prev + chrono::microseconds(duration_us);
+            chrono::time_point<chrono::steady_clock> time_now;
+            for (;;)
+            {
+                time_now = chrono::steady_clock::now();
+                if (time_now >= next_time)
+                    break;
+                if (int_state)
+                    break;
+            }
+
+            time_dev_us += (long) chrono::duration_cast<chrono::microseconds>(time_now - time_prev).count() - msg_interval_us;
+            time_prev = time_now;
+        }
         if (int_state)
             break;
 
@@ -331,6 +356,8 @@ int main(int argc, char** argv)
         { {"statsfile"},      OptionScheme::ARG_ONE },
         { {"statsfreq"},      OptionScheme::ARG_ONE },
         { {"repeat"},         OptionScheme::ARG_ONE },
+        { {"bitrate"},        OptionScheme::ARG_ONE },
+        { {"msgsize"},        OptionScheme::ARG_ONE },
     };
     map<string, vector<string>> params = ProcessOptions(argv, argc, optargs);
 
@@ -376,26 +403,28 @@ int main(int argc, char** argv)
 
 
     const int statsfreq = stoi(Option<OutString>(params, "0", "statsfreq"));
-    const bool reply    = stoi(Option<OutString>(params, "1", "reply")) != 0;
+    const bool reply    = stoi(Option<OutString>(params, "0", "reply")) != 0;
     const bool printmsg = stoi(Option<OutString>(params, "1", "printmsg")) != 0;
+    const int bitrate   = stoi(Option<OutString>(params, "0", "bitrate"));
+    const int msg_size  = stoi(Option<OutString>(params, "8388608", "msgsize"));    // 8 MB
 
     if (params[""].size() == 1)
     {
-        receive_message(params[""][0].c_str(), reply, printmsg);
+        receive_message(params[""][0].c_str(), msg_size, reply, printmsg);
         return 0;
     }
 
 
-    if (params[""][1].size() > s_message_size)
+    if (params[""][1].size() > msg_size)
     {
-        cerr << "ERROR. Message size exceeds maximum size of " << s_message_size << endl;
+        cerr << "ERROR. Message size exceeds maximum size of " << msg_size << endl;
         return 1;
     }
 
     const int repeat = stoi(Option<OutString>(params, "60", "repeat"));
 
-    send_message(params[""][0].c_str(), params[""][1].c_str(), params[""][1].size(),
-        reply, printmsg, repeat, out_stats, chrono::seconds(statsfreq));
+    send_message(params[""][0].c_str(), params[""][1].c_str(), params[""][1].size(), msg_size,
+        reply, printmsg, bitrate, repeat, out_stats, chrono::seconds(statsfreq));
 
     return 0;
 }
