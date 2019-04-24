@@ -80,7 +80,7 @@ private:
     std::atomic<bool> m_stop_accept = { false };
     std::mutex        m_recv_mutex;
 
-    std::thread m_accepting_thread;
+    std::future<void> m_accepting_th;
 
 };
 

@@ -192,8 +192,9 @@ int srt_msgn_destroy()
     if (!g_rcv_srt_model)
         return -1;
 
-    g_rcv_srt_model->Close();
+    const int ret = g_rcv_srt_model->Close();
     g_rcv_srt_model.reset();
+    return ret;
 }
 
 
