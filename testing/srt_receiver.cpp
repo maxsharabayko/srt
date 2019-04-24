@@ -20,7 +20,7 @@ std::string print_time()
 {
 
     time_t time = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    tm *tm  = localtime(&time);
+    tm *tm = localtime(&time);
     time_t usec = time % 1000000;
 
     char tmp_buf[512];
@@ -36,16 +36,13 @@ std::string print_time()
 
 
 
-SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> par)
-    : m_host(host)
-    , m_port(port)
-    , m_options(par)
+SrtReceiver::SrtReceiver()
 {
     //Verbose::on = true;
     srt_startup();
     //srt_setloglevel(LOG_DEBUG);
 
-    m_epoll_accept  = srt_epoll_create();
+    m_epoll_accept = srt_epoll_create();
     if (m_epoll_accept == -1)
         throw std::runtime_error("Can't create epoll in nonblocking mode");
     m_epoll_receive = srt_epoll_create();
@@ -56,29 +53,38 @@ SrtReceiver::SrtReceiver(std::string host, int port, std::map<string, string> pa
 
 SrtReceiver::~SrtReceiver()
 {
-    m_stop_accept = true;
-    if (m_accepting_thread.joinable())
-        m_accepting_thread.join();
-
-    lock_guard<mutex> lock(m_recv_mutex);
+    Close();
 }
 
 
-void SrtReceiver::AcceptingThread()
+int SrtReceiver::Close()
+{
+    m_stop_accept = true;
+
+    if (m_accepting_th.valid())
+        m_accepting_th.wait();
+
+    lock_guard<mutex> lock(m_recv_mutex);
+    return srt_close(m_bindsock);
+}
+
+
+
+void SrtReceiver::AcceptingThread(const std::map<string, string> options)
 {
     int rnum = 2;
     SRTSOCKET read_fds[2] = {};
 
     while (!m_stop_accept)
     {
-        const int epoll_res 
+        const int epoll_res
             = srt_epoll_wait(m_epoll_accept, read_fds, &rnum, 0, 0, 3000,
-                                                    0,     0, 0, 0);
+                             0, 0, 0, 0);
 
         if (epoll_res > 0)
         {
             Verb() << "AcceptingThread: epoll res " << epoll_res << " rnum: " << rnum;
-            const SRTSOCKET sock = AcceptNewClient();
+            const SRTSOCKET sock = AcceptNewClient(options);
             if (sock != SRT_INVALID_SOCK)
             {
                 const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
@@ -90,7 +96,7 @@ void SrtReceiver::AcceptingThread()
 }
 
 
-SRTSOCKET SrtReceiver::AcceptNewClient()
+SRTSOCKET SrtReceiver::AcceptNewClient(const std::map<string, string> &options)
 {
     sockaddr_in scl;
     int sclen = sizeof scl;
@@ -108,7 +114,7 @@ SRTSOCKET SrtReceiver::AcceptNewClient()
 
     // ConfigurePre is done on bindsock, so any possible Pre flags
     // are DERIVED by sock. ConfigurePost is done exclusively on sock.
-    const int stat = ConfigureAcceptedSocket(socket);
+    const int stat = ConfigureAcceptedSocket(socket, options);
     if (stat == SRT_ERROR)
         Verb() << "ConfigureAcceptedSocket failed: " << srt_getlasterror_str();
 
@@ -117,7 +123,7 @@ SRTSOCKET SrtReceiver::AcceptNewClient()
 
 
 
-int SrtReceiver::ConfigureAcceptedSocket(SRTSOCKET sock)
+int SrtReceiver::ConfigureAcceptedSocket(SRTSOCKET sock, const std::map<string, string> &options)
 {
     bool no = false;
     const int yes = 1;
@@ -132,13 +138,13 @@ int SrtReceiver::ConfigureAcceptedSocket(SRTSOCKET sock)
     //if (m_timeout)
     //    return srt_setsockopt(sock, 0, SRTO_RCVTIMEO, &m_timeout, sizeof m_timeout);
 
-    SrtConfigurePost(sock, m_options);
+    SrtConfigurePost(sock, options);
 
     return 0;
 }
 
 
-int SrtReceiver::ConfigurePre(SRTSOCKET sock)
+int SrtReceiver::ConfigurePre(SRTSOCKET sock, const std::map<string, string> &options)
 {
     const int no  = 0;
     const int yes = 1;
@@ -165,7 +171,7 @@ int SrtReceiver::ConfigurePre(SRTSOCKET sock)
     // NOTE: here host = "", so the 'connmode' will be returned as LISTENER always,
     // but it doesn't matter here. We don't use 'connmode' for anything else than
     // checking for failures.
-    SocketOption::Mode conmode = SrtConfigurePre(sock, "", m_options, &failures);
+    SocketOption::Mode conmode = SrtConfigurePre(sock, "", options, &failures);
 
     if (conmode == SocketOption::FAILURE)
     {
@@ -183,21 +189,22 @@ int SrtReceiver::ConfigurePre(SRTSOCKET sock)
 }
 
 
-int SrtReceiver::EstablishConnection(bool caller, int max_conn)
+int SrtReceiver::EstablishConnection(const std::string &host, int port,
+    const std::map<string, string> &options, bool caller, int max_conn)
 {
     m_bindsock = srt_create_socket();
 
     if (m_bindsock == SRT_INVALID_SOCK)
         return SRT_ERROR;
 
-    int stat = ConfigurePre(m_bindsock);
+    int stat = ConfigurePre(m_bindsock, options);
     if (stat == SRT_ERROR)
         return SRT_ERROR;
 
     const int modes = SRT_EPOLL_IN;
     srt_epoll_add_usock(m_epoll_accept, m_bindsock, &modes);
 
-    sockaddr_in sa = CreateAddrInet(m_host, m_port);
+    sockaddr_in sa = CreateAddrInet(host, port);
     sockaddr* psa = (sockaddr*)&sa;
 
     if (caller)
@@ -210,7 +217,7 @@ int SrtReceiver::EstablishConnection(bool caller, int max_conn)
         if (result == -1)
             return result;
 
-        Verb() << "Connecting to " << m_host << ":" << m_port << " ... " << VerbNoEOL;
+        Verb() << "Connecting to " << host << ":" << port << " ... " << VerbNoEOL;
         int stat = srt_connect(m_bindsock, psa, sizeof sa);
         if (stat == SRT_ERROR)
         {
@@ -227,7 +234,7 @@ int SrtReceiver::EstablishConnection(bool caller, int max_conn)
     }
     else
     {
-        Verb() << "Binding a server on " << m_host << ":" << m_port << VerbNoEOL;
+        Verb() << "Binding a server on " << host << ":" << port << VerbNoEOL;
         stat = srt_bind(m_bindsock, psa, sizeof sa);
         if (stat == SRT_ERROR)
         {
@@ -243,7 +250,7 @@ int SrtReceiver::EstablishConnection(bool caller, int max_conn)
             return SRT_ERROR;
         }
 
-        m_accepting_thread = thread(&SrtReceiver::AcceptingThread, this);
+        m_accepting_th     = async(launch::async, &SrtReceiver::AcceptingThread, this, options);
     }
 
     m_epoll_read_fds .assign(max_conn, SRT_INVALID_SOCK);
@@ -253,15 +260,15 @@ int SrtReceiver::EstablishConnection(bool caller, int max_conn)
 }
 
 
-int SrtReceiver::Listen(int max_conn)
+int SrtReceiver::Listen(const std::string &host, int port, const std::map<string, string> &options, int max_conn)
 {
-    return EstablishConnection(false, max_conn);
+    return EstablishConnection(host, port, options, false, max_conn);
 }
 
 
-int SrtReceiver::Connect()
+int SrtReceiver::Connect(const std::string &host, int port, const std::map<string, string> &options)
 {
-    return EstablishConnection(true, 1);
+    return EstablishConnection(host, port, options, true, 1);
 }
 
 
@@ -371,7 +378,7 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             else if (srt_err == SRT_EINVSOCK)
             {
                 Verb() << print_time() << "Socket " << sock << " is no longer valid (state "
-                       << srt_getsockstate(sock) << "). Remove from epoll.";
+                    << srt_getsockstate(sock) << "). Remove from epoll.";
                 srt_epoll_remove_usock(m_epoll_receive, sock);
                 continue;
             }
@@ -387,6 +394,37 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
 }
 
 
+int SrtReceiver::WaitUndelivered(int wait_ms)
+{
+    const SRTSOCKET sock = GetBindSocket();
+
+    const SRT_SOCKSTATUS status = srt_getsockstate(sock);
+    if (status != SRTS_CONNECTED && status != SRTS_CLOSING)
+        return 0;
+
+    size_t blocks = 0;
+    size_t bytes = 0;
+    int ms_passed = 0;
+    do
+    {
+        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, &bytes))
+            return SRT_ERROR;
+
+        if (wait_ms == 0)
+            break;
+
+        if (wait_ms != -1 && ms_passed >= wait_ms)
+            break;
+
+        if (blocks)
+            this_thread::sleep_for(chrono::milliseconds(1));
+        ++ms_passed;
+    } while (blocks != 0);
+
+    return bytes;
+};
+
+
 
 int SrtReceiver::Send(const char *buffer, size_t buffer_len, int srt_socket_id)
 {
@@ -398,4 +436,3 @@ int SrtReceiver::Send(const char *buffer, size_t buffer_len)
 {
     return srt_sendmsg(m_bindsock, buffer, (int)buffer_len, -1, true);
 }
-

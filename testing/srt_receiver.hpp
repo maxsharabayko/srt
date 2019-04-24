@@ -3,6 +3,7 @@
 #include <queue>
 #include <atomic>
 #include <mutex>
+#include <future>
 #include "srt.h"
 #include "uriparser.hpp"
 #include "testmedia.hpp"
@@ -10,18 +11,21 @@
 
 
 class SrtReceiver
-    //: public SrtCommon
 {
 
 public:
 
-    SrtReceiver(std::string host, int port, std::map<string, string> par);
+    SrtReceiver();
 
     ~SrtReceiver();
 
-    int Listen(int max_conn);
+    int Listen(const std::string &host, int port,
+        const std::map<string, string> &options, int max_conn);
 
-    int Connect();
+    int Connect(const std::string &host, int port,
+        const std::map<string, string> &options);
+
+    int Close();
 
 
     // Receive data
@@ -41,17 +45,20 @@ public:
 
     SRTSOCKET GetBindSocket() { return m_bindsock; }
 
+    int WaitUndelivered(int wait_ms);
 
 private:
 
-    int EstablishConnection(bool caller, int max_conn);
+    int EstablishConnection(const std::string &host, int port,
+        const std::map<string, string> &options, bool caller, int max_conn);
 
-    void AcceptingThread();
+    void AcceptingThread(const std::map<string, string> options);
 
-    SRTSOCKET AcceptNewClient();
+    SRTSOCKET AcceptNewClient(const std::map<string, string> &options);
 
-    int ConfigurePre(SRTSOCKET sock);
-    int ConfigureAcceptedSocket(SRTSOCKET sock);
+    int ConfigurePre(SRTSOCKET sock, const std::map<string, string> &options);
+    int ConfigureAcceptedSocket(SRTSOCKET sock, const std::map<string, string> &options);
+
 
 
 private:    // Reading manipulation helper functions
@@ -70,16 +77,10 @@ private:
 
 private:
 
-    volatile std::atomic<bool> m_stop_accept = { false };
+    std::atomic<bool> m_stop_accept = { false };
     std::mutex        m_recv_mutex;
 
-    std::thread m_accepting_thread;
-
-private:    // Configuration
-
-    std::string m_host;
-    int m_port;
-    std::map<string, string> m_options; // All other options, as provided in the URI
+    std::future<void> m_accepting_th;
 
 };
 

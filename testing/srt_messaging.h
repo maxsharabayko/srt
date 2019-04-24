@@ -117,6 +117,9 @@ SRT_MSGN_API const char* srt_msgn_getlasterror_str(void);
 SRT_MSGN_API int         srt_msgn_getlasterror(void);
 
 
+SRT_MSGN_API int         srt_msgn_set_loglevel(int loglevel, int verbose);
+
+
 /**
  * Destroy the messaging service
  *

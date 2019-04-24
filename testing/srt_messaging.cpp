@@ -1,13 +1,15 @@
 #include <list>
 #include <thread>
+#include <atomic>
 #include "srt_messaging.h"
 #include "srt_receiver.hpp"
 #include "uriparser.hpp"
 #include "testmedia.hpp"
+#include "verbose.hpp"
 
 using namespace std;
 
-static unique_ptr<SrtReceiver> s_rcv_srt_model;
+unique_ptr<SrtReceiver> g_rcv_srt_model;
 
 
 int srt_msgn_connect(const char *uri, size_t message_size)
@@ -28,12 +30,13 @@ int srt_msgn_connect(const char *uri, size_t message_size)
     // If we have this parameter provided, probably someone knows better
     if (!ut["sndbuf"].exists())
     {
-        ut["sndbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
+        ut["sndbuf"] = to_string(5 * (message_size * 1472 / 1456 + 1472));
     }
 
-    s_rcv_srt_model = unique_ptr<SrtReceiver>(new SrtReceiver(ut.host(), ut.portno(), ut.parameters()));
+    if (!g_rcv_srt_model)
+        g_rcv_srt_model = unique_ptr<SrtReceiver>(new SrtReceiver());
 
-    const int res = s_rcv_srt_model->Connect();
+    const int res = g_rcv_srt_model->Connect(ut.host(), ut.portno(), ut.parameters());
     if (res == SRT_INVALID_SOCK)
     {
         cerr << "ERROR! While setting up a caller\n";
@@ -70,17 +73,13 @@ int srt_msgn_listen(const char *uri, size_t message_size)
     // If we have this parameter provided, probably someone knows better
     if (!ut["rcvbuf"].exists() && ut.queryValue("transtype") != "live")
     {
-        ut["rcvbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
-    }
-    s_rcv_srt_model = std::unique_ptr<SrtReceiver>(new SrtReceiver(ut.host(), ut.portno(), ut.parameters()));
-
-    if (!s_rcv_srt_model)
-    {
-        cerr << "ERROR! While creating a listener\n";
-        return -1;
+        ut["rcvbuf"] = to_string(5 * (message_size * 1472 / 1456 + 1472));
     }
 
-    if (s_rcv_srt_model->Listen(maxconn) != 0)
+    if (!g_rcv_srt_model)
+        g_rcv_srt_model = unique_ptr<SrtReceiver>(new SrtReceiver());
+
+    if (g_rcv_srt_model->Listen(ut.host(), ut.portno(), ut.parameters(), maxconn) != 0)
     {
         cerr << "ERROR! While setting up a listener: " <<srt_getlasterror_str() << endl;
         return -1;
@@ -92,61 +91,52 @@ int srt_msgn_listen(const char *uri, size_t message_size)
 
 int srt_msgn_send(const char *buffer, size_t buffer_len)
 {
-    if (!s_rcv_srt_model)
+    if (!g_rcv_srt_model)
         return -1;
 
-    return s_rcv_srt_model->Send(buffer, buffer_len);
+    return g_rcv_srt_model->Send(buffer, buffer_len);
 }
 
 
 int srt_msgn_send_on_conn(const char *buffer, size_t buffer_len, int connection_id)
 {
-    if (!s_rcv_srt_model)
+    if (!g_rcv_srt_model)
         return -1;
 
-    return s_rcv_srt_model->Send(buffer, buffer_len, connection_id);
+    return g_rcv_srt_model->Send(buffer, buffer_len, connection_id);
 }
 
 
 int srt_msgn_wait_undelievered(int wait_ms)
 {
-    if (!s_rcv_srt_model)
-        return SRT_ERROR;
+    if (!g_rcv_srt_model)
+        return -1;
 
-    const SRTSOCKET sock = s_rcv_srt_model->GetBindSocket();
-    const SRT_SOCKSTATUS status = srt_getsockstate(sock);
-    if (status != SRTS_CONNECTED && status != SRTS_CLOSING)
-        return 0;
-
-    size_t blocks = 0;
-    size_t bytes  = 0;
-    int ms_passed = 0;
-    do
-    {
-        if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, &bytes))
-            return SRT_ERROR;
-
-        if (wait_ms == 0)
-            break;
-
-        if (wait_ms != -1 && ms_passed >= wait_ms)
-            break;
-
-        if (blocks)
-            this_thread::sleep_for(chrono::milliseconds(1));
-        ++ms_passed;
-    } while (blocks != 0);
-
-    return bytes;
+    return g_rcv_srt_model->WaitUndelivered(wait_ms);
 }
 
 
 int srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id)
 {
-    if (!s_rcv_srt_model)
+    if (!g_rcv_srt_model)
         return -1;
 
-    return s_rcv_srt_model->Receive(buffer, buffer_len, connection_id);
+    return g_rcv_srt_model->Receive(buffer, buffer_len, connection_id);
+}
+
+
+
+
+
+int srt_msgn_set_loglevel(int loglevel, int verbose)
+{
+    srt_logging::LogLevel::type lev = (srt_logging::LogLevel::type) loglevel;
+    UDT::setloglevel(lev);
+
+    if (verbose)
+        Verbose::on = true;
+
+    return 0;
 }
 
 
@@ -164,12 +154,12 @@ int srt_msgn_getlasterror(void)
 
 int srt_msgn_destroy()
 {
-    if (!s_rcv_srt_model)
-        return 0;
+    if (!g_rcv_srt_model)
+        return -1;
 
-    s_rcv_srt_model.reset();
-    srt_cleanup();
-    return 0;
+    const int ret = g_rcv_srt_model->Close();
+    g_rcv_srt_model.reset();
+    return ret;
 }
 
 
