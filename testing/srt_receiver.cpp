@@ -60,9 +60,11 @@ SrtReceiver::~SrtReceiver()
 int SrtReceiver::Close()
 {
     m_stop_accept = true;
-    if (m_accepting_thread.joinable())
-        m_accepting_thread.join();
 
+    if (m_accepting_th.valid())
+        m_accepting_th.wait();
+
+    lock_guard<mutex> lock(m_recv_mutex);
     return srt_close(m_bindsock);
 }
 
@@ -248,7 +250,7 @@ int SrtReceiver::EstablishConnection(const std::string &host, int port,
             return SRT_ERROR;
         }
 
-        m_accepting_thread = thread(&SrtReceiver::AcceptingThread, this, options);
+        m_accepting_th     = async(launch::async, &SrtReceiver::AcceptingThread, this, options);
     }
 
     m_epoll_read_fds .assign(max_conn, SRT_INVALID_SOCK);

@@ -3,6 +3,7 @@
 #include <queue>
 #include <atomic>
 #include <mutex>
+#include <future>
 #include "srt.h"
 #include "uriparser.hpp"
 #include "testmedia.hpp"
