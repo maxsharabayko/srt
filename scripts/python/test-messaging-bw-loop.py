@@ -64,10 +64,10 @@ def create_process(name, args):
         else:
             process = subprocess.Popen(
                 args, 
-                stdin =subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=False,
+                #stdin =subprocess.PIPE,
+                #stdout=subprocess.PIPE,
+                #stderr=subprocess.PIPE,
+                #universal_newlines=False,
                 bufsize=1
             )
     except OSError as e:
@@ -141,18 +141,18 @@ def cleanup_process(name, process):
 
 
 def main():
-    args = ["./srt-test-messaging", "srt://192.168.0.7:4200?sndbuf=12058624&smoother=live", "",
-            "-msgsize", "1456", "-reply", "0", "-printmsg", "0", "-v"]
+    args = ["./srt-test-messaging", "srt://192.168.0.110:4200?sndbuf=12058624&smoother=live", "",
+            "-msgsize", "1456", "-reply", "0", "-printmsg", "0"]
 
     pc_name = 'srt-test-messaging (SND)'
 
-    for bitrate in range(100000000, 1000000000, 100000000):
+    for bitrate in range(100000000, 300000000, 100000000):
         # Calculate number of packets for 20 sec of streaming
         # based on the target bitrate and packet size.
         repeat = 20 * bitrate // (1456 * 8)
         maxbw  = int(bitrate // 8 * 1.25)
         args_ = args + ["-bitrate", str(bitrate), "-repeat", str(repeat)]
-        args[1] += "&maxbw={}".format(maxbw)
+        args_[1] += "&maxbw={}".format(maxbw)
         print(args[1])
         logger.info("Starting with bitrate {}, repeat {}".format(bitrate, repeat))
         snd_srt_process = create_process(pc_name, args_)
@@ -161,10 +161,10 @@ def main():
         while is_running:
             is_running, returncode = process_is_running(snd_srt_process)
             if is_running:
-                time.sleep(1)
+                time.sleep(5)
 
         logger.info("Done")
-        cleanup_process(pc_name, snd_srt_process)
+        #cleanup_process(pc_name, snd_srt_process)
 
     # Start transmission in file mode
     #args = ["srt-test-messaging", "srt://192.168.0.7:4200", "",
