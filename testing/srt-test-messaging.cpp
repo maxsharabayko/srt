@@ -19,20 +19,26 @@ using namespace std;
 
 
 volatile bool int_state = false;
+thread g_closing_th;
+
 
 
 void OnINT_ForceExit(int)
 {
     cerr << "\n-------- REQUESTED INTERRUPT!\n";
-    int_state = true;
-    const int undelivered = srt_msgn_wait_undelievered(3000);
-    if (undelivered)
-    {
-        cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
-        if (undelivered == -1)
-            cerr << srt_msgn_getlasterror_str() << "\n";
-    }
-    srt_msgn_destroy();
+    if (g_closing_th.joinable()) return;
+
+    g_closing_th = std::thread([]() {
+        int_state = true;
+        const int undelivered = srt_msgn_wait_undelievered(3000);
+        if (undelivered)
+        {
+            cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
+            if (undelivered == -1)
+                cerr << srt_msgn_getlasterror_str() << "\n";
+        }
+        srt_msgn_destroy();
+    });
 }
 
 
@@ -299,6 +305,7 @@ int main(int argc, char** argv)
     if (params[""].size() == 1)
     {
         receive_message(params[""][0].c_str(), msg_size, reply, printmsg);
+        if (g_closing_th.joinable()) g_closing_th.join();
         return 0;
     }
 
@@ -313,6 +320,7 @@ int main(int argc, char** argv)
 
     send_message(params[""][0].c_str(), params[""][1].c_str(), params[""][1].size(), msg_size,
         reply, printmsg, bitrate, repeat);
+    if (g_closing_th.joinable()) g_closing_th.join();
 
     return 0;
 }
