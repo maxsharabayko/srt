@@ -183,7 +183,7 @@ void send_message(const char *uri, const char* message, size_t length,
     }
 
     const long msgs_per_s = static_cast<long long>(target_bitrate_bps / 8) / message_size;
-    const long msg_interval_us = 1000000 / msgs_per_s;
+    const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
 
     vector<char> message_to_send(message_size);
     char c = 0;
@@ -200,7 +200,7 @@ void send_message(const char *uri, const char* message, size_t length,
         if (int_state)
             break;
 
-        if (target_bitrate_bps)
+        if (target_bitrate_bps && msg_interval_us)
         {
             const long duration_us = time_dev_us > msg_interval_us ? 0 : (msg_interval_us - time_dev_us);
             const auto next_time = time_prev + chrono::microseconds(duration_us);
