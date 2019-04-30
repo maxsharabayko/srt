@@ -19,29 +19,35 @@ using namespace std;
 
 
 volatile bool int_state = false;
+thread g_closing_th;
+
 
 
 void OnINT_ForceExit(int)
 {
     cerr << "\n-------- REQUESTED INTERRUPT!\n";
-    int_state = true;
-    const int undelivered = srt_msgn_wait_undelievered(3000);
-    if (undelivered)
-    {
-        cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
-        if (undelivered == -1)
-            cerr << srt_msgn_getlasterror_str() << "\n";
-    }
-    srt_msgn_destroy();
+    if (g_closing_th.joinable()) return;
+
+    g_closing_th = std::thread([]() {
+        int_state = true;
+        const int undelivered = srt_msgn_wait_undelievered(3000);
+        if (undelivered)
+        {
+            cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
+            if (undelivered == -1)
+                cerr << srt_msgn_getlasterror_str() << "\n";
+        }
+        srt_msgn_destroy();
+        });
 }
 
 
 
-void receive_message(const char *uri, size_t msg_size, bool reply, bool printmsg)
+void receive_message(const char* uri, size_t msg_size, bool reply, bool printmsg)
 {
     ::cout << "Listen to " << uri << "\n";
 
-    const size_t &message_size = msg_size;
+    const size_t& message_size = msg_size;
     if (0 != srt_msgn_listen(uri, message_size))
     {
         cerr << "ERROR: Listen failed.\n";
@@ -51,8 +57,6 @@ void receive_message(const char *uri, size_t msg_size, bool reply, bool printmsg
     }
 
     vector<char> message_rcvd(message_size);
-
-    //this_thread::sleep_for(chrono::seconds(5));
 
     while (!int_state)
     {
@@ -117,7 +121,7 @@ void receive_message(const char *uri, size_t msg_size, bool reply, bool printmsg
 
 
 
-static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out, bool print_csv)
+static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream& out, bool print_csv)
 {
     std::ostringstream output;
     static bool print_header = true;
@@ -187,9 +191,9 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream &out,
 }
 
 
-void send_message(const char *uri, const char* message, size_t length,
+void send_message(const char* uri, const char* message, size_t length,
     size_t msg_size, bool reply, const bool printmsg, int target_bitrate_bps,
-    int num_repeats, ostream &out_stats, chrono::seconds stats_freq)
+    int num_repeats, ostream& out_stats, chrono::seconds stats_freq)
 {
     ::cout << "Connect to " << uri << "\n";
     const size_t message_size = msg_size;
@@ -203,146 +207,171 @@ void send_message(const char *uri, const char* message, size_t length,
     const int num_messages = num_repeats;
 
     auto rcvth = reply ? std::thread([&message_size, &num_messages, &printmsg]
-    {
-        vector<char> message_rcv(message_size);
+        {
+            vector<char> message_rcv(message_size);
 
-        for (int i = 0; i < num_messages + 1; ++i)
+            for (int i = 0; i < num_messages + 1; ++i)
+            {
+                if (int_state)
+                    break;
+
+                if (printmsg)
+                    ::cout << "WAITING FOR MESSAGE no." << i << "\n";
+                const int rcv_res = srt_msgn_recv(message_rcv.data(), message_rcv.size(), nullptr);
+                if (rcv_res <= 0)
+                {
+                    cerr << "ERROR: Receiving message. Result: " << rcv_res << "\n";
+                    cerr << srt_msgn_getlasterror_str() << endl;
+                    srt_msgn_destroy();
+                    return;
+                }
+
+                if (printmsg)
+                {
+                    ::cout << "RECEIVED MESSAGE no." << i << ":\n";
+                    ::cout << string(message_rcv.data(), rcv_res).c_str() << endl;
+                }
+            }
+        }) : std::thread();
+
+        auto statsth = stats_freq != chrono::seconds(0) ? std::thread([&out_stats, &stats_freq]
+            {
+                if (stats_freq == chrono::seconds(0))
+                    return;
+
+                while (!int_state)
+                {
+                    this_thread::sleep_for(stats_freq);
+
+                    SRTPerformanceStats stats;
+                    if (-1 == srt_msgn_bstats(&stats, -1, 1))
+                    {
+                        cerr << "ERROR: Failed to get the stats. ";
+                        cerr << srt_msgn_getlasterror_str() << endl;
+                        break;
+                    }
+                    else
+                    {
+                        PrintSrtStats(-1, stats, out_stats, true);
+                    }
+                }
+            }) : std::thread();
+
+            if (length > 0)
+            {
+                int sent_res = srt_msgn_send(message, length);
+                if (sent_res != (int)length)
+                {
+                    cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
+                    cerr << srt_msgn_getlasterror_str() << endl;
+                    srt_msgn_destroy();
+                    return;
+                }
+
+                if (printmsg)
+                {
+                    ::cout << "SENT MESSAGE:\n";
+                    ::cout << message << endl;
+                }
+            }
+
+        const long msgs_per_s = static_cast<long long>(target_bitrate_bps / 8) / message_size;
+        const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
+
+        vector<char> message_to_send(message_size);
+        char c = 0;
+        for (size_t i = 0; i < message_to_send.size(); ++i)
+        {
+            message_to_send[i] = c++;
+        }
+
+        auto time_prev = chrono::steady_clock::now();
+        long time_dev_us = 0;
+
+        for (int i = 0; i < num_messages; ++i)
         {
             if (int_state)
                 break;
 
-            if (printmsg)
-                ::cout << "WAITING FOR MESSAGE no." << i << "\n";
-            const int rcv_res = srt_msgn_recv(message_rcv.data(), message_rcv.size(), nullptr);
-            if (rcv_res <= 0)
+            if (target_bitrate_bps && msg_interval_us)
             {
-                cerr << "ERROR: Receiving message. Result: " << rcv_res << "\n";
-                cerr << srt_msgn_getlasterror_str() << endl;
-                srt_msgn_destroy();
-                return;
+                const long duration_us = time_dev_us > msg_interval_us ? 0 : (msg_interval_us - time_dev_us);
+                const auto next_time = time_prev + chrono::microseconds(duration_us);
+                chrono::time_point<chrono::steady_clock> time_now;
+                for (;;)
+                {
+                    time_now = chrono::steady_clock::now();
+                    if (time_now >= next_time)
+                        break;
+                    if (int_state)
+                        break;
+                }
+
+                time_dev_us += (long)chrono::duration_cast<chrono::microseconds>(time_now - time_prev).count() - msg_interval_us;
+                time_prev = time_now;
             }
+            if (int_state)
+                break;
 
-            if (printmsg)
+            message_to_send[0] = '0' + i % 74;
+            const int res = srt_msgn_send(message_to_send.data(), message_to_send.size());
+            if (res != (int)message_size)
             {
-                ::cout << "RECEIVED MESSAGE no." << i << ":\n";
-                ::cout << string(message_rcv.data(), rcv_res).c_str() << endl;
-            }
-        }
-    }) : std::thread();
-
-    auto statsth = stats_freq != chrono::seconds(0) ? std::thread([&out_stats, &stats_freq]
-    {
-        if (stats_freq == chrono::seconds(0))
-            return;
-
-        while (!int_state)
-        {
-            this_thread::sleep_for(stats_freq);
-
-            SRTPerformanceStats stats;
-            if (-1 == srt_msgn_bstats(&stats, -1, 1))
-            {
-                cerr << "ERROR: Failed to get the stats. ";
+                cerr << "ERROR: Sending " << message_size << ", sent " << res << "\n";
                 cerr << srt_msgn_getlasterror_str() << endl;
                 break;
             }
-            else
-            {
-                PrintSrtStats(-1, stats, out_stats, true);
-            }
+            if (printmsg)
+                ::cout << "SENT MESSAGE #" << i << "\n";
         }
-    }) : std::thread();
 
-    if (length > 0)
-    {
-        int sent_res = srt_msgn_send(message, length);
-        if (sent_res != (int)length)
+        if (rcvth.joinable())
+            rcvth.join();
+
+        const int undelivered = srt_msgn_wait_undelievered(5000);
+        if (undelivered)
         {
-            cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
-            cerr << srt_msgn_getlasterror_str() << endl;
-            srt_msgn_destroy();
-            return;
+            cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
         }
 
-        if (printmsg)
-        {
-            ::cout << "SENT MESSAGE:\n";
-            ::cout << message << endl;
-        }
-    }
+        int_state = true;
+        if (statsth.joinable())
+            statsth.join();
 
-    const long msgs_per_s = static_cast<long long>(target_bitrate_bps / 8) / message_size;
-    const long msg_interval_us = 1000000 / msgs_per_s;
-
-    vector<char> message_to_send(message_size);
-    char c = 0;
-    for (size_t i = 0; i < message_to_send.size(); ++i)
-    {
-        message_to_send[i] = c++;
-    }
-
-    auto time_prev = chrono::steady_clock::now();
-    long time_dev_us = 0;
-
-    for (int i = 0; i < num_messages; ++i)
-    {
-        if (int_state)
-            break;
-
-        if (target_bitrate_bps)
-        {
-            const long duration_us = time_dev_us > msg_interval_us ? 0 : (msg_interval_us - time_dev_us);
-            const auto next_time = time_prev + chrono::microseconds(duration_us);
-            chrono::time_point<chrono::steady_clock> time_now;
-            for (;;)
-            {
-                time_now = chrono::steady_clock::now();
-                if (time_now >= next_time)
-                    break;
-                if (int_state)
-                    break;
-            }
-
-            time_dev_us += (long) chrono::duration_cast<chrono::microseconds>(time_now - time_prev).count() - msg_interval_us;
-            time_prev = time_now;
-        }
-        if (int_state)
-            break;
-
-        message_to_send[0] = '0' + i % 74;
-        const int res = srt_msgn_send(message_to_send.data(), message_to_send.size());
-        if (res != (int)message_size)
-        {
-            cerr << "ERROR: Sending " << message_size << ", sent " << res << "\n";
-            cerr << srt_msgn_getlasterror_str() << endl;
-            break;
-        }
-        if (printmsg)
-            ::cout << "SENT MESSAGE #" << i << "\n";
-    }
-
-    if (rcvth.joinable())
-        rcvth.join();
-
-    const int undelivered = srt_msgn_wait_undelievered(5000);
-    if (undelivered)
-    {
-        cerr << "ERROR: Still have undelivered bytes " << undelivered << "\n";
-    }
-
-    int_state = true;
-    if (statsth.joinable())
-        statsth.join();
-
-    srt_msgn_destroy();
+        srt_msgn_destroy();
 }
 
 
-void print_help()
+void print_option(const set<string> & opt_names, const string & value, const string & desc)
+{
+    cerr << "\t";
+    int i = 0;
+    for (auto opt : opt_names)
+    {
+        if (i++) cerr << ", ";
+        cerr << "-" << opt;
+    }
+
+    if (!value.empty())
+        cerr << ":" << value;
+    cerr << "\t- " << desc << "\n";
+}
+
+
+void print_help(const vector<OptionScheme> & optargs)
 {
     cout << "The CLI syntax for the two peers test is\n"
-         << "    Send:    srt-test-messaging \"srt://ip:port\" \"message\"\n"
-         << "    Receive: srt-test-messaging \"srt://ip:port\"\n";
+        << "    Send:    srt-test-messaging \"srt://ip:port\" \"first message\"\n"
+        << "    Receive: srt-test-messaging \"srt://ip:port\"\n";
+
+    print_option(optargs[0].names, "<0>", "receiver sends reply messages to sender [0|1]");
+    print_option(optargs[1].names, "<0>", "print received and sent messages to stdout");
+    print_option(optargs[2].names, "<level = error>", "log level[fatal, error, info, note, warning]");
+    print_option(optargs[3].names, "<filename>", "output stats file name");
+    print_option(optargs[4].names, "<seconds=0>", "stats report frequency");
+    print_option(optargs[5].names, "<num=60>", "number of messages to send");
+    print_option(optargs[6].names, "0", "sender data generation rate");
+    print_option(optargs[7].names, "<8 MB>", "message size in bytes");
 }
 
 
@@ -363,20 +392,20 @@ int main(int argc, char** argv)
 
     if (params.count("-help") || params.count("-h"))
     {
-        print_help();
-        return 1;
+        print_help(optargs);
+        return 0;
     }
 
     if (params[""].empty())
     {
-        print_help();
+        print_help(optargs);
         return 1;
     }
 
     if (params[""].size() > 2)
     {
         cerr << "Extra parameter after the first one: " << Printable(params[""]) << endl;
-        print_help();
+        print_help(optargs);
         return 1;
     }
 
@@ -399,18 +428,18 @@ int main(int argc, char** argv)
             logfile_stats.close();
         }
     }
-    ostream &out_stats = logfile_stats.is_open() ? logfile_stats : cout;
-
+    ostream& out_stats = logfile_stats.is_open() ? logfile_stats : cout;
 
     const int statsfreq = stoi(Option<OutString>(params, "0", "statsfreq"));
-    const bool reply    = stoi(Option<OutString>(params, "0", "reply")) != 0;
+    const bool reply = stoi(Option<OutString>(params, "0", "reply")) != 0;
     const bool printmsg = stoi(Option<OutString>(params, "1", "printmsg")) != 0;
-    const int bitrate   = stoi(Option<OutString>(params, "0", "bitrate"));
-    const int msg_size  = stoi(Option<OutString>(params, "8388608", "msgsize"));    // 8 MB
+    const int bitrate = stoi(Option<OutString>(params, "0", "bitrate"));
+    const int msg_size = stoi(Option<OutString>(params, "8388608", "msgsize"));    // 8 MB
 
     if (params[""].size() == 1)
     {
         receive_message(params[""][0].c_str(), msg_size, reply, printmsg);
+        if (g_closing_th.joinable()) g_closing_th.join();
         return 0;
     }
 
@@ -425,6 +454,7 @@ int main(int argc, char** argv)
 
     send_message(params[""][0].c_str(), params[""][1].c_str(), params[""][1].size(), msg_size,
         reply, printmsg, bitrate, repeat, out_stats, chrono::seconds(statsfreq));
+    if (g_closing_th.joinable()) g_closing_th.join();
 
     return 0;
 }
