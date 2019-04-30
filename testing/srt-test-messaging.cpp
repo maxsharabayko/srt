@@ -247,11 +247,36 @@ void send_message(const char *uri, const char* message, size_t length,
 }
 
 
-void print_help()
+void print_option(const set<string>& opt_names, const string& value, const string& desc)
+{
+    cerr << "\t";
+    int i = 0;
+    for (auto opt : opt_names)
+    {
+        if (i++) cerr << ", ";
+        cerr << "-" << opt;
+    }
+
+    if (!value.empty())
+        cerr << ":" << value;
+    cerr << "\t- " << desc << "\n";
+}
+
+
+void print_help(const vector<OptionScheme> &optargs)
 {
     cout << "The CLI syntax for the two peers test is\n"
          << "    Send:    srt-test-messaging \"srt://ip:port\" \"message\"\n"
          << "    Receive: srt-test-messaging \"srt://ip:port\"\n";
+
+    print_option(optargs[0].names, "<0>", "receiver sends reply messages to sender [0|1]");
+    print_option(optargs[1].names, "<0>", "print received and sent messages to stdout");
+    print_option(optargs[2].names, "<level = error>", "log level[fatal, error, info, note, warning]");
+    //print_option(optargs[3].names, "<filename>", "output stats file name");
+    //print_option(optargs[4].names, "<seconds=0>", "stats report frequency");
+    print_option(optargs[5].names, "<num=60>", "number of messages to send");
+    print_option(optargs[6].names, "0", "sender data generation rate");
+    print_option(optargs[7].names, "<8 MB>", "message size in bytes");
 }
 
 
@@ -272,20 +297,20 @@ int main(int argc, char** argv)
 
     if (params.count("-help") || params.count("-h"))
     {
-        print_help();
-        return 1;
+        print_help(optargs);
+        return 0;
     }
 
     if (params[""].empty())
     {
-        print_help();
+        print_help(optargs);
         return 1;
     }
 
     if (params[""].size() > 2)
     {
         cerr << "Extra parameter after the first one: " << Printable(params[""]) << endl;
-        print_help();
+        print_help(optargs);
         return 1;
     }
 
