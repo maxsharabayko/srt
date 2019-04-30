@@ -216,6 +216,32 @@ void CTimer::sleepto(uint64_t nexttime)
        __asm__ volatile ("nop; nop; nop; nop; nop;");
 #endif
 #else
+
+#ifndef SLEEPTO_ALG
+       // BEGIN ORIGINAL SRT 1.3.2 VERSION
+       timeval now;
+       timespec timeout;
+       gettimeofday(&now, 0);
+       if (now.tv_usec < 990000)
+       {
+           timeout.tv_sec = now.tv_sec;
+           timeout.tv_nsec = (now.tv_usec + 10000) * 1000;
+       }
+       else
+       {
+           timeout.tv_sec = now.tv_sec + 1;
+           timeout.tv_nsec = (now.tv_usec + 10000 - 1000000) * 1000;
+       }
+       THREAD_PAUSED();
+       pthread_mutex_lock(&m_TickLock);
+       pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
+       pthread_mutex_unlock(&m_TickLock);
+       THREAD_RESUMED();
+       // END ORIGINAL SRT 1.3.2 VERSION
+
+#elif (SLEEPTO_ALG == 1)
+       // This one increases accuracy.
+       // Do not sleep If waiting time is less than 100 us
        if ((m_ullSchedTime - t) > 100 * freq)   // 100 us
        {
            THREAD_PAUSED();
@@ -225,27 +251,9 @@ void CTimer::sleepto(uint64_t nexttime)
            THREAD_RESUMED();
        }
        // Else buisy waiting
-
-       //condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) * freq);
-
-       //timeval now;
-       //timespec timeout;
-       //gettimeofday(&now, 0);
-       //if (now.tv_usec < 990000)
-       //{
-       //    timeout.tv_sec = now.tv_sec;
-       //    timeout.tv_nsec = (now.tv_usec + 10000) * 1000;
-       //}
-       //else
-       //{
-       //    timeout.tv_sec = now.tv_sec + 1;
-       //    timeout.tv_nsec = (now.tv_usec + 10000 - 1000000) * 1000;
-       //}
-       //THREAD_PAUSED();
-       //pthread_mutex_lock(&m_TickLock);
-       //pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
-       //pthread_mutex_unlock(&m_TickLock);
-       //THREAD_RESUMED();
+#else
+       condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) * freq);
+#endif
 #endif
 
        rdtsc(t);
