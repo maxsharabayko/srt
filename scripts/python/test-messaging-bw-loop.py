@@ -3,6 +3,7 @@ import time
 import subprocess
 import signal
 import logging
+import catch
 from threading import Thread
 
 
@@ -139,29 +140,32 @@ def cleanup_process(name, process):
 
 
 
-
-def main():
-    args = ["./srt-test-messaging", "srt://192.168.0.110:4200?sndbuf=12058624&smoother=live", "",
+@click.command()
+@click.argument('dst_ip',   default="192.168.0.110")
+@click.argument('dst_port', default="4200")
+def main(dst_ip, dst_port):
+    common_args = ["./srt-test-messaging", "srt://{}:{}?sndbuf=12058624&smoother=live".format(dst_ip, dst_port), "",
             "-msgsize", "1456", "-reply", "0", "-printmsg", "0"]
 
     pc_name = 'srt-test-messaging (SND)'
 
-    for bitrate in range(100000000, 300000000, 100000000):
+    for bitrate in range(100000000, 1100000000, 100000000):
         # Calculate number of packets for 20 sec of streaming
         # based on the target bitrate and packet size.
         repeat = 20 * bitrate // (1456 * 8)
         maxbw  = int(bitrate // 8 * 1.25)
-        args_ = args + ["-bitrate", str(bitrate), "-repeat", str(repeat)]
-        args_[1] += "&maxbw={}".format(maxbw)
-        print(args[1])
+        args = common_args + ["-bitrate", str(bitrate), "-repeat", str(repeat)]
+        args[1] += "&maxbw={}".format(maxbw)
         logger.info("Starting with bitrate {}, repeat {}".format(bitrate, repeat))
-        snd_srt_process = create_process(pc_name, args_)
+        snd_srt_process = create_process(pc_name, args)
 
+        sleep_s = 20
         is_running = True
         while is_running:
             is_running, returncode = process_is_running(snd_srt_process)
             if is_running:
-                time.sleep(5)
+                time.sleep(sleep_s)
+                sleep_s = 1  # Next time sleep for 1 second to react on the process finished.
 
         logger.info("Done")
         #cleanup_process(pc_name, snd_srt_process)
