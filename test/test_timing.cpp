@@ -203,7 +203,7 @@ TEST(CSndQueue, DISABLED_WorkerIntervalsV2)
 }
 
 
-TEST(CSndQueue, rdtscPenalty)
+TEST(CSndQueue, DISABLED_rdtscPenalty)
 {
     const int num_samples = 5000;
     uint64_t tk_vals[num_samples] = { };
@@ -234,7 +234,7 @@ TEST(CSndQueue, rdtscPenalty)
 }
 
 
-TEST(CSndQueue, SleeptoAccuracy)
+TEST(CSndQueue, DISABLED_SleeptoAccuracy)
 {
     const int num_samples = 1000;
     uint64_t tk_vals[num_samples] = { };
