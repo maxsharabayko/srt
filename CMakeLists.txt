@@ -110,6 +110,8 @@ option(ENABLE_CXX_DEPS "Extra library dependencies in srt.pc for the CXX librari
 option(USE_STATIC_LIBSTDCXX "Should use static rather than shared libstdc++" OFF)
 option(ENABLE_INET_PTON "Set to OFF to prevent usage of inet_pton when building against modern SDKs while still requiring compatibility with older Windows versions, such as Windows XP, Windows Server 2003 etc." ON)
 option(USE_OPENSSL_PC "Use pkg-config to find OpenSSL libraries" ON)
+option(USE_BUSY_WAITING "Enable more accurate sending times at a cost of potentially higher CPU load" OFF)
+option(ENABLE_IST_DEVIATION "Enable and don't adjust inter sending times (IST) deviations from target values" OFF)
 
 set(TARGET_srt "srt" CACHE STRING "The name for the SRT library")
 
@@ -122,6 +124,20 @@ else()
 	else()
 		message(STATUS "LOGGING: ENABLED")
 	endif()
+endif()
+
+if (USE_BUSY_WAITING)
+	message(STATUS "USE_BUSY_WAITING: ON")
+	list(APPEND SRT_EXTRA_CFLAGS "-DUSE_BUSY_WAITING=1")
+else()
+	message(STATUS "USE_BUSY_WAITING: OFF (default)")
+endif()
+
+if (ENABLE_IST_DEVIATION)
+	message(STATUS "ENABLE_IST_DEVIATION: ON")
+	list(APPEND SRT_EXTRA_CFLAGS "-DENABLE_IST_DEVIATION=1")
+else()
+	message(STATUS "ENABLE_IST_DEVIATION: OFF (default)")
 endif()
 
 if ( CYGWIN AND NOT CYGWIN_USE_POSIX )
