@@ -207,7 +207,7 @@ void CTimer::sleepto(uint64_t nexttime)
 
    while (t < m_ullSchedTime)
    {
-#ifndef NO_BUSY_WAITING
+#if USE_BUSY_WAITING
 #ifdef IA32
        __asm__ volatile ("pause; rep; nop; nop; nop; nop; nop;");
 #elif IA64
@@ -217,7 +217,7 @@ void CTimer::sleepto(uint64_t nexttime)
 #endif
 #else
 
-#ifndef SLEEPTO_ALG
+#if (SLEEPTO_ALG == 0)
        // BEGIN ORIGINAL SRT 1.3.2 VERSION
        timeval now;
        timespec timeout;
@@ -251,8 +251,50 @@ void CTimer::sleepto(uint64_t nexttime)
            THREAD_RESUMED();
        }
        // Else buisy waiting
-#else
+#elif (SLEEPTO_ALG == 2)
+
+       uint64_t dt = s_ullCPUFrequency * 10000;
+       while (m_ullSchedTime - t >= dt)
+       {
+           timeval now;
+           timespec timeout;
+           gettimeofday(&now, 0);
+           if (now.tv_usec < 990000)
+           {
+               timeout.tv_sec = now.tv_sec;
+               timeout.tv_nsec = (now.tv_usec + 10000) * 1000;
+           }
+           else
+           {
+               timeout.tv_sec = now.tv_sec + 1;
+               timeout.tv_nsec = (now.tv_usec + 10000 - 1000000) * 1000;
+           }
+           THREAD_PAUSED();
+           pthread_mutex_lock(&m_TickLock);
+           pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
+           pthread_mutex_unlock(&m_TickLock);
+           THREAD_RESUMED();
+
+           rdtsc(t);
+       }
+
+       while (t < m_ullSchedTime)
+       {
+#ifdef IA32
+           __asm__ volatile ("pause; rep; nop; nop; nop; nop; nop;");
+#elif IA64
+           __asm__ volatile ("nop 0; nop 0; nop 0; nop 0; nop 0;");
+#elif AMD64
+           __asm__ volatile ("nop; nop; nop; nop; nop;");
+#endif
+
+           rdtsc(t);
+       }
+
+#elif (SLEEPTO_ALG == 3)
        condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) * freq);
+#else
+    #error "Undefined SLEEPTO_ALG";
 #endif
 #endif
 
@@ -898,19 +940,19 @@ std::string FormatTime(uint64_t time)
 
 LogDispatcher::Proxy::Proxy(LogDispatcher& guy) : that(guy), that_enabled(that.CheckEnabled())
 {
-	if (that_enabled)
-	{
+    if (that_enabled)
+    {
         i_file = "";
         i_line = 0;
         flags = that.src_config->flags;
-		// Create logger prefix
-		that.CreateLogLinePrefix(os);
-	}
+        // Create logger prefix
+        that.CreateLogLinePrefix(os);
+    }
 }
 
 LogDispatcher::Proxy LogDispatcher::operator()()
 {
-	return Proxy(*this);
+    return Proxy(*this);
 }
 
 void LogDispatcher::CreateLogLinePrefix(std::ostringstream& serr)
