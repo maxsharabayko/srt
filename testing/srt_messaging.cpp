@@ -28,7 +28,7 @@ int srt_msgn_connect(const char *uri, size_t message_size)
     // If we have this parameter provided, probably someone knows better
     if (!ut["sndbuf"].exists())
     {
-        ut["sndbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
+        ut["sndbuf"] = to_string(5 * (message_size * 1472 / 1456 + 1472));
     }
 
     s_rcv_srt_model = unique_ptr<SrtReceiver>(new SrtReceiver(ut.host(), ut.portno(), ut.parameters()));
@@ -70,7 +70,7 @@ int srt_msgn_listen(const char *uri, size_t message_size)
     // If we have this parameter provided, probably someone knows better
     if (!ut["rcvbuf"].exists() && ut.queryValue("transtype") != "live")
     {
-        ut["rcvbuf"] = to_string(3 * (message_size * 1472 / 1456 + 1472));
+        ut["rcvbuf"] = to_string(5 * (message_size * 1472 / 1456 + 1472));
     }
     s_rcv_srt_model = std::unique_ptr<SrtReceiver>(new SrtReceiver(ut.host(), ut.portno(), ut.parameters()));
 
