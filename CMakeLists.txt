@@ -98,8 +98,17 @@ option(ENABLE_INET_PTON "Set to OFF to prevent usage of inet_pton when building 
 option(USE_OPENSSL_PC "Use pkg-config to find OpenSSL libraries" ON)
 option(USE_BUSY_WAITING "Enable more accurate sending times at a cost of potentially higher CPU load" OFF)
 option(ENABLE_IST_DEVIATION "Enable and don't adjust inter sending times (IST) deviations from target values" OFF)
-option(SLEEPTO_ALG "" 0)
+#option(SLEEPTO_ALG "" 0)
 
+
+if (USE_BUSY_WAITING)
+	list(APPEND SRT_EXTRA_CFLAGS "-DUSE_BUSY_WAITING")
+endif()
+if (ENABLE_IST_DEVIATION)
+	list(APPEND SRT_EXTRA_CFLAGS "-DENABLE_IST_DEVIATION")
+endif()
+
+list(APPEND SRT_EXTRA_CFLAGS "-DSLEEPTO_ALG=${SLEEPTO_ALG}")
 
 set(TARGET_srt "srt" CACHE STRING "The name for the SRT library")
 set(TARGET_srt_messaging "srt_messaging" CACHE STRING "The name for the SRT messaging library")

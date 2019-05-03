@@ -207,7 +207,8 @@ void CTimer::sleepto(uint64_t nexttime)
 
    while (t < m_ullSchedTime)
    {
-#if USE_BUSY_WAITING
+#ifdef USE_BUSY_WAITING
+#pragma message("USE_BUSY_WAITING!")
 #ifdef IA32
        __asm__ volatile ("pause; rep; nop; nop; nop; nop; nop;");
 #elif IA64
@@ -215,9 +216,8 @@ void CTimer::sleepto(uint64_t nexttime)
 #elif AMD64
        __asm__ volatile ("nop; nop; nop; nop; nop;");
 #endif
-#else
-
-#if (SLEEPTO_ALG == 0)
+#elif (SLEEPTO_ALG == 0)
+#pragma message("SLEEPTO_ALG == 0!")
        // BEGIN ORIGINAL SRT 1.3.2 VERSION
        timeval now;
        timespec timeout;
@@ -240,6 +240,7 @@ void CTimer::sleepto(uint64_t nexttime)
        // END ORIGINAL SRT 1.3.2 VERSION
 
 #elif (SLEEPTO_ALG == 1)
+#pragma message("SLEEPTO_ALG == 1!")
        // This one increases accuracy.
        // Do not sleep If waiting time is less than 100 us
        if ((m_ullSchedTime - t) > 100 * freq)   // 100 us
@@ -252,7 +253,7 @@ void CTimer::sleepto(uint64_t nexttime)
        }
        // Else buisy waiting
 #elif (SLEEPTO_ALG == 2)
-
+#pragma message("SLEEPTO_ALG == 2!")
        uint64_t dt = s_ullCPUFrequency * 10000;
        while (m_ullSchedTime - t >= dt)
        {
@@ -292,10 +293,11 @@ void CTimer::sleepto(uint64_t nexttime)
        }
 
 #elif (SLEEPTO_ALG == 3)
+#pragma message("SLEEPTO_ALG == 3!")
        condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) * freq);
 #else
+#pragma message("SLEEPTO_ALG else!")
     #error "Undefined SLEEPTO_ALG";
-#endif
 #endif
 
        rdtsc(t);

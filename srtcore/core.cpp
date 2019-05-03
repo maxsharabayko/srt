@@ -7534,7 +7534,7 @@ int CUDT::packData(CPacket& packet, uint64_t& ts_tk)
    }
    else
    {
-      #if ENABLE_IST_DEVIATION
+      #ifdef ENABLE_IST_DEVIATION
          ts_tk = entertime_tk + m_ullInterval_tk;
       #else
          if (m_ullTimeDiff_tk >= m_ullInterval_tk)
