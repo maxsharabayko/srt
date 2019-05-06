@@ -159,38 +159,32 @@ private:
                 << m_parent->deliveryRate() << " pkts/s)");
         }
 
-        // During Slow Start, no rate increase
-        if (m_bSlowStart)
-        {
-            goto RATE_LIMIT;
-        }
 
         if (m_bLoss)
         {
             m_bLoss = false;
-            goto RATE_LIMIT;
         }
-
-        int64_t B = (int64_t)(m_parent->bandwidth() - 1000000.0 / m_dPktSndPeriod);
-        if ((m_dPktSndPeriod > m_dLastDecPeriod) && ((m_parent->bandwidth() / 9) < B))
-            B = m_parent->bandwidth() / 9;
-        if (B <= 0)
-            inc = 1.0 / m_parent->MSS();    // was inc = 0.01;
-        else
+        // During Slow Start, no rate increase
+        else if (!m_bSlowStart)
         {
-            // inc = max(10 ^ ceil(log10( B * MSS * 8 ) * Beta / MSS, 1/MSS)
-            // Beta = 1.5 * 10^(-6)
+            int64_t B = (int64_t)(m_parent->bandwidth() - 1000000.0 / m_dPktSndPeriod);
+            if ((m_dPktSndPeriod > m_dLastDecPeriod) && ((m_parent->bandwidth() / 9) < B))
+                B = m_parent->bandwidth() / 9;
+            if (B <= 0)
+                inc = 1.0 / m_parent->MSS();    // was inc = 0.01;
+            else
+            {
+                // inc = max(10 ^ ceil(log10( B * MSS * 8 ) * Beta / MSS, 1/MSS)
+                // Beta = 1.5 * 10^(-6)
 
-            inc = pow(10.0, ceil(log10(B * m_parent->MSS() * 8.0))) * 0.0000015 / m_parent->MSS();
+                inc = pow(10.0, ceil(log10(B * m_parent->MSS() * 8.0))) * 0.0000015 / m_parent->MSS();
 
-            if (inc < 1.0 / m_parent->MSS())  // was < 0.01 then 0.01
-                inc = 1.0 / m_parent->MSS();
+                if (inc < 1.0 / m_parent->MSS())  // was < 0.01 then 0.01
+                    inc = 1.0 / m_parent->MSS();
+            }
+
+            m_dPktSndPeriod = (m_dPktSndPeriod * m_iRCInterval) / (m_dPktSndPeriod * inc + m_iRCInterval);
         }
-
-        m_dPktSndPeriod = (m_dPktSndPeriod * m_iRCInterval) / (m_dPktSndPeriod * inc + m_iRCInterval);
-
-
-    RATE_LIMIT:
 
 #if 1 //ENABLE_HEAVY_LOGGING
         // Try to do reverse-calculation for m_dPktSndPeriod, as per minSP below
