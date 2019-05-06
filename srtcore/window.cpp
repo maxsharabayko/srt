@@ -163,8 +163,13 @@ int CPktTimeWindowTools::getPktRcvSpeed_in(const int* window, int* replica, cons
 
    unsigned count = 0;
    int sum = 0;
-   int upper = median << 3;
-   int lower = median >> 3;
+#ifdef RCVSPEED_FIX
+   const int upper = median * 4096;
+   const int lower = median / 4;
+#else
+   const int upper = median << 3;
+   const int lower = median >> 3;
+#endif
 
    bytesps = 0;
    unsigned long bytes = 0;

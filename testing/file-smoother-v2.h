@@ -108,7 +108,7 @@ private:
     // SLOTS
     void updateSndPeriod(ETransmissionEvent, EventVariant arg)
     {
-        int ack = arg.get<EventVariant::ACK>();
+        const int ack = arg.get<EventVariant::ACK>();
 
         double inc = 0;
 
@@ -167,9 +167,12 @@ private:
         // During Slow Start, no rate increase
         else if (!m_bSlowStart)
         {
-            int64_t B = (int64_t)(m_parent->bandwidth() - 1000000.0 / m_dPktSndPeriod);
-            if ((m_dPktSndPeriod > m_dLastDecPeriod) && ((m_parent->bandwidth() / 9) < B))
-                B = m_parent->bandwidth() / 9;
+            const int loss_bw = (1000000 / m_dLastDecPeriod) * m_parent->MSS() * 8.0;
+            const int bw = min(loss_bw, m_parent->bandwidth());
+
+            int64_t B = (int64_t)(bw - 1000000.0 / m_dPktSndPeriod);
+            if ((m_dPktSndPeriod > m_dLastDecPeriod) && ((bw / 9) < B))
+                B = bw / 9;
             if (B <= 0)
                 inc = 1.0 / m_parent->MSS();    // was inc = 0.01;
             else

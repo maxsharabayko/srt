@@ -100,6 +100,7 @@ option(USE_BUSY_WAITING "Enable more accurate sending times at a cost of potenti
 option(ENABLE_IST_DEVIATION "Enable and don't adjust inter sending times (IST) deviations from target values" OFF)
 #option(SLEEPTO_ALG "" 0)
 
+#option(RCVSPEED_FIX)
 
 if (USE_BUSY_WAITING)
 	list(APPEND SRT_EXTRA_CFLAGS "-DUSE_BUSY_WAITING")

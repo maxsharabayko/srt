@@ -423,6 +423,408 @@ public:
 
 #endif
 
+
+// This is a stack, onto which you push values, but
+// you never pop them. They stay there forever, but 
+// the oldest get dropped. You can backtrack up to
+// the last N items backward using the index:
+// - 0: the top of the stack
+// - 1, 2... the N'th older in the push history.
+// - up to SPAN value
+template <typename TYPE, unsigned SPAN>
+class RingLossyStack
+{
+    TYPE m_qValueStack[SPAN];
+
+    size_t m_zStackPos;
+    size_t m_zStackSize;
+
+    template <unsigned N, bool CORRECT /*true*/>
+    TYPE history_tracker_hlp()
+    {
+        return m_qValueStack[(SPAN + m_zStackPos - N) % SPAN];
+    }
+
+public:
+
+    typedef TYPE value_type;
+
+    static const unsigned span = SPAN;
+
+    struct iterator
+    {
+        TYPE* array;
+        size_t index;
+
+        // IMPORTANT !!!
+        // The ++ operator goes backward in the internal array.
+        // The [0] position is the top, then towards SPAN value
+        // it goes back into the array.
+        iterator& operator++()
+        {
+            if (index == 0)
+                index = SPAN - 1;
+            else
+                --index;
+            return *this;
+        }
+
+        iterator operator++(int)
+        {
+            iterator i = *this;
+            ++i;
+            return i;
+        }
+
+        TYPE& operator*()
+        {
+            return array[index];
+        }
+
+        bool operator==(const iterator & y)
+        {
+            return index == y.index;
+        }
+
+        bool operator!=(const iterator & y)
+        {
+            return index != y.index;
+        }
+    };
+
+#if ENABLE_LOGGING
+
+    std::string dump()
+    {
+        std::ostringstream os;
+        os << "pos=" << m_zStackPos << " size=" << m_zStackSize << " SPAN=" << SPAN
+            << " DATA: ";
+
+        for (size_t i = 0; i < SPAN; ++i)
+            os << m_qValueStack[i] << " ";
+
+        return os.str();
+    }
+#endif
+
+    typedef typename RingLossyStack<const TYPE, SPAN>::iterator const_iterator;
+
+    size_t beginpos() const
+    {
+        if (m_zStackSize == 0)
+            return 0; // will be equal to end
+        if (m_zStackPos == 0)
+            return SPAN - 1;
+        return m_zStackPos - 1;
+    }
+
+    size_t endpos() const
+    {
+        // Until the full size is reached, it behaves
+        // as a normal array. Return the highest position.
+        if (m_zStackSize != SPAN)
+            return m_zStackSize;
+
+        // m_zStackPos is the position to be filled
+        return m_zStackPos;
+    }
+
+
+    iterator begin()
+    {
+        iterator i = { m_qValueStack, beginpos() };
+        return i;
+    }
+
+    const_iterator begin() const
+    {
+        const_iterator i = { m_qValueStack, beginpos() };
+        return i;
+    }
+
+    // m_zStackPos points to the current position 
+    iterator end()
+    {
+        iterator i = { m_qValueStack, endpos() };
+        return i;
+    }
+
+    const_iterator end() const
+    {
+        const_iterator i = { m_qValueStack, endpos() };
+        return i;
+    }
+
+    RingLossyStack() : m_zStackPos(), m_zStackSize() {}
+
+    void push(const TYPE & val)
+    {
+        m_qValueStack[m_zStackPos] = val;
+        ++m_zStackPos;
+        if (m_zStackPos == SPAN)
+            m_zStackPos = 0;
+        if (m_zStackSize < SPAN)
+            ++m_zStackSize;
+    }
+
+    /* This doesn't make sense in case of a ring buffer
+    template <unsigned N>
+    TYPE history()
+    {
+        return IndexArray<TYPE, N, (N < SPAN) >::perform(m_qValueStack);
+    }
+    */
+
+    size_t size() { return m_zStackSize; }
+    TYPE top() { return m_qValueStack[m_zStackPos]; }
+    bool empty() { return m_zStackSize == 0; }
+    bool full() { return m_zStackSize == SPAN; }
+
+    TYPE operator[](size_t index)
+    {
+        return m_qValueStack[(SPAN + m_zStackPos - index) % SPAN];
+    }
+
+    TYPE average()
+    {
+        if (m_zStackSize == SPAN)
+            return accumulate_array(m_qValueStack) / SPAN;
+
+        // Without this check this below may end up with div/0.
+        if (m_zStackSize == 0)
+            return TYPE();
+
+        size_t firstsize = SPAN - m_zStackPos;
+        if (firstsize > m_zStackSize) // all used data are in the second segment
+            return std::accumulate(m_qValueStack + m_zStackPos, m_qValueStack + m_zStackPos + m_zStackSize, TYPE()) / m_zStackSize;
+
+        size_t remainsize = m_zStackSize - firstsize;
+        return std::accumulate(m_qValueStack + m_zStackPos, m_qValueStack + SPAN,
+            // as the initial value, we use the sum from the first segment
+            std::accumulate(m_qValueStack, m_qValueStack + remainsize, TYPE())) / m_zStackSize;
+    }
+};
+
+
+template <typename TYPE, unsigned N_SEGMENTS, unsigned SEGMENT_SPAN>
+class JumpingAverage
+{
+    TYPE m_qSegments[N_SEGMENTS]; // variables that keep the fragmentary average
+    TYPE m_qValueStack[SEGMENT_SPAN]; // values collected during updating
+
+    size_t m_zRingPos; // First position in the ring-buffer segment array
+    size_t m_zRingSize; // How many of the ring items are in use (grows up to N_SEGMENTS)
+    size_t m_zStackPos; // Position to be filled by the next update
+
+    TYPE m_qStableAverage;
+
+public:
+
+    JumpingAverage() :
+        m_zRingPos(),
+        m_zRingSize(),
+        m_zStackPos(),
+        m_qStableAverage()
+    {
+    }
+
+    void update(TYPE value)
+    {
+        // Try to add the value to the position in the value stack first.
+        m_qValueStack[m_zStackPos] = value;
+        ++m_zStackPos;
+
+        if (m_zStackPos == SEGMENT_SPAN)
+        {
+            // Good, time to sum up everything and dump to the segments.
+            TYPE average = accumulate_array(m_qValueStack) / SEGMENT_SPAN;
+            m_zStackPos = 0; // start here
+
+            // Now put it under the ring position.
+            m_qSegments[m_zRingPos] = average;
+
+            // Now move the ring. Mind the ring.
+            ++m_zRingPos;
+            if (m_zRingPos == N_SEGMENTS)
+                m_zRingPos = 0;
+
+            if (m_zRingSize < N_SEGMENTS)
+            {
+                // Extend the size, if not reached yet already
+                ++m_zRingSize;
+                // As a new segment has been added, calculate now
+                // the jumping average value out of all segments
+                // and save it.
+                m_qStableAverage = std::accumulate(m_qSegments, m_qSegments + m_zRingSize, 0) / m_zRingSize;
+            }
+            else
+            {
+                // Otherwise the ring size stays with the maximum value,
+                // which means that it will use N segments backwards.
+                m_qStableAverage = accumulate_array(m_qSegments) / N_SEGMENTS;
+            }
+        }
+    }
+
+    TYPE stableAverage()
+    {
+        return m_qStableAverage;
+    }
+
+    size_t size()
+    {
+        // This value represents the number of all values collected so far.
+        return m_zRingPos * SEGMENT_SPAN + m_zStackPos;
+    }
+
+    // Needs external mutex in case of multithreading
+    TYPE currentAverage()
+    {
+        TYPE stav = m_qStableAverage;
+        if (m_zStackPos > 0)
+        {
+            TYPE adstav = std::accumulate(m_qValueStack, m_qValueStack + m_zStackPos, 0) / m_zStackPos;
+            stav = (stav + adstav) / 2;
+        }
+        return stav;
+    }
+};
+
+
+
+template<unsigned SEGMENT_SPAN_I, unsigned SEGMENT_NUMBER_I, int MAX_DRIFT_I>
+class FastDriftTracer
+{
+    int64_t m_qDriftSumSeg[SEGMENT_NUMBER_I];
+
+    unsigned m_uDriftSpan; // how many elements are filled.
+
+    int64_t m_qDrift;
+    int64_t m_qOverdrift;
+
+    static void size_assertion()
+    {
+        // SEGMENT_NUMBER_I must be at least 2.
+        // Segment number 10 is extraordinary, so this is
+        // tested as well (as possibly falsely overridden unsigned)
+        static const int X = 1 / (SEGMENT_NUMBER_I < 2 || SEGMENT_NUMBER_I > 10 ? 0 : 1);
+        (void)X;
+    }
+
+public:
+
+    static const unsigned MAX_SPAN = SEGMENT_SPAN_I * SEGMENT_NUMBER_I;
+    static const int MAX_DRIFT = MAX_DRIFT_I;
+
+    FastDriftTracer() :
+        m_qDriftSumSeg(),
+        m_uDriftSpan(0),
+        m_qDrift(0),
+        m_qOverdrift(0)
+    {
+        size_assertion();
+    }
+
+    void shiftSegments()
+    {
+        // Copy over. Ranges overlap, but source range is in front
+        // of the target range.
+        std::copy(m_qDriftSumSeg + 1, m_qDriftSumSeg + SEGMENT_NUMBER_I,
+            m_qDriftSumSeg);
+
+        // Clear the newly shifted-in segment
+        m_qDriftSumSeg[SEGMENT_NUMBER_I - 1] = 0;
+
+        // Should be same as m_uDriftSpan -= SEGMENT_SPAN_I, but don't be too trusftul.
+        m_uDriftSpan = SEGMENT_SPAN_I * (SEGMENT_NUMBER_I - 1);
+    }
+
+    bool update(int64_t driftval)
+    {
+        // We start from value 0, and m_uDriftSpan is under control
+
+        // Calculate which segment should be updated.
+        unsigned nseg = m_uDriftSpan / SEGMENT_SPAN_I;
+        // Sanity check
+        if (nseg >= SEGMENT_NUMBER_I)
+        {
+            // Maybe report error?
+            m_uDriftSpan = 0;
+            return false;
+        }
+
+        m_qDriftSumSeg[nseg] += driftval;
+        ++m_uDriftSpan;
+        if (m_uDriftSpan == MAX_SPAN)
+        {
+            // Only when this size was achieved, should the average be calculated.
+            // (This does the same as std::accumulate, but accepts arrays of constant size
+            // and does not use a loop - enforces compiler to expand the + expression in place).
+            m_qOverdrift = 0;
+            m_qDrift = accumulate_array(m_qDriftSumSeg) / MAX_SPAN;
+            shiftSegments();
+
+            // In case of "overdrift", save the overdriven value in 'm_qOverdrift'.
+            // In clear mode, you should add this value to the time base when update()
+            // returns true. The drift value will be since now measured with the
+            // overdrift assumed to be added to the base.
+            if (std::abs(m_qDrift) > MAX_DRIFT)
+            {
+                m_qOverdrift = m_qDrift < 0 ? -MAX_DRIFT : MAX_DRIFT;
+                m_qDrift -= m_qOverdrift;
+            }
+
+            // Inform that the values were just updated.
+            return true;
+        }
+
+        return false;
+    }
+
+    std::string stats()
+    {
+        std::ostringstream os;
+        unsigned nseg = m_uDriftSpan / SEGMENT_SPAN_I;
+
+        os << "DRIFT STATS: SUMS: [ ";
+
+        for (unsigned i = 0; i < SEGMENT_NUMBER_I; ++i)
+        {
+            unsigned size = i == nseg ? (m_uDriftSpan - (nseg * SEGMENT_SPAN_I)) : SEGMENT_SPAN_I;
+            os << m_qDriftSumSeg[i] << "~" << (size ? m_qDriftSumSeg[i] / size : 0) << " ";
+        }
+        os << "] seg=" << nseg << " span=" << m_uDriftSpan;
+        return os.str();
+    }
+
+    // These values can be read at any time, however if you want
+    // to depend on the fact that they have been changed lately,
+    // you have to check the return value from update().
+    //
+    // IMPORTANT: drift() can be called at any time, just remember
+    // that this value may look different than before only if the
+    // last update() returned true, which need not be important for you.
+    //
+    // CASE: CLEAR_ON_UPDATE = true
+    // overdrift() should be read only immediately after update() returned
+    // true. It will stay available with this value until the next time when
+    // update() returns true, in which case the value will be cleared.
+    // Therefore, after calling update() if it retuns true, you should read
+    // overdrift() immediately an make some use of it. Next valid overdrift
+    // will be then relative to every previous overdrift.
+    //
+    // CASE: CLEAR_ON_UPDATE = false
+    // overdrift() will start from 0, but it will always keep track on
+    // any changes in overdrift. By manipulating the MAX_DRIFT parameter
+    // you can decide how high the drift can go relatively to stay below
+    // overdrift.
+    int64_t drift() { return m_qDrift; }
+    int64_t overdrift() { return m_qOverdrift; }
+    unsigned span() { return m_uDriftSpan; }
+    static unsigned max() { return MAX_SPAN; }
+};
+
+
 inline std::string FormatBinaryString(const uint8_t* bytes, size_t size)
 {
     if ( size == 0 )
@@ -615,10 +1017,18 @@ inline size_t safe_advance(It& it, size_t num, It end)
 template <class V, size_t N> inline
 ATR_CONSTEXPR size_t Size(const V (&)[N]) ATR_NOEXCEPT { return N; }
 
-template <size_t DEPRLEN, typename ValueType>
+
+template <size_t SPAN, typename ValueType>
 inline ValueType avg_iir(ValueType old_value, ValueType new_value)
 {
-    return (old_value*(DEPRLEN-1) + new_value)/DEPRLEN;
+    return (old_value * (SPAN - 1) + new_value) / SPAN;
+}
+
+// Version where the span value can be given as variable, not compile-time constant.
+template<typename ValueType>
+inline ValueType avg_iir(size_t span, ValueType old_value, ValueType new_value)
+{
+    return (old_value * (span - 1) + new_value) / span;
 }
 
 #endif
