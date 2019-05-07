@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <vector>
+#include <atomic>
 #include <iostream>
+#include <functional>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -39,84 +41,6 @@ void OnINT_ForceExit(int)
         }
         srt_msgn_destroy();
         });
-}
-
-
-
-void receive_message(const char* uri, size_t msg_size, bool reply, bool printmsg)
-{
-    ::cout << "Listen to " << uri << "\n";
-
-    const size_t& message_size = msg_size;
-    if (0 != srt_msgn_listen(uri, message_size))
-    {
-        cerr << "ERROR: Listen failed.\n";
-
-        srt_msgn_destroy();
-        return;
-    }
-
-    vector<char> message_rcvd(message_size);
-
-    while (!int_state)
-    {
-        int connection_id = 0;
-        const int recv_res = srt_msgn_recv(message_rcvd.data(), message_rcvd.size(), &connection_id);
-
-        if (recv_res == 0)
-        {
-            continue;
-        }
-        else if (recv_res < 0)
-        {
-            cerr << "ERROR: Receiving message. Result: " << recv_res;
-            cerr << " on conn ID " << connection_id << "\n";
-            cerr << srt_msgn_getlasterror_str() << endl;
-
-            srt_msgn_destroy();
-            return;
-        }
-
-        if (printmsg)
-        {
-            ::cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id;
-            if (recv_res < 50)
-            {
-                ::cout << ":\n";
-                ::cout << string(message_rcvd.data(), recv_res).c_str();
-            }
-            else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
-            {
-                ::cout << " (first character):";
-                ::cout << message_rcvd[0];
-            }
-            ::cout << endl;
-        }
-
-        if (reply)
-        {
-            const string out_message("Message received");
-            const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
-            if (send_res <= 0)
-            {
-                cerr << "ERROR: Sending reply message. Result: " << send_res;
-                cerr << " on conn ID " << connection_id << "\n";
-                cerr << srt_msgn_getlasterror_str() << endl;
-
-                srt_msgn_destroy();
-                return;
-            }
-            if (printmsg)
-                ::cout << "Reply sent on conn ID " << connection_id << "\n";
-        }
-    }
-
-    if (int_state)
-    {
-        cerr << "\n (interrupted on request)\n";
-    }
-
-    srt_msgn_destroy();
 }
 
 
@@ -191,6 +115,125 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream& out,
 }
 
 
+
+void receive_message(const char* uri, size_t msg_size, bool reply, bool printmsg,
+    ostream& out_stats, chrono::seconds stats_freq)
+{
+    ::cout << "Listen to " << uri << "\n";
+
+    const size_t& message_size = msg_size;
+    if (0 != srt_msgn_listen(uri, message_size))
+    {
+        cerr << "ERROR: Listen failed.\n";
+
+        srt_msgn_destroy();
+        return;
+    }
+
+    //set<int> connections;
+    vector<char> message_rcvd(message_size);
+
+    auto stats_func = [&out_stats, &stats_freq](int sock)
+    {
+        if (stats_freq == chrono::seconds(0))
+            return;
+
+        while (!int_state)
+        {
+            this_thread::sleep_for(stats_freq);
+
+            cerr << "Get the stats. ";
+            SRTPerformanceStats stats;
+            if (-1 == srt_msgn_bstats(&stats, sock, 1))
+            {
+                cerr << "ERROR: Failed to get the stats. ";
+                cerr << srt_msgn_getlasterror_str() << endl;
+                break;
+            }
+            else
+            {
+                PrintSrtStats(-1, stats, out_stats, true);
+            }
+        }
+    };
+
+    auto statsth = std::thread();
+
+    const bool collect_stats = stats_freq != chrono::seconds(0);
+
+
+    while (!int_state)
+    {
+        int connection_id = 0;
+        const int recv_res = srt_msgn_recv(message_rcvd.data(), message_rcvd.size(), &connection_id);
+
+        if (recv_res == 0)
+        {
+            continue;
+        }
+        else if (recv_res < 0)
+        {
+            cerr << "ERROR: Receiving message. Result: " << recv_res;
+            cerr << " on conn ID " << connection_id << "\n";
+            cerr << srt_msgn_getlasterror_str() << endl;
+
+            srt_msgn_destroy();
+            return;
+        }
+
+
+        if (!statsth.joinable() && stats_freq != chrono::seconds(0))
+        {
+            statsth = std::thread(stats_func, connection_id);
+        }
+
+        if (printmsg)
+        {
+            ::cout << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id;
+            if (recv_res < 50)
+            {
+                ::cout << ":\n";
+                ::cout << string(message_rcvd.data(), recv_res).c_str();
+            }
+            else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
+            {
+                ::cout << " (first character):";
+                ::cout << message_rcvd[0];
+            }
+            ::cout << endl;
+        }
+
+        if (reply)
+        {
+            const string out_message("Message received");
+            const int send_res = srt_msgn_send_on_conn(out_message.data(), out_message.size(), connection_id);
+            if (send_res <= 0)
+            {
+                cerr << "ERROR: Sending reply message. Result: " << send_res;
+                cerr << " on conn ID " << connection_id << "\n";
+                cerr << srt_msgn_getlasterror_str() << endl;
+
+                srt_msgn_destroy();
+                return;
+            }
+            if (printmsg)
+                ::cout << "Reply sent on conn ID " << connection_id << "\n";
+        }
+    }
+
+    if (int_state)
+    {
+        cerr << "\n (interrupted on request)\n";
+    }
+
+    if (statsth.joinable())
+        statsth.join();
+
+    srt_msgn_destroy();
+}
+
+
+
 void send_message(const char* uri, const char* message, size_t length,
     size_t msg_size, bool reply, const bool printmsg, int target_bitrate_bps,
     int num_repeats, ostream& out_stats, chrono::seconds stats_freq)
@@ -257,23 +300,23 @@ void send_message(const char* uri, const char* message, size_t length,
                 }
             }) : std::thread();
 
-            if (length > 0)
+        if (length > 0)
+        {
+            int sent_res = srt_msgn_send(message, length);
+            if (sent_res != (int)length)
             {
-                int sent_res = srt_msgn_send(message, length);
-                if (sent_res != (int)length)
-                {
-                    cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
-                    cerr << srt_msgn_getlasterror_str() << endl;
-                    srt_msgn_destroy();
-                    return;
-                }
-
-                if (printmsg)
-                {
-                    ::cout << "SENT MESSAGE:\n";
-                    ::cout << message << endl;
-                }
+                cerr << "ERROR: Sending message " << length << ". Result: " << sent_res << "\n";
+                cerr << srt_msgn_getlasterror_str() << endl;
+                srt_msgn_destroy();
+                return;
             }
+
+            if (printmsg)
+            {
+                ::cout << "SENT MESSAGE:\n";
+                ::cout << message << endl;
+            }
+        }
 
         const long msgs_per_s = static_cast<long long>(target_bitrate_bps / 8) / message_size;
         const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
@@ -438,7 +481,7 @@ int main(int argc, char** argv)
 
     if (params[""].size() == 1)
     {
-        receive_message(params[""][0].c_str(), msg_size, reply, printmsg);
+        receive_message(params[""][0].c_str(), msg_size, reply, printmsg, out_stats, chrono::seconds(statsfreq));
         if (g_closing_th.joinable()) g_closing_th.join();
         return 0;
     }

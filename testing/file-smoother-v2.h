@@ -59,6 +59,7 @@ public:
         m_iLastDecSeq = CSeqNo::decseq(m_iLastAck);
         m_dLastDecPeriod = 1;
         m_iAvgNAKNum = 0;
+        m_iDecCount = 0;
         m_iNAKCount = 0;
         m_iDecRandom = 1;
 
