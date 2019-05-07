@@ -196,7 +196,9 @@ void CTimer::sleepto(uint64_t nexttime)
    if (t >= m_ullSchedTime)
        return;
 
-   //const uint64_t freq = CTimer::getCPUFrequency();
+#if (SLEEPTO_ALG == 3)
+   const uint64_t freq = CTimer::getCPUFrequency();
+#endif
    //timeval now;
    //gettimeofday(&now, 0);
    //const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + (m_ullSchedTime - t) * freq;
