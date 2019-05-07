@@ -142,7 +142,6 @@ void receive_message(const char* uri, size_t msg_size, bool reply, bool printmsg
         {
             this_thread::sleep_for(stats_freq);
 
-            cerr << "Get the stats. ";
             SRTPerformanceStats stats;
             if (-1 == srt_msgn_bstats(&stats, sock, 1))
             {
@@ -182,7 +181,7 @@ void receive_message(const char* uri, size_t msg_size, bool reply, bool printmsg
         }
 
 
-        if (!statsth.joinable() && stats_freq != chrono::seconds(0))
+        if (!statsth.joinable() && collect_stats)
         {
             statsth = std::thread(stats_func, connection_id);
         }
