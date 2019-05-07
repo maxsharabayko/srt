@@ -423,7 +423,7 @@ public:
 
 #endif
 
-
+#if 0
 // This is a stack, onto which you push values, but
 // you never pop them. They stay there forever, but 
 // the oldest get dropped. You can backtrack up to
@@ -823,7 +823,7 @@ public:
     unsigned span() { return m_uDriftSpan; }
     static unsigned max() { return MAX_SPAN; }
 };
-
+#endif // 0
 
 inline std::string FormatBinaryString(const uint8_t* bytes, size_t size)
 {
