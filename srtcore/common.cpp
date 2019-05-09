@@ -295,8 +295,42 @@ void CTimer::sleepto(uint64_t nexttime)
        }
 
 #elif (SLEEPTO_ALG == 3)
-#pragma message("SLEEPTO_ALG == 3!")
+#pragma message("SLEEPTO_ALG 3")
+       THREAD_PAUSED();
+       pthread_mutex_lock(&m_TickLock);
        condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) / freq);
+       THREAD_PAUSED();
+       pthread_mutex_lock(&m_TickLock);
+#elif (SLEEPTO_ALG == 4)
+#pragma message("SLEEPTO_ALG 4")
+       const uint64_t freq = CTimer::getCPUFrequency();
+#ifdef _WIN32
+       const uint64_t target_wait_us = (m_ullSchedTime - t) / freq;
+       const uint64_t min_wait_us = 1000;
+       const uint64_t wait_us = std::max(target_wait_us, min_wait_us);
+#else
+       const uint64_t wait_us = (m_ullSchedTime - t) / freq;
+#endif
+       THREAD_PAUSED();
+       pthread_mutex_lock(&m_TickLock);
+       condTimedWaitUS(&m_TickCond, &m_TickLock, wait_us);
+       pthread_mutex_unlock(&m_TickLock);
+       THREAD_RESUMED();
+#elif (SLEEPTO_ALG == 5)
+#pragma message("SLEEPTO_ALG 5")
+       const uint64_t freq = CTimer::getCPUFrequency();
+#ifdef _WIN32
+       const uint64_t target_wait_us = (m_ullSchedTime - t) / freq;
+       const uint64_t min_wait_us = 10000;
+       const uint64_t wait_us = std::max(target_wait_us, min_wait_us);
+#else
+       const uint64_t wait_us = (m_ullSchedTime - t) / freq;
+#endif
+       THREAD_PAUSED();
+       pthread_mutex_lock(&m_TickLock);
+       condTimedWaitUS(&m_TickCond, &m_TickLock, wait_us);
+       pthread_mutex_unlock(&m_TickLock);
+       THREAD_RESUMED();
 #else
 #pragma message("SLEEPTO_ALG else!")
     #error "Undefined SLEEPTO_ALG";
