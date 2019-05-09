@@ -296,7 +296,7 @@ void CTimer::sleepto(uint64_t nexttime)
 
 #elif (SLEEPTO_ALG == 3)
 #pragma message("SLEEPTO_ALG == 3!")
-       condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) * freq);
+       condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) / freq);
 #else
 #pragma message("SLEEPTO_ALG else!")
     #error "Undefined SLEEPTO_ALG";
