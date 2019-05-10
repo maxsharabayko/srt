@@ -296,39 +296,47 @@ void CTimer::sleepto(uint64_t nexttime)
 
 #elif (SLEEPTO_ALG == 3)
 #pragma message("SLEEPTO_ALG 3")
+       const uint64_t freq = CTimer::getCPUFrequency();
+
+       const uint64_t target_wait_us = (m_ullSchedTime - t) / freq;
+       const uint64_t min_wait_us = MIN_SLEEPTO_WAIT_TIME_US;
+       const uint64_t wait_usec = std::max(target_wait_us, min_wait_us);
+
+       if (wait_usec <= 0)
+           break;
+
        THREAD_PAUSED();
        pthread_mutex_lock(&m_TickLock);
-       condTimedWaitUS(&m_TickCond, &m_TickLock, (m_ullSchedTime - t) / freq);
-       THREAD_PAUSED();
-       pthread_mutex_lock(&m_TickLock);
+       condTimedWaitUS(&m_TickCond, &m_TickLock, wait_usec);
+       pthread_mutex_unlock(&m_TickLock);
+       THREAD_RESUMED();
 #elif (SLEEPTO_ALG == 4)
 #pragma message("SLEEPTO_ALG 4")
        const uint64_t freq = CTimer::getCPUFrequency();
-#ifdef _WIN32
+
        const uint64_t target_wait_us = (m_ullSchedTime - t) / freq;
-       const uint64_t min_wait_us = 1000;
-       const uint64_t wait_us = std::max(target_wait_us, min_wait_us);
-#else
-       const uint64_t wait_us = (m_ullSchedTime - t) / freq;
-#endif
+       const uint64_t min_wait_us = MIN_SLEEPTO_WAIT_TIME_US;
+       const uint64_t wait_usec = std::max(target_wait_us, min_wait_us);
+
+       if (wait_usec <= 0)
+           break;
+
+       timeval now;
+       timespec timeout;
+       gettimeofday(&now, 0);
+       if (now.tv_usec < 990000)
+       {
+           timeout.tv_sec = now.tv_sec;
+           timeout.tv_nsec = (now.tv_usec + wait_usec) * 1000;
+       }
+       else
+       {
+           timeout.tv_sec = now.tv_sec + 1;
+           timeout.tv_nsec = (now.tv_usec + wait_usec - 1000000) * 1000;
+       }
        THREAD_PAUSED();
        pthread_mutex_lock(&m_TickLock);
-       condTimedWaitUS(&m_TickCond, &m_TickLock, wait_us);
-       pthread_mutex_unlock(&m_TickLock);
-       THREAD_RESUMED();
-#elif (SLEEPTO_ALG == 5)
-#pragma message("SLEEPTO_ALG 5")
-       const uint64_t freq = CTimer::getCPUFrequency();
-#ifdef _WIN32
-       const uint64_t target_wait_us = (m_ullSchedTime - t) / freq;
-       const uint64_t min_wait_us = 10000;
-       const uint64_t wait_us = std::max(target_wait_us, min_wait_us);
-#else
-       const uint64_t wait_us = (m_ullSchedTime - t) / freq;
-#endif
-       THREAD_PAUSED();
-       pthread_mutex_lock(&m_TickLock);
-       condTimedWaitUS(&m_TickCond, &m_TickLock, wait_us);
+       pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
        pthread_mutex_unlock(&m_TickLock);
        THREAD_RESUMED();
 #else
