@@ -7360,7 +7360,12 @@ int CUDT::packData(CPacket& packet, uint64_t& ts_tk)
 
       int offset = CSeqNo::seqoff(m_iSndLastDataAck, packet.m_iSeqNo);
       if (offset < 0)
-         return 0;
+      {
+          LOGC(dlog.Debug, log << "packData: LOST packet negative offset: seqoff(m_iSeqNo " << packet.m_iSeqNo << ", m_iSndLastDataAck " << m_iSndLastDataAck
+              << ")=" << offset << " return 0");
+          return 0;
+      }
+
 
       int msglen;
 
@@ -7439,6 +7444,7 @@ int CUDT::packData(CPacket& packet, uint64_t& ts_tk)
             m_ullTargetTime_tk = 0;
             m_ullTimeDiff_tk = 0;
             ts_tk = 0;
+            LOGC(dlog.Debug, log << "packData: cwnd >= seqdiff but m_pSndBuffer->readData() returned 0");
             return 0;
          }
       }
@@ -7551,6 +7557,12 @@ int CUDT::packData(CPacket& packet, uint64_t& ts_tk)
    }
 
    m_ullTargetTime_tk = ts_tk;
+
+   if (ts_tk == 0)
+   {
+       LOGC(dlog.Debug, log << "packData ts_tk == 0: m_ullTimeDiff_tk " << m_ullTimeDiff_tk
+           << ", m_ullInterval_tk " << m_ullInterval_tk << ", entertime_tk " << entertime_tk);
+   }
 
    return payload;
 }
