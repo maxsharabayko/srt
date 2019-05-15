@@ -7317,10 +7317,11 @@ void CUDT::updateAfterSrtHandshake(int srt_cmd, int hsv)
 
 int CUDT::packLostData(CPacket& packet, uint64_t &origintime)
 {
+    // protect m_iSndLastDataAck from updating by ACK processing
+    CGuard ackguard(m_AckLock);
+
     while (0 <= (packet.m_iSeqNo = m_pSndLossList->getLostSeq()))
     {
-        // protect m_iSndLastDataAck from updating by ACK processing
-        CGuard ackguard(m_AckLock);
 
         const int offset = CSeqNo::seqoff(m_iSndLastDataAck, packet.m_iSeqNo);
         if (offset < 0)
