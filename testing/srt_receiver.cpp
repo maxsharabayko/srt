@@ -358,7 +358,7 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             m_read_fifo.erase(sock_it++);
 
             const int recv_res = srt_recvmsg2(sock, buffer, (int)buffer_len, nullptr);
-            Verb() << print_time() << "Read from socket " << sock << " resulted with " << recv_res;
+            // Verb() << print_time() << "Read from socket " << sock << " resulted with " << recv_res;
 
             if (recv_res > 0)
             {
