@@ -7322,11 +7322,11 @@ int CUDT::packLostData(CPacket& packet, uint64_t &origintime)
 
     while (0 <= (packet.m_iSeqNo = m_pSndLossList->getLostSeq()))
     {
-
         const int offset = CSeqNo::seqoff(m_iSndLastDataAck, packet.m_iSeqNo);
         if (offset < 0)
         {
-            LOGC(dlog.Debug, log << "packLostData: LOST packet negative offset: seqoff(m_iSeqNo " << packet.m_iSeqNo << ", m_iSndLastDataAck " << m_iSndLastDataAck
+            LOGC(dlog.Error, log << "IPE: packLostData: LOST packet negative offset: seqoff(m_iSeqNo "
+                << packet.m_iSeqNo<< ", m_iSndLastDataAck " << m_iSndLastDataAck
                 << ")=" << offset << ". Continue");
             continue;
         }
@@ -7359,6 +7359,11 @@ int CUDT::packLostData(CPacket& packet, uint64_t &origintime)
         // loss record has been updated by the FASTREXMIT.
         else if (payload == 0)
             continue;
+
+        // At this point we no longer need the ACK lock,
+        // because we are goind to return from the function.
+        // Therefore unlocking in order not to block other threads.
+        ackguard.forceUnlock();
 
         CGuard::enterCS(m_StatsLock);
         ++m_stats.traceRetrans;
