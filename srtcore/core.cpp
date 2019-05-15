@@ -7321,7 +7321,11 @@ int CUDT::packLostData(CPacket& packet, uint64_t &origintime)
 
         const int offset = CSeqNo::seqoff(m_iSndLastDataAck, packet.m_iSeqNo);
         if (offset < 0)
+        {
+            LOGC(dlog.Debug, log << "packLostData: LOST packet negative offset: seqoff(m_iSeqNo " << packet.m_iSeqNo << ", m_iSndLastDataAck " << m_iSndLastDataAck
+                << ")=" << offset << ". Continue");
             continue;
+        }
 
         int msglen;
 
