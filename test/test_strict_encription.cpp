@@ -347,6 +347,10 @@ public:
             std::cerr << "UNEXPECTED! srt_connect returned error: "
                 << srt_getlasterror_str() << " (code " << srt_getlasterror(NULL) << ")\n";
         }
+        else if (connect_ret == SRT_ERROR)
+        {
+            std::cerr << "connect failed with: " << srt_getlasterror_str() << " (code " << srt_getlasterror(NULL) << ")\n";
+        }
 
         const int epoll_res = WaitOnEpoll(expect);
 
