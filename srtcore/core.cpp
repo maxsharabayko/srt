@@ -8676,14 +8676,14 @@ void CUDT::checkTimers()
                 {
                     // resend all unacknowledged packets on timeout, but only if there is no packet in the loss list
                     int32_t csn = m_iSndCurrSeqNo;
-                    int num = m_pSndLossList->insert(m_iSndLastAck, csn);
+                    const int num = m_pSndLossList->insert(m_iSndLastAck, csn);
                     if (num > 0) {
                         CGuard::enterCS(m_StatsLock);
                         m_stats.traceSndLoss += 1; // num;
                         m_stats.sndLossTotal += 1; // num;
                         CGuard::leaveCS(m_StatsLock);
 
-                        HLOGC(mglog.Debug, log << CONID() << "ENFORCED LATEREXMIT by ACK-TMOUT (scheduling): " << CSeqNo::incseq(m_iSndLastAck) << "-" << csn
+                        LOGC(mglog.Debug, log << CONID() << "ENFORCED LATEREXMIT by ACK-TMOUT (scheduling): " << CSeqNo::incseq(m_iSndLastAck) << "-" << csn
                             << " (" << CSeqNo::seqoff(m_iSndLastAck, csn) << " packets)");
                     }
                 }
@@ -8742,7 +8742,7 @@ void CUDT::checkTimers()
                 // resend all unacknowledged packets on timeout
                 int32_t csn = m_iSndCurrSeqNo;
                 int num = m_pSndLossList->insert(m_iSndLastAck, csn);
-                HLOGC(mglog.Debug, log << CONID() << "ENFORCED FASTREXMIT by ACK-TMOUT PREPARED: " << m_iSndLastAck << "-" << csn
+                LOGC(mglog.Debug, log << CONID() << "ENFORCED FASTREXMIT by ACK-TMOUT PREPARED: " << m_iSndLastAck << "-" << csn
                     << " (" << CSeqNo::seqoff(m_iSndLastAck, csn) << " packets)");
 
                 HLOGC(mglog.Debug, log << "timeout lost: pkts=" <<  num << " rtt+4*var=" <<
