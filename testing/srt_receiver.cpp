@@ -322,19 +322,19 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
         assert(rnum > 0);
         assert(wnum <= rnum);
 
-        if (Verbose::on)
-        {
-            // Verbose info:
-            Verb() << "Received epoll_res " << epoll_res;
-            Verb() << "   to read  " << rnum << ": " << VerbNoEOL;
-            copy(m_epoll_read_fds.begin(), next(m_epoll_read_fds.begin(), rnum),
-                ostream_iterator<int>(*Verbose::cverb, ", "));
-            Verb();
-            Verb() << "   to write " << wnum << ": " << VerbNoEOL;
-            copy(m_epoll_write_fds.begin(), next(m_epoll_write_fds.begin(), wnum),
-                ostream_iterator<int>(*Verbose::cverb, ", "));
-            Verb();
-        }
+        // if (Verbose::on)
+        // {
+        //     // Verbose info:
+        //     Verb() << "Received epoll_res " << epoll_res;
+        //     Verb() << "   to read  " << rnum << ": " << VerbNoEOL;
+        //     copy(m_epoll_read_fds.begin(), next(m_epoll_read_fds.begin(), rnum),
+        //         ostream_iterator<int>(*Verbose::cverb, ", "));
+        //     Verb();
+        //     Verb() << "   to write " << wnum << ": " << VerbNoEOL;
+        //     copy(m_epoll_write_fds.begin(), next(m_epoll_write_fds.begin(), wnum),
+        //         ostream_iterator<int>(*Verbose::cverb, ", "));
+        //     Verb();
+        // }
 
         // If this is true, it is really unexpected.
         if (rnum <= 0 && wnum <= 0)
@@ -343,13 +343,13 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
         // Update m_read_fifo based on sockets in m_epoll_read_fds
         UpdateReadFIFO(rnum, wnum);
 
-        if (Verbose::on)
-        {
-            Verb() << "   m_read_fifo: " << VerbNoEOL;
-            copy(m_read_fifo.begin(), m_read_fifo.end(),
-                ostream_iterator<int>(*Verbose::cverb, ", "));
-            Verb();
-        }
+        // if (Verbose::on)
+        // {
+        //     Verb() << "   m_read_fifo: " << VerbNoEOL;
+        //     copy(m_read_fifo.begin(), m_read_fifo.end(),
+        //         ostream_iterator<int>(*Verbose::cverb, ", "));
+        //     Verb();
+        // }
 
         auto sock_it = m_read_fifo.begin();
         while (sock_it != m_read_fifo.end())
@@ -358,7 +358,7 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             m_read_fifo.erase(sock_it++);
 
             const int recv_res = srt_recvmsg2(sock, buffer, (int)buffer_len, nullptr);
-            Verb() << print_time() << "Read from socket " << sock << " resulted with " << recv_res;
+            // Verb() << print_time() << "Read from socket " << sock << " resulted with " << recv_res;
 
             if (recv_res > 0)
             {
