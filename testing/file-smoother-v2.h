@@ -168,7 +168,7 @@ private:
         // During Slow Start, no rate increase
         else if (!m_bSlowStart)
         {
-            const int loss_bw = (1000000 / m_dLastDecPeriod);
+            const int loss_bw = 2 * (1000000 / m_dLastDecPeriod); // 2 times last loss point
             const int bw_pktps = min(loss_bw, m_parent->bandwidth());
 
             int64_t B = (int64_t)(bw_pktps - 1000000.0 / m_dPktSndPeriod);
@@ -301,7 +301,7 @@ private:
         else if ((m_iDecCount++ < 5) && (0 == (++m_iNAKCount % m_iDecRandom)))
         {
             // 0.875^5 = 0.51, rate should not be decreased by more than half within a congestion period
-            m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.125);
+            m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.05);
             m_iLastDecSeq = m_parent->sndSeqNo();
             LOGC(mglog.Debug, log << "FileSmootherV2: LOSS:PERIOD lseqno=" << lossbegin
                 << ", lastsentseqno=" << m_iLastDecSeq
