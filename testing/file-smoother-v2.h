@@ -291,7 +291,9 @@ private:
             m_iDecRandom = (int)ceil(m_iAvgNAKNum * (double(rand()) / RAND_MAX));
             if (m_iDecRandom < 1)
                 m_iDecRandom = 1;
-            LOGC(mglog.Debug, log << "FileSmootherV2: LOSS:NEW lastseq=" << m_iLastDecSeq
+            LOGC(mglog.Debug, log << "FileSmootherV2: LOSS:NEW lseqno=" << lossbegin
+                << ", lastsentseqno=" << m_iLastDecSeq
+                << ", seqdiff=" << CSeqNo::seqoff(m_iLastDecSeq, lossbegin)
                 << ", rand=" << m_iDecRandom
                 << " avg NAK:" << m_iAvgNAKNum
                 << ", sndperiod=" << m_dPktSndPeriod << "us");
@@ -301,8 +303,8 @@ private:
             // 0.875^5 = 0.51, rate should not be decreased by more than half within a congestion period
             m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.125);
             m_iLastDecSeq = m_parent->sndSeqNo();
-            LOGC(mglog.Debug, log << "FileSmootherV2: LOSS:PERIOD lseq=" << lossbegin
-                << ", dseq=" << m_iLastDecSeq
+            LOGC(mglog.Debug, log << "FileSmootherV2: LOSS:PERIOD lseqno=" << lossbegin
+                << ", lastsentseqno=" << m_iLastDecSeq
                 << ", seqdiff=" << CSeqNo::seqoff(m_iLastDecSeq, lossbegin)
                 << ", deccnt=" << m_iDecCount
                 << ", decrnd=" << m_iDecRandom
@@ -310,8 +312,8 @@ private:
         }
         else
         {
-            LOGC(mglog.Debug, log << "FileSmootherV2: LOSS:STILL lseq=" << lossbegin
-                << ", dseq=" << m_iLastDecSeq
+            LOGC(mglog.Debug, log << "FileSmootherV2: LOSS:STILL lseqno=" << lossbegin
+                << ", lastsentseqno=" << m_iLastDecSeq
                 << ", seqdiff=" << CSeqNo::seqoff(m_iLastDecSeq, lossbegin)
                 << ", deccnt=" << m_iDecCount
                 << ", decrnd=" << m_iDecRandom
