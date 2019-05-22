@@ -247,6 +247,18 @@ private:
             return;
         }
 
+        const int ack_seqno  = m_parent->sndLastDataAck();
+        const int sent_seqno = m_parent->sndSeqNo();
+        const int num_pkts_sent = CSeqNo::seqlen(ack_seqno, sent_seqno);
+        const int num_pkts_lost = m_parent->sndLossLength();
+        const int lost_pcent_x10 = (num_pkts_lost * 1000) / num_pkts_sent;
+
+        LOGC(mglog.Debug, log << "FileSmootherV2: LOSS: " << lost_pcent_x10 / 10 << "." << lost_pcent_x10 % 10 << "\%");
+        if (lost_pcent_x10 < 15)    // 1.5%
+        {
+            return;
+        }
+
         //Slow Start stopped, if it hasn't yet
         if (m_bSlowStart)
         {
@@ -278,9 +290,9 @@ private:
         if (CSeqNo::seqcmp(lossbegin, m_iLastDecSeq) > 0)
         {
             m_dLastDecPeriod = m_dPktSndPeriod;
-            m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.125);
+            m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.03);
 
-            m_iAvgNAKNum = (int)ceil(m_iAvgNAKNum * 0.875 + m_iNAKCount * 0.125);
+            m_iAvgNAKNum = (int)ceil(m_iAvgNAKNum * 0.97 + m_iNAKCount * 0.03);
             m_iNAKCount = 1;
             m_iDecCount = 1;
 
@@ -301,7 +313,7 @@ private:
         else if ((m_iDecCount++ < 5) && (0 == (++m_iNAKCount % m_iDecRandom)))
         {
             // 0.875^5 = 0.51, rate should not be decreased by more than half within a congestion period
-            m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.05);
+            m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.03);
             m_iLastDecSeq = m_parent->sndSeqNo();
             LOGC(mglog.Debug, log << "FileSmootherV2: LOSS:PERIOD lseqno=" << lossbegin
                 << ", lastsentseqno=" << m_iLastDecSeq

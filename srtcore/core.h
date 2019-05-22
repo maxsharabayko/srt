@@ -264,17 +264,20 @@ public: // internal API
 
     bool isTsbPd() { return m_bOPT_TsbPd; }
     int RTT() { return m_iRTT; }
-    int32_t sndSeqNo() { return m_iSndCurrSeqNo; }
-    int32_t rcvSeqNo() { return m_iRcvCurrSeqNo; }
-    int flowWindowSize() { return m_iFlowWindowSize; }
-    int32_t deliveryRate() { return m_iDeliveryRate; }
-    int bandwidth() { return m_iBandwidth; }
-    int64_t maxBandwidth() { return m_llMaxBW; }
-    int MSS() { return m_iMSS; }
-    size_t maxPayloadSize() { return m_iMaxSRTPayloadSize; }
-    size_t OPT_PayloadSize() { return m_zOPT_ExpPayloadSize; }
-    uint64_t minNAKInterval() { return m_ullMinNakInt_tk; }
-    int32_t ISN() { return m_iISN; }
+    int32_t sndSeqNo() const { return m_iSndCurrSeqNo; }
+    int32_t rcvSeqNo() const { return m_iRcvCurrSeqNo; }
+    int flowWindowSize() const { return m_iFlowWindowSize; }
+    int32_t deliveryRate() const { return m_iDeliveryRate; }
+    int bandwidth() const { return m_iBandwidth; }
+    int64_t maxBandwidth() const { return m_llMaxBW; }
+    int MSS() const { return m_iMSS; }
+    size_t maxPayloadSize() const { return m_iMaxSRTPayloadSize; }
+    size_t OPT_PayloadSize() const { return m_zOPT_ExpPayloadSize; }
+    uint64_t minNAKInterval() const { return m_ullMinNakInt_tk; }
+    int32_t ISN() const { return m_iISN; }
+
+    int sndLossLength() { return m_pSndLossList->getLossLength(); }
+    int sndLastDataAck() const { return m_iSndLastDataAck; }
 
     // XXX See CUDT::tsbpd() to see how to implement it. This should
     // do the same as TLPKTDROP feature when skipping packets that are agreed
