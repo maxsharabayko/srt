@@ -168,12 +168,12 @@ private:
         // During Slow Start, no rate increase
         else if (!m_bSlowStart)
         {
-            const int loss_bw = (1000000 / m_dLastDecPeriod) * m_parent->MSS() * 8.0;
-            const int bw = min(loss_bw, m_parent->bandwidth());
+            const int loss_bw = (1000000 / m_dLastDecPeriod);
+            const int bw_pktps = min(loss_bw, m_parent->bandwidth());
 
-            int64_t B = (int64_t)(bw - 1000000.0 / m_dPktSndPeriod);
-            if ((m_dPktSndPeriod > m_dLastDecPeriod) && ((bw / 9) < B))
-                B = bw / 9;
+            int64_t B = (int64_t)(bw_pktps - 1000000.0 / m_dPktSndPeriod);
+            if ((m_dPktSndPeriod > m_dLastDecPeriod) && ((bw_pktps / 9) < B))
+                B = bw_pktps / 9;
             if (B <= 0)
                 inc = 1.0 / m_parent->MSS();    // was inc = 0.01;
             else
