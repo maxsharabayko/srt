@@ -187,6 +187,11 @@ private:
                     inc = 1.0 / m_parent->MSS();
             }
 
+            LOGC(mglog.Debug, log << "FileSmootherV2: UPD (slowstart:OFF) loss_bw=" << loss_bw
+                << " bandwidth=" << m_parent->bandwidth() << " inc=" << inc
+                << " m_dPktSndPeriod=" << m_dPktSndPeriod
+                << "->" << (m_dPktSndPeriod * m_iRCInterval) / (m_dPktSndPeriod * inc + m_iRCInterval));
+
             m_dPktSndPeriod = (m_dPktSndPeriod * m_iRCInterval) / (m_dPktSndPeriod * inc + m_iRCInterval);
         }
 
