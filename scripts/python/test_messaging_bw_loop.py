@@ -80,6 +80,7 @@ def start_sender(
     logger.info(f'Started successfully: {name}')
     return (name, snd_srt_process)
 
+
 def start_receiver(
     rcv_ssh_host, 
     rcv_ssh_username, 
@@ -111,6 +112,7 @@ def start_receiver(
     logger.info('Started successfully')
     return (name, process)
 
+
 @attr.s
 class Config:
     """
@@ -121,6 +123,7 @@ class Config:
     rcv_path_to_srt: str = attr.ib()
     snd_path_to_srt: str = attr.ib()
     snd_tshark_iface: str = attr.ib()
+    snd_instances: int = attr.ib()
     dst_host: str = attr.ib()
     dst_port: str = attr.ib()
     algdescr: str = attr.ib()
@@ -150,6 +153,7 @@ class Config:
             int(parsed_config['bw-loop-test']['bitrate_step']),
             int(parsed_config['bw-loop-test']['time_to_stream'])
         )
+
 
 def start_several_senders(
     config,
@@ -222,17 +226,54 @@ def start_several_senders(
 
     return sender_processes
 
-def main_function(
-    config_filepath,
+
+class TestConfig:
+    """
+    Global configuration settings.
+    """
+    rcv_ssh_host: str = attr.ib()
+    rcv_ssh_username: str = attr.ib()
+    rcv_path_to_srt: str = attr.ib()
+    snd_path_to_srt: str = attr.ib()
+    snd_tshark_iface: str = attr.ib()
+    snd_bitrate: int = attr.ib()
+    dst_host: str = attr.ib()
+    dst_port: str = attr.ib()
+    algdescr: str = attr.ib()
+    scenario: str = attr.ib()
+    testdesc: str = attr.ib()
+    time_to_stream: int = attr.ib()
+
+
+def bw_loop_gen(config):
+    test_config = TestConfig
+    test_config.rcv_ssh_host     = config.rcv_ssh_host
+    test_config.rcv_ssh_username = config.rcv_ssh_username
+    test_config.rcv_path_to_srt  = config.rcv_path_to_srt
+    test_config.snd_path_to_srt  = config.snd_path_to_srt
+    test_config.snd_tshark_iface = config.snd_tshark_iface
+    test_config.dst_host         = config.dst_host
+    test_config.dst_port         = config.dst_port
+    test_config.algdescr         = config.algdescr
+    test_config.scenario         = config.scenario
+    test_config.time_to_stream   = config.time_to_stream
+    
+    for bitrate in range(config.bitrate_min, config.bitrate_max, config.bitrate_step):
+        test_config.snd_bitrate = bitrate
+        test_config.testdesc = f"blt-{bitrate / shared.DELIMETER}Mbps"
+        yield test_config
+
+
+def run_test_loop(
+    config,
     rcv,
     snd_number,
     snd_mode,
     results_dir,
     collect_stats,
-    run_tshark
+    run_tshark,
+    test_desc_generator
 ):
-    config = Config.from_config_filepath(pathlib.Path(config_filepath))
-
     processes = []
     try:
         if rcv == 'remotely':
@@ -253,24 +294,18 @@ def main_function(
                     return
             logger.info('Created successfully')
 
-        logger.info('Creating a folder for saving results on a sender side')
-        results_dir = pathlib.Path(results_dir)
-        if results_dir.exists():
-            shutil.rmtree(results_dir)
-        results_dir.mkdir()
-        logger.info('Created successfully')
-
-        for bitrate in range(config.bitrate_min, config.bitrate_max, config.bitrate_step):
+        # Testing loop
+        for config in test_desc_generator:
             # Information needed to form .csv stats and .pcapng WireShark
             # files' names
-            file_info = (config.scenario, config.algdescr, bitrate)
+            file_info = (config.scenario, config.algdescr, config.sender.bitrate)
 
             # Start SRT on a receiver side
             if rcv == 'remotely':
                 rcv_srt_process = start_receiver(
-                    config.rcv_ssh_host, 
-                    config.rcv_ssh_username, 
-                    config.rcv_path_to_srt, 
+                    config.rcv.ssh_host, 
+                    config.rcv.ssh_username, 
+                    config.rcv.path_to_srt, 
                     config.dst_port,
                     results_dir,
                     collect_stats,
@@ -281,9 +316,9 @@ def main_function(
 
             # Start tshark on a sender side
             if run_tshark:
-                filename = f'{config.scenario}-alg-{config.algdescr}-blt-{bitrate / shared.DELIMETER}Mbps-snd.pcapng'
+                filename = f'{config.scenario}-alg-{config.algdescr}-{config.testdesc}-snd.pcapng'
                 snd_tshark_process = shared.start_tshark(
-                    config.snd_tshark_iface, 
+                    config.snd.tshark_iface,
                     config.dst_port, 
                     filename,
                     results_dir
@@ -294,14 +329,16 @@ def main_function(
             # Start several SRT senders on a sender side to stream for
             # config.time_to_stream seconds
             sender_processes = start_several_senders(
-                config,
-                bitrate,
-                snd_number,
-                snd_mode,
+                cnfig.sender.config,
+                cnfig.sender.bitrate,
+                cnfig.sender.instances,
+                cnfig.sender.mode,
                 results_dir,
                 collect_stats,
-                file_info
+                config.sender.file_info
             )
+            
+            # FIXME: processes.extend(sender_processes)
             for p in sender_processes:
                 processes.append(p)
 
@@ -327,7 +364,7 @@ def main_function(
                 logger.info(
                     f'Waited {config.time_to_stream + extra_time} seconds '
                     f'instead of {config.time_to_stream}. '
-                    f'{bitrate}bps is considered as maximim available bandwidth.'
+                    f'{config.sender.bitrate}bps is considered as maximim available bandwidth.'
                 )
                 break
     except KeyboardInterrupt:
@@ -355,6 +392,21 @@ def main_function(
                     f'experiment can not be done further!'
                 )
                 raise error
+
+
+
+def main_function(
+    config_filepath,
+    rcv,
+    snd_number,
+    snd_mode,
+    results_dir,
+    collect_stats,
+    run_tshark
+):
+    config = Config.from_config_filepath(pathlib.Path(config_filepath))
+    run_test_loop(config, rcv, snd_number, snd_mode, results_dir, collect_stats, run_tshark, bw_loop_gen(config))
+
 
 
 @click.command()
