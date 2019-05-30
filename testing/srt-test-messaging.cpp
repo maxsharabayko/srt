@@ -57,8 +57,8 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream& out,
             output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
             output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
             output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
-            output << "pktRecv,byteAvailRcvBuf,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
-            output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
+            output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+            output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
             output << endl;
             print_header = false;
         }
@@ -84,13 +84,13 @@ static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream& out,
         output << mon.usPktSndPeriod << ",";
 
         output << mon.pktRecv << ",";
-        output << mon.byteAvailRcvBuf << ",";
         output << mon.pktRcvLoss << ",";
         output << mon.pktRcvDrop << ",";
         output << mon.pktRcvRetrans << ",";
         output << mon.pktRcvBelated << ",";
 
         output << mon.byteRecv << ",";
+        output << mon.byteAvailRcvBuf << ",";
         output << mon.byteRcvLoss << ",";
         output << mon.byteRcvDrop << ",";
         output << mon.mbpsRecvRate << ",";
