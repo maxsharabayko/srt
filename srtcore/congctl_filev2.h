@@ -271,6 +271,26 @@ private:
 
         m_bLoss = true;
 
+        const int pktsInFlight = m_parent->RTT() / m_dPktSndPeriod;
+        const int ack_seqno = m_iLastAck;// m_parent->sndLastDataAck();
+        const int sent_seqno = m_parent->sndSeqNo();
+        const int num_pkts_sent = CSeqNo::seqlen(ack_seqno, sent_seqno);
+        //const int num_pkts_reached = num_pkts_sent > pktsInFlight ? (num_pkts_sent - pktsInFlight) : num_pkts_sent;
+        const int num_pkts_lost = m_parent->sndLossLength();
+        //const int lost_pcent_x10 = (num_pkts_lost * 1000) / num_pkts_reached;
+        const int lost_pcent_x10 = (num_pkts_lost * 1000) / pktsInFlight;
+
+        LOGC(mglog.Debug, log << "FileSmootherV2: LOSS: "
+            << "sent=" << num_pkts_sent << ", inFlight=" << pktsInFlight
+            << ", lost=" << num_pkts_lost << " ("
+            << lost_pcent_x10 / 10 << "." << lost_pcent_x10 % 10 << "\%)");
+        if (lost_pcent_x10 < 20)    // 2.0%
+        {
+            LOGC(mglog.Debug, log << "FileSmootherV2: LOSS: m_dLastDecPeriod=" << m_dLastDecPeriod << "->" << m_dPktSndPeriod);
+            m_dLastDecPeriod = m_dPktSndPeriod;
+            return;
+        }
+
         // In contradiction to UDT, TEV_LOSSREPORT will be reported also when
         // the lossreport is being sent again, periodically, as a result of
         // NAKREPORT feature. You should make sure that NAKREPORT is off when
