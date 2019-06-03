@@ -276,6 +276,8 @@ public: // internal API
     uint64_t minNAKInterval() { return m_ullMinNakInt_tk; }
     int32_t ISN() { return m_iISN; }
 
+    int sndLossLength() { return m_pSndLossList->getLossLength(); }
+
     // XXX See CUDT::tsbpd() to see how to implement it. This should
     // do the same as TLPKTDROP feature when skipping packets that are agreed
     // to be lost. Note that this is predicted to be called with TSBPD off.
