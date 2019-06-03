@@ -27,6 +27,7 @@
 
 
 #include "common.h"
+#include "congctl_filev2.h"
 #include "core.h"
 #include "queue.h"
 #include "packet.h"
@@ -593,7 +594,8 @@ struct Creator
 SrtCongestion::NamePtr SrtCongestion::congctls[N_CONTROLLERS] =
 {
     {"live", Creator<LiveCC>::Create },
-    {"file", Creator<FileCC>::Create }
+    {"file", Creator<FileCC>::Create },
+    {"filev2", Creator<FileV2CC>::Create }
 };
 
 
