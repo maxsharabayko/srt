@@ -26,7 +26,7 @@ class SrtCongestion
     // for a user-defined controller.
     // Note that this is a pointer to function :)
 
-    static const size_t N_CONTROLLERS = 2;
+    static const size_t N_CONTROLLERS = 3;
     // The first/second is to mimic the map.
     typedef struct { const char* first; srtcc_create_t* second; } NamePtr;
     static NamePtr congctls[N_CONTROLLERS];
