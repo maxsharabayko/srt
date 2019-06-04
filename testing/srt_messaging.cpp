@@ -26,11 +26,20 @@ int srt_msgn_connect(const char *uri, size_t message_size)
     ut["messageapi"] = string("true");
     ut["blocking"]   = string("true");
     ut["mode"]       = string("caller");
+    ut["congestion"] = string("filev2");
 
     // If we have this parameter provided, probably someone knows better
     if (!ut["sndbuf"].exists())
     {
-        ut["sndbuf"] = to_string(5 * (message_size * 1472 / 1456 + 1472));
+        ut["sndbuf"] = string("625000000");
+    }
+    if (!ut["rcvbuf"].exists())
+    {
+        ut["rcvbuf"] = string("625000000");
+    }
+    if (!ut["fc"].exists())
+    {
+        ut["fc"] = string("60000");
     }
 
     if (!g_rcv_srt_model)
@@ -63,6 +72,7 @@ int srt_msgn_listen(const char *uri, size_t message_size)
     ut["messageapi"] = string("true");
     ut["blocking"]   = string("true");
     ut["mode"]       = string("listener");
+    ut["congestion"] = string("filev2");
 
     int maxconn = 5;
     if (ut["maxconn"].exists())
@@ -73,7 +83,15 @@ int srt_msgn_listen(const char *uri, size_t message_size)
     // If we have this parameter provided, probably someone knows better
     if (!ut["rcvbuf"].exists() && ut.queryValue("transtype") != "live")
     {
-        ut["rcvbuf"] = to_string(5 * (message_size * 1472 / 1456 + 1472));
+        ut["rcvbuf"] = string("625000000");
+    }
+    if (!ut["sndbuf"].exists())
+    {
+        ut["sndbuf"] = string("625000000");
+    }
+    if (!ut["fc"].exists())
+    {
+        ut["fc"] = string("60000");
     }
 
     if (!g_rcv_srt_model)
