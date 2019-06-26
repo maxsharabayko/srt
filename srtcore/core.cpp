@@ -8633,8 +8633,8 @@ void CUDT::checkRexmitTimer(uint64_t currtime_tk)
                 const int num = m_pSndLossList->insert(m_iSndLastAck, csn);
                 if (num > 0) {
                     CGuard::enterCS(m_StatsLock);
-                    m_stats.traceSndLoss += 1; // num;
-                    m_stats.sndLossTotal += 1; // num;
+                    m_stats.traceSndLoss += num;
+                    m_stats.sndLossTotal += num;
                     CGuard::leaveCS(m_StatsLock);
 
                     HLOGC(mglog.Debug, log << CONID() << "ENFORCED LATEREXMIT by ACK-TMOUT (scheduling): " << CSeqNo::incseq(m_iSndLastAck) << "-" << csn
@@ -8643,6 +8643,8 @@ void CUDT::checkRexmitTimer(uint64_t currtime_tk)
             }
             // protect packet retransmission
             CGuard::leaveCS(m_AckLock);
+
+            ++m_iReXmitCount;
 
             checkSndTimers(DONT_REGEN_KM);
             updateCC(TEV_CHECKTIMER, TEV_CHT_REXMIT);
@@ -8686,8 +8688,8 @@ void CUDT::checkRexmitTimer(uint64_t currtime_tk)
 
             if (num > 0) {
                 CGuard::enterCS(m_StatsLock);
-                m_stats.traceSndLoss += 1; // num;
-                m_stats.sndLossTotal += 1; // num;
+                m_stats.traceSndLoss += num;
+                m_stats.sndLossTotal += num;
                 CGuard::leaveCS(m_StatsLock);
             }
         }
