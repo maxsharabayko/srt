@@ -3783,6 +3783,10 @@ EConnectStatus CUDT::postConnect(const CPacket& response, bool rendezvous, CUDTE
     m_pRNode->m_bOnList = true;
     m_pRcvQueue->setNewEntry(this);
 
+    uint64_t currtime_tk;
+    CTimer::rdtsc(currtime_tk);
+    m_ullLastRspTime_tk = currtime_tk;
+
     // Remove from rendezvous queue (in this particular case it's
     // actually removing the socket that undergoes asynchronous HS processing).
     // Removing at THIS point because since when setNewEntry is called,
@@ -6650,7 +6654,7 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
    m_ullLastRspTime_tk = currtime_tk;
    bool using_rexmit_flag = m_bPeerRexmitFlag;
 
-   LOGC(mglog.Debug, log << CONID() << "incoming UMSG:" << ctrlpkt.getType() << " ("
+   HLOGC(mglog.Debug, log << CONID() << "incoming UMSG:" << ctrlpkt.getType() << " ("
        << MessageTypeStr(ctrlpkt.getType(), ctrlpkt.getExtendedType()) << ") socket=%" << ctrlpkt.m_iID);
 
    switch (ctrlpkt.getType())
