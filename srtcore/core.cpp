@@ -1242,7 +1242,7 @@ void CUDT::open()
    m_pRNode->m_pPrev = m_pRNode->m_pNext = NULL;
    m_pRNode->m_bOnList = false;
 
-   m_iRTT = 10 * COMM_SYN_INTERVAL_US;
+   m_iRTT = 30 * COMM_SYN_INTERVAL_US;
    m_iRTTVar = m_iRTT >> 1;
    m_ullCPUFrequency = CTimer::getCPUFrequency();
 
