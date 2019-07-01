@@ -73,7 +73,7 @@ public:
         parent->ConnectSignal(TEV_LOSSREPORT, SSLOT(slowdownSndPeriod));
         parent->ConnectSignal(TEV_CHECKTIMER, SSLOT(speedupToWindowSize));
 
-        HLOGC(mglog.Debug, log << "Creating FileSmoother V2");
+        LOGC(mglog.Debug, log << "Creating FileSmoother V2");
     }
 
     bool checkTransArgs(Smoother::TransAPI, Smoother::TransDir, const char*, size_t, int, bool) ATR_OVERRIDE
