@@ -1275,6 +1275,9 @@ void CUDT::open()
    m_ullNextNAKTime_tk = currtime_tk + m_ullNAKInt_tk;
    m_ullLastRspAckTime_tk = currtime_tk;
    m_iReXmitCount = 1;
+
+   LOGC(mglog.Debug, log << "CUDT::open");
+
    // Fix keepalive
    m_ullLastSndTime_tk = currtime_tk;
 
@@ -6647,7 +6650,7 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
    m_ullLastRspTime_tk = currtime_tk;
    bool using_rexmit_flag = m_bPeerRexmitFlag;
 
-   HLOGC(mglog.Debug, log << CONID() << "incoming UMSG:" << ctrlpkt.getType() << " ("
+   LOGC(mglog.Debug, log << CONID() << "incoming UMSG:" << ctrlpkt.getType() << " ("
        << MessageTypeStr(ctrlpkt.getType(), ctrlpkt.getExtendedType()) << ") socket=%" << ctrlpkt.m_iID);
 
    switch (ctrlpkt.getType())
