@@ -1242,7 +1242,7 @@ void CUDT::open()
    m_pRNode->m_pPrev = m_pRNode->m_pNext = NULL;
    m_pRNode->m_bOnList = false;
 
-   m_iRTT = 30 * COMM_SYN_INTERVAL_US;
+   m_iRTT = 10 * COMM_SYN_INTERVAL_US;
    m_iRTTVar = m_iRTT >> 1;
    m_ullCPUFrequency = CTimer::getCPUFrequency();
 
@@ -3786,7 +3786,10 @@ EConnectStatus CUDT::postConnect(const CPacket& response, bool rendezvous, CUDTE
     uint64_t currtime_tk;
     CTimer::rdtsc(currtime_tk);
     m_ullLastRspTime_tk = currtime_tk;
-    LOGC(mglog.Note, log << "PostConnect: m_ullLastRspTime_tk=" << FormatTime(currtime_tk / m_ullCPUFrequency));
+    m_ullNextACKTime_tk = currtime_tk + m_ullSYNInt_tk;
+    m_ullNextNAKTime_tk = currtime_tk + m_ullNAKInt_tk;
+    m_ullLastRspAckTime_tk = currtime_tk;
+    LOGC(mglog.Debug, log << "Timers updated");
 
     // Remove from rendezvous queue (in this particular case it's
     // actually removing the socket that undergoes asynchronous HS processing).
