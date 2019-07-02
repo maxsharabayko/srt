@@ -3786,6 +3786,7 @@ EConnectStatus CUDT::postConnect(const CPacket& response, bool rendezvous, CUDTE
     uint64_t currtime_tk;
     CTimer::rdtsc(currtime_tk);
     m_ullLastRspTime_tk = currtime_tk;
+    LOGC(mglog.Note, log << "PostConnect: m_ullLastRspTime_tk=" << FormatTime(currtime_tk / m_ullCPUFrequency));
 
     // Remove from rendezvous queue (in this particular case it's
     // actually removing the socket that undergoes asynchronous HS processing).
