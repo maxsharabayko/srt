@@ -8,13 +8,13 @@
 
 # Branch Info
 
-This branch is in sync with master branch version cdeb47133e400ee89552ab3cf766d79deb392408.
+This branch is in sync with master branch dated [July, 5, 2019](https://github.com/Haivision/srt/commit/cdeb47133e400ee89552ab3cf766d79deb392408).
 The following PRs are included:
-* PR #711 Busy waiting build option
-* PR #741 LATEREXMIT fix
-* PR #563 Epoll read-ready notification fix
+* PR [#711](https://github.com/Haivision/srt/pull/711) Busy waiting build option
+* PR [#741](https://github.com/Haivision/srt/pull/741) LATEREXMIT fix
+* PR [#563](https://github.com/Haivision/srt/pull/563) Epoll read-ready notification fix
 
-Besides this branch has a messaging library and srt-test-messaging application. Both can be build by defining the `-DENABLE_MESSAGING_LIB` cmake build option.
+Besides this branch has a messaging library and srt-test-messaging application. Both can be build by defining the `-DENABLE_MESSAGING_LIB=ON` cmake build option.
 
 
 # Introduction
