@@ -133,7 +133,7 @@ def start_receiver(
     Attributes:
         attrs_values:
             A list of SRT options (SRT URI attributes) in a format
-            [('rcvbuf', '12058624'), ('smoother', 'live'), ('maxcon', '50')].
+            [('rcvbuf', '12058624'), ('congestion', 'live'), ('maxcon', '50')].
         options_values:
             A list of srt-test-messaging application options in a format
             [('-msgsize', '1456'), ('-reply', '0'), ('-printmsg', '0')].
