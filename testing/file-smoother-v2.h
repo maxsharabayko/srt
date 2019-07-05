@@ -373,13 +373,13 @@ private:
         }
         else
         {
-            // XXX This code is a copy of legacy CUDTCC::onTimeout() body.
-            // This part was commented out there already.
-            /*
-               m_dLastDecPeriod = m_dPktSndPeriod;
-               m_dPktSndPeriod = ceil(m_dPktSndPeriod * 2);
-               m_iLastDecSeq = m_iLastAck;
-             */
+            // Blind retransmission triggered. Do not speed up, wait for ACK.
+            m_bLoss = true;
+            m_dLastDecPeriod = m_dPktSndPeriod;
+            // Do not decrease yet
+            //m_dPktSndPeriod = ceil(m_dPktSndPeriod * 2);
+            m_iLastDecSeq = m_iLastAck;
+            LOGC(mglog.Debug, log << "FileSmootherV2: BLINDREXMIT at sndperiod=" << m_dPktSndPeriod << "us. Hold speedup.");
         }
     }
 
