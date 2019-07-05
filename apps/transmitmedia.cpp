@@ -92,12 +92,6 @@ public:
         return !(ofile.bad()) ? (int) size : 0;
     }
 
-    int Write(const char* data, size_t size) override
-    {
-        ofile.write(data, size);
-        return !(ofile.bad()) ? size : false;
-    }
-
     bool IsOpen() override { return !!ofile; }
     bool Broken() override { return !ofile.good(); }
     //~FileTarget() { ofile.close(); }
