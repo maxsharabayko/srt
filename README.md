@@ -6,6 +6,17 @@
 
 [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/ruujele1yfsfsyer/branch/master?svg=true)](https://ci.appveyor.com/project/Haivision/srt) [![Build Status](https://travis-ci.org/Haivision/srt.svg?branch=master)](https://travis-ci.org/Haivision/srt)
 
+# Branch Info
+
+This branch is in sync with master branch version cdeb47133e400ee89552ab3cf766d79deb392408.
+The following PRs are included:
+* PR #711 Busy waiting build option
+* PR #741 LATEREXMIT fix
+* PR #563 Epoll read-ready notification fix
+
+Besides this branch has a messaging library and srt-test-messaging application. Both can be build by defining the `-DENABLE_MESSAGING_LIB` cmake build option.
+
+
 # Introduction
 
 Secure Reliable Transport (SRT) is an open source transport technology that optimizes streaming performance across unpredictable networks, such as the Internet.
