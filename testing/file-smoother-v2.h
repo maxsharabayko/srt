@@ -301,7 +301,8 @@ private:
         if (CSeqNo::seqcmp(lossbegin, m_iLastDecSeq) > 0)
         {
             m_dLastDecPeriod = m_dPktSndPeriod;
-            m_dPktSndPeriod = ceil(m_dPktSndPeriod * 1.03);
+            const double mult = lost_pcent_x10 < 40 ? 1.03 : 1.3;
+            m_dPktSndPeriod = ceil(m_dPktSndPeriod * mult);
 
             m_iAvgNAKNum = (int)ceil(m_iAvgNAKNum * 0.97 + m_iNAKCount * 0.03);
             m_iNAKCount = 1;
