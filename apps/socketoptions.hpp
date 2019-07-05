@@ -66,13 +66,13 @@ struct SocketOption
 template<>
 inline int SocketOption::setso<SocketOption::SRT>(int socket, int /*ignored*/, int sym, const void* data, size_t size)
 {
-    return srt_setsockopt(socket, 0, SRT_SOCKOPT(sym), data, size);
+    return srt_setsockopt(socket, 0, SRT_SOCKOPT(sym), data, (int) size);
 }
 
 template<>
 inline int SocketOption::setso<SocketOption::SYSTEM>(int socket, int proto, int sym, const void* data, size_t size)
 {
-    return ::setsockopt(socket, proto, sym, (const char *)data, size);
+    return ::setsockopt(socket, proto, sym, (const char *)data, (int) size);
 }
 
 template<>
@@ -209,6 +209,8 @@ const SocketOption srt_options [] {
     { "fc", 0, SRTO_FC, SocketOption::PRE, SocketOption::INT, nullptr},
     { "sndbuf", 0, SRTO_SNDBUF, SocketOption::PRE, SocketOption::INT, nullptr},
     { "rcvbuf", 0, SRTO_RCVBUF, SocketOption::PRE, SocketOption::INT, nullptr},
+    // linger option is handled outside of the common loop, therefore commented out.
+    //{ "linger", 0, SRTO_LINGER, SocketOption::PRE, SocketOption::INT, nullptr},
     { "ipttl", 0, SRTO_IPTTL, SocketOption::PRE, SocketOption::INT, nullptr},
     { "iptos", 0, SRTO_IPTOS, SocketOption::PRE, SocketOption::INT, nullptr},
     { "inputbw", 0, SRTO_INPUTBW, SocketOption::POST, SocketOption::INT64, nullptr},
@@ -229,7 +231,8 @@ const SocketOption srt_options [] {
     { "payloadsize", 0, SRTO_PAYLOADSIZE, SocketOption::PRE, SocketOption::INT, nullptr},
     { "kmrefreshrate", 0, SRTO_KMREFRESHRATE, SocketOption::PRE, SocketOption::INT, nullptr },
     { "kmpreannounce", 0, SRTO_KMPREANNOUNCE, SocketOption::PRE, SocketOption::INT, nullptr },
-    { "strictenc", 0, SRTO_STRICTENC, SocketOption::PRE, SocketOption::BOOL, nullptr }
+    { "strictenc", 0, SRTO_STRICTENC, SocketOption::PRE, SocketOption::BOOL, nullptr },
+    { "peeridletimeo", 0, SRTO_PEERIDLETIMEO, SocketOption::PRE, SocketOption::INT, nullptr }
 };
 }
 

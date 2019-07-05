@@ -225,7 +225,7 @@ public: // internal API
     // Note: use notation with X*1000*1000* ... instead of million zeros in a row.
     // In C++17 there is a possible notation of 5'000'000 for convenience, but that's
     // something only for a far future.
-    static const int COMM_RESPONSE_TIMEOUT_US = 5*1000*1000; // 5 seconds
+    static const int COMM_RESPONSE_TIMEOUT_MS = 5*1000; // 5 seconds
     static const int COMM_RESPONSE_MAX_EXP = 16;
     static const int SRT_TLPKTDROP_MINTHRESHOLD_MS = 1000;
     static const uint64_t COMM_KEEPALIVE_PERIOD_US = 1*1000*1000;
@@ -371,7 +371,7 @@ private:
 
     /// Close the opened UDT entity.
 
-    void close();
+    bool close();
 
     /// Request UDT to send out a data block "data" with size of "len".
     /// @param data [in] The address of the application data to be sent.
@@ -456,7 +456,7 @@ private:
     /// @param perf [in, out] pointer to a CPerfMon structure to record the performance data.
     /// @param clear [in] flag to decide if the local performance trace should be cleared. 
     /// @param instantaneous [in] flag to request instantaneous data 
-    /// instead of moving averages. 
+    /// instead of moving averages.
     void bstats(CBytePerfMon* perf, bool clear = true, bool instantaneous = false);
 
     /// Mark sequence contained in the given packet as not lost. This
@@ -568,6 +568,7 @@ private: // Identification
     int m_iOPT_SndDropDelay;         // Extra delay when deciding to snd-drop for TLPKTDROP, -1 to off
     bool m_bOPT_StrictEncryption;    // Off by default. When on, any connection other than nopw-nopw & pw1-pw1 is rejected.
     std::string m_sStreamName;
+    int m_iOPT_PeerIdleTimeout;      // Timeout for hearing anything from the peer.
 
     int m_iTsbPdDelay_ms;                           // Rx delay to absorb burst in milliseconds
     int m_iPeerTsbPdDelay_ms;                       // Tx delay that the peer uses to absorb burst in milliseconds
@@ -575,6 +576,7 @@ private: // Identification
     int64_t m_llInputBW;                         // Input stream rate (bytes/sec)
     int m_iOverheadBW;                           // Percent above input stream rate (applies if m_llMaxBW == 0)
     bool m_bRcvNakReport;                        // Enable Receiver Periodic NAK Reports
+    int m_iIpV6Only;                             // IPV6_V6ONLY option (-1 if not set)
 private:
     UniquePtr<CCryptoControl> m_pCryptoControl;                            // congestion control SRT class (small data extension)
     CCache<CInfoBlock>* m_pCache;                // network information cache
@@ -703,6 +705,15 @@ private: // Common connection Congestion Control setup
 private: // Generation and processing of packets
     void sendCtrl(UDTMessageType pkttype, void* lparam = NULL, void* rparam = NULL, int size = 0);
     void processCtrl(CPacket& ctrlpkt);
+
+    /// Pack a packet from a list of lost packets.
+    ///
+    /// @param packet [in, out] a packet structure to fill
+    /// @param origintime [in, out] origin timestamp of the packet
+    ///
+    /// @return payload size on success, <=0 on failure
+    int packLostData(CPacket& packet, uint64_t& origintime);
+
     int packData(CPacket& packet, uint64_t& ts);
     int processData(CUnit* unit);
     void processClose();

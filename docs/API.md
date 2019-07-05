@@ -471,6 +471,77 @@ regular development.*
 - *Sender: user configurable, default: 64*
 ---
 
+| OptName           | Since | Binding | Type  | Units | Default            | Range |
+| ----------------- | ----- | ------- | ----- | ----- | ------------------ | ------|
+| `SRTO_IPV6ONLY`   | 1.4.0 | pre     | `int` | n/a   | (platform default) | -1..1 |
+
+- **[GET or SET]** - Set system socket flag IPV6ONLY. When set to 0 a listening
+socket binding an IPv6 address accepts also IPv4 clients (their addresses will be 
+formatted as IPv4-mapped IPv6 addresses). By default (-1) this option is not set 
+and the platform default value is used.
+---
+
+| OptName               | Since | Binding | Type      | Units  | Default  | Range  |
+| --------------------- | ----- | ------- | --------- | ------ | -------- | ------ |
+| `SRTO_KMREFRESHRATE`  | 1.3.2 | pre     | `int32_t` | pkts   | 0x1000000| 0..unlimited |
+
+- **[GET or SET]** - The number of packets to be transmitted after which the Stream
+Encryption Key (SEK), used to encrypt packets, will be switched to the new one.
+Note that the old and new keys live in parallel for a certain period of time
+(see `SRTO_KMPREANNOUNCE`) before and after the switchover.
+
+Having a preannounce period before switchover ensures the new SEK is installed
+at the receiver before the first packet encrypted with the new SEK is received.
+The old key remains active after switchover in order to decrypt packets that
+might still be in flight, or packets that have to be retransmitted.
+---
+
+| OptName               | Since | Binding | Type      | Units  | Default  | Range  |
+| --------------------- | ----- | ------- | --------- | ------ | -------- | ------ |
+| `SRTO_KMPREANNOUNCE`  | 1.3.2 | pre     | `int32_t` | pkts   | 0x1000 | see below |
+
+- **[GET or SET]** - The interval (defined in packets) between when a new
+  Stream Encrypting Key (SEK) is sent and when switchover occurs. This value
+also applies to the subsequent interval between when switchover occurs and when
+the old SEK is decommissioned.
+
+At `SRTO_KMPREANNOUNCE` packets before switchover the new key is sent
+(repeatedly, if necessary, until it is confirmed by the receiver).
+
+At the switchover point (see `SRTO_KMREFRESHRATE`), the sender starts
+  encrypting and sending packets using the new key. The old key persists in
+  case it is needed to decrypt packets that were in the flight window, or
+  retransmitted packets.
+
+The old key is decommissioned at `SRTO_KMPREANNOUNCE` packets after switchover . 
+
+The allowed range for this value is between 1 and half of the current value
+of `SRTO_KMREFRESHRATE`. The minimum value should never be less than the
+flight window (i.e. the number of packets that have already left the sender but
+have not yet arrived at the receiver).
+
+
+- **[GET or SET]** - The interval (defined in packets) between when a new
+  Stream Encrypting Key (SEK) is sent and when switchover occurs. This value
+also applies to the subsequent interval between when switchover occurs and when
+the old SEK is decommissioned.
+
+At `SRTO_KMPREANNOUNCE` packets before switchover the new key is sent
+(repeatedly, if necessary, until it is confirmed by the receiver).
+
+At the switchover point (see `SRTO_KMREFRESHRATE`), the sender starts
+encrypting and sending packets using the new key. The old key persists in case
+it is needed to decrypt packets that were in the flight window, or
+retransmitted packets.
+
+The old key is decommissioned at `SRTO_KMPREANNOUNCE` packets after switchover.
+
+The allowed range for this value is between 1 and half of the current value of
+`SRTO_KMREFRESHRATE`. The minimum value should never be less than the flight
+window (i.e. the number of packets that have already left the sender but have
+not yet arrived at the receiver).
+---
+
 | OptName               | Since | Binding | Type      | Units  | Default  | Range  |
 | --------------------- | ----- | ------- | --------- | ------ | -------- | ------ |
 | `SRTO_KMSTATE`        | 1.0.2 | n/a     | `int32_t` |        | n/a      | n/a    |
@@ -518,9 +589,10 @@ immediately upon experiencing a "gap" in sequences.
 | --------------------- | ----- | ------- | --------- | --------- | -------- | ------ |
 | `SRTO_MAXBW`          | 1.0.5 | pre     | `int64_t` | bytes/sec | -1       | -1     |
 
-- **[GET or SET]** - Maximum send bandwidth. -1: infinite (CSRTCC limit is 
-30mbps) = 0: relative to input rate (SRT 1.0.5 addition, see `SRTO_INPUTBW`) 
->0: absolute limit 
+- **[GET or SET]** - Maximum send bandwidth.
+- `-1`: infinite (CSRTCC limit is 30mbps)
+- `= 0`: relative to input rate (SRT 1.0.5 addition, see `SRTO_INPUTBW`) 
+- `>0`: absolute limit 
 - *SRT recommended value: 0 (relative)*
 ---
 
@@ -663,6 +735,15 @@ different in 1.2.0 (HSv4) and 1.3.0 (HSv5):
   - 32 = AES-256
 
 - *Sender: user configurable.* 
+---
+
+| OptName               | Since | Binding | Type      | Units  | Default  | Range         |
+| --------------------- | ----- | ------- | --------- | ------ | -------- | ------------- |
+| `SRTO_PEERIDLETIMEO`  | 1.3.3 | pre     | `int32_t` | msec   | 5000     | positive only |
+
+- The maximum time in `[ms]` to wait until any packet is received from peer since
+the last such packet reception. If this time is passed, connection is considered
+broken on timeout.
 ---
 
 | OptName               | Since | Binding | Type      | Units  | Default  | Range         |
@@ -818,6 +899,20 @@ set, based on MSS value. For desired result, configure MSS first.***
 
 | OptName               | Since | Binding | Type  | Units  | Default  | Range  |
 | --------------------- | ----- | ------- | ----- | ------ | -------- | ------ |
+| `SRTO_SNDDROPDELAY`   | 1.3.2 | pre     | `int` | ms     | 0        |        |
+
+- **[SET]** - Sets an extra delay before TLPKTDROP is triggered on the data
+  sender. TLPKTDROP discards packets reported as lost if it is already too late
+to send them (the receiver would discard them even if received).  The total
+delay before TLPKTDROP is triggered consists of the LATENCY (`SRTO_PEERLATENCY`),
+plus `SRTO_SNDDROPDELAY`, plus 2 * the ACK interval (default = 20ms).
+`SRTO_SNDDROPDELAY` extends the tolerance for retransmitting packets at
+the expense of more likely retransmitting them uselessly. To be effective, it
+must have a value greater than 1000 - `SRTO_PEERLATENCY`.
+---
+
+| OptName               | Since | Binding | Type  | Units  | Default  | Range  |
+| --------------------- | ----- | ------- | ----- | ------ | -------- | ------ |
 | `SRTO_SNDKMSTATE`     | 1.2.0 | post    | enum  | n/a    | n/a      |        |
 
 - **[GET]** - Peer KM state on receiver side for `SRTO_KMSTATE`
@@ -871,6 +966,34 @@ interpretation of the contents of this string. As this uses internally the
 (udt.h): `UDT::setstreamid` and `UDT::getstreamid`. This option doesn't make sense 
 in Rendezvous connection; the result might be that simply one side will override 
 the value from the other side and it's the matter of luck which one would win
+---
+
+| OptName           | Since | Binding | Type            | Units | Default  | Range  |
+| ----------------- | ----- | ------- | --------------- | ----- | -------- | ------ |
+| `SRTO_STRICTENC`  | 1.3.2 | pre     | `int (bool)`    |       | true     | false  |
+
+- **[SET]** - This option, when set to TRUE, allows connection only if the
+encryption setup of the connection parties is a "strictly encrypted" case,
+that is:
+
+   - neither party has enabled encryption
+   - both parties have enabled encryption with the same passphrase
+
+In other cases the connection will be rejected.
+
+When this option is set to FALSE **by both parties of the connection**, the
+following combinations of encryption setup will be allowed for connection (with
+appropriate limitations):
+
+   - both parties have enabled encryption with different passphrase
+      - transmission not possible in either direction
+   - only one party has enabled encryption
+      - unencrypted transmission possible only from unencrypted party to encrypted one
+
+Setting the `SRTO_STRICTENC`option to FALSE can be useful in situations where
+it is important to know whether a connection is possible. The inability to
+decrypt an incoming transmission can be reported as a different kind of
+problem.
 ---
 
 | OptName           | Since | Binding | Type            | Units | Default  | Range  |
@@ -1171,6 +1294,3 @@ buffer size is too small for a single message to fit in it.
 Note that you can use any of the sending and receiving functions
 for sending and receiving messages, except sendfile/recvfile, which
 are dedicated exclusively for Buffer API. 
-
-
-

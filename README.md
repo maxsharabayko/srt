@@ -22,6 +22,7 @@ As audio/video packets are streamed from a source to a destination device, SRT d
 
 # Guides
 * [Why SRT Was Created](docs/why-srt-was-created.md)
+* [SRT Protocol Technical Overview](https://github.com/Haivision/srt/files/2489142/SRT_Protocol_TechnicalOverview_DRAFT_2018-10-17.pdf)
 * [Using the `srt-live-transmit` and `srt-file-transmit` Apps](docs/stransmit.md)
 * [SRT Encryption](docs/encryption.md)
 * [API](docs/API.md)
@@ -100,7 +101,7 @@ make
 
 The 64-bit devel package can be downloaded from here:
 
-     http://slproweb.com/download/Win64OpenSSL-1_0_2a.exe
+     http://slproweb.com/download/Win64OpenSSL-1_0_2r.exe
 
 	 
 (Note that the last letter or version number may be changed and older versions
