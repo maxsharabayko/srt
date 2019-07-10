@@ -143,7 +143,7 @@ int srt_msgn_recv(char *buffer, size_t buffer_len, int *connection_id)
 }
 
 
-int srt_msgn_bstats(SRTPerformanceStats* stats, int connection_id, int clear)
+int srt_msgn_bstats(SRT_PERF_STATS* stats, int connection_id, int clear)
 {
     if (stats == nullptr)
         return -1;

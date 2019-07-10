@@ -193,7 +193,9 @@ struct SRTPerformanceStats
 };
 
 
-SRT_MSGN_API int         srt_msgn_bstats(SRTPerformanceStats* stats, int connection_id, int clear);
+typedef struct SRTPerformanceStats SRT_PERF_STATS;
+
+SRT_MSGN_API int         srt_msgn_bstats(SRT_PERF_STATS* stats, int connection_id, int clear);
 
 
 
