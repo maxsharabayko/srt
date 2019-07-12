@@ -158,6 +158,8 @@ int srt_msgn_bstats(SRT_PERF_STATS* stats, int connection_id, int clear)
         : g_rcv_srt_model->GetBindSocket();
 
     const int res = srt_bstats(sock, &stats_srt, clear);
+    if (res != 0)
+        return res;
 
     memcpy(stats, &stats_srt, sizeof(SRT_TRACEBSTATS));
     return res;
