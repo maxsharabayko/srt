@@ -210,7 +210,7 @@ struct EventVariant
     union U
     {
         CPacket* packet;
-        int32_t  ack;
+        int32_t ack;
         struct
         {
             int32_t* ptr;

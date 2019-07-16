@@ -247,9 +247,6 @@ class FileCC: public SrtCongestionControlBase
 {
     typedef FileCC Me; // Required by SSLOT macro
 
-    // Fields from CCC not used by LiveCC
-    int m_iACKPeriod;
-
     // Fields from CUDTCC
     int m_iRCInterval;          // UDT Rate control interval
     uint64_t m_LastRCTime;      // last rate increase time
@@ -269,7 +266,6 @@ public:
 
     FileCC(CUDT* parent)
         : SrtCongestionControlBase(parent)
-        , m_iACKPeriod(CUDT::COMM_SYN_INTERVAL_US)
         , m_iRCInterval(CUDT::COMM_SYN_INTERVAL_US)
         , m_LastRCTime(CTimer::getTime())
         , m_bSlowStart(true)

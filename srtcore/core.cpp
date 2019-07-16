@@ -1314,7 +1314,7 @@ void CUDT::open()
    uint64_t currtime_tk;
    CTimer::rdtsc(currtime_tk);
    m_ullLastRspTime_tk    = currtime_tk;
-   m_ullNextACKTime_tk    = currtime_tk + m_ullSYNInt_tk;
+   m_ullNextACKTime_tk    = currtime_tk + m_ullACKInt_tk;
    m_ullNextNAKTime_tk    = currtime_tk + m_ullNAKInt_tk;
    m_ullLastRspAckTime_tk = currtime_tk;
    m_ullLastSndTime_tk    = currtime_tk;
@@ -4714,7 +4714,7 @@ void CUDT::setupCC()
     uint64_t currtime_tk;
     CTimer::rdtsc(currtime_tk);
     m_ullLastRspTime_tk    = currtime_tk;
-    m_ullNextACKTime_tk    = currtime_tk + m_ullSYNInt_tk;
+    m_ullNextACKTime_tk    = currtime_tk + m_ullACKInt_tk;
     m_ullNextNAKTime_tk    = currtime_tk + m_ullNAKInt_tk;
     m_ullLastRspAckTime_tk = currtime_tk;
     m_ullLastSndTime_tk    = currtime_tk;
@@ -6561,7 +6561,8 @@ void CUDT::sendCtrl(UDTMessageType pkttype, void* lparam, void* rparam, int size
          if (data[ACKD_BUFFERLEFT] < 2)
             data[ACKD_BUFFERLEFT] = 2;
 
-         if (currtime_tk - m_ullLastAckTime_tk > m_ullSYNInt_tk)
+         // NOTE: m_CongCtl->ACKIntervalMicrosec() should be taken into account.
+         if (currtime_tk - m_ullLastAckTime_tk > m_ullACKInt_tk)
          {
              int rcvRate;
              int ctrlsz = ACKD_TOTAL_SIZE_UDTBASE * ACKD_FIELD_SIZE; // Minimum required size
@@ -6581,7 +6582,6 @@ void CUDT::sendCtrl(UDTMessageType pkttype, void* lparam, void* rparam, int size
                  // Normal, currently expected version.
                  data[ACKD_RCVRATE] = rcvRate; //bytes/sec
                  ctrlsz = ACKD_FIELD_SIZE * ACKD_TOTAL_SIZE_VER101;
-
              }
              // ELSE: leave the buffer with ...UDTBASE size.
 
@@ -8604,14 +8604,14 @@ void CUDT::checkTimers()
             // OR the number of sent packets since last ACK has reached
             // the congctl-defined value of ACK Interval
             // (note that none of the builtin congctls defines ACK Interval)
-            || (m_CongCtl->ACKInterval() > 0 && m_iPktCount >= m_CongCtl->ACKInterval()))
+            || (m_CongCtl->ACKIntervalPkts() > 0 && m_iPktCount >= m_CongCtl->ACKIntervalPkts()))
     {
         // ACK timer expired or ACK interval is reached
 
         sendCtrl(UMSG_ACK);
         CTimer::rdtsc(currtime_tk);
 
-        int ack_interval_tk = m_CongCtl->ACKPeriod() > 0 ? m_CongCtl->ACKPeriod() * m_ullCPUFrequency : m_ullACKInt_tk;
+        const int ack_interval_tk = m_CongCtl->ACKIntervalMicrosec() > 0 ? m_CongCtl->ACKIntervalMicrosec() * m_ullCPUFrequency : m_ullACKInt_tk;
         m_ullNextACKTime_tk = currtime_tk + ack_interval_tk;
 
         m_iPktCount = 0;
