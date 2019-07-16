@@ -15,6 +15,7 @@ md5.cpp
 packet.cpp
 queue.cpp
 congctl.cpp
+cc_copa.cpp
 srt_c_api.cpp
 window.cpp
 srt_compat.c
@@ -45,6 +46,7 @@ netinet_any.h
 packet.h
 queue.h
 congctl.h
+cc_copa.h
 srt4udt.h
 srt_compat.h
 threadname.h

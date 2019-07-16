@@ -13,6 +13,7 @@ cmake_minimum_required (VERSION 2.8.12 FATAL_ERROR)
 #cmake_minimum_required (VERSION 3.0.2 FATAL_ERROR)
 #project(SRT VERSION "1.3.2")
 project(SRT C CXX)
+set(CMAKE_CXX_STANDARD 17)
 
 set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
 include(haiUtil)
@@ -680,10 +681,9 @@ configure_file(scripts/srt.pc.in srt.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/srt.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 # Applications
-
 if ( HAVE_COMPILER_GNU_COMPAT )
 	message(STATUS "C++ VERSION: Setting C++11 compat flag for gnu compiler")
-	set (CFLAGS_CXX_STANDARD "-std=c++11")
+	set (CFLAGS_CXX_STANDARD "-std=c++17")
 else()
 	message(STATUS "C++ VERSION: leaving default, not a GNU compiler, assuming C++11 or newer is default.")
 	set (CFLAGS_CXX_STANDARD "")
