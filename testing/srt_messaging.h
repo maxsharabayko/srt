@@ -198,6 +198,17 @@ typedef struct SRTPerformanceStats SRT_PERF_STATS;
 SRT_MSGN_API int         srt_msgn_bstats(SRT_PERF_STATS* stats, int connection_id, int clear);
 
 
+/**
+ * Enumerate connections.
+ *
+ * @param[in,out] array   a buffer of integers to receive connections IDs
+ * @param[in]      size   length of the buffer
+ *
+ * @return                number of connections
+ *                        -1 in case of error
+ */
+SRT_MSGN_API int         srt_msgn_enum_connections(int* array, int size);
+
 
 SRT_MSGN_API const char* srt_msgn_getlasterror_str(void);
 

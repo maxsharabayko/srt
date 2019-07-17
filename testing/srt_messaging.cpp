@@ -166,6 +166,15 @@ int srt_msgn_bstats(SRT_PERF_STATS* stats, int connection_id, int clear)
 }
 
 
+int srt_msgn_enum_connections(int* array, int size)
+{
+    if (!g_rcv_srt_model)
+        return -1;
+
+    return g_rcv_srt_model->EnumConnections(array, size);
+}
+
+
 int srt_msgn_set_loglevel(int loglevel, int verbose)
 {
     srt_logging::LogLevel::type lev = (srt_logging::LogLevel::type) loglevel;

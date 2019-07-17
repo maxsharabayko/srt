@@ -43,73 +43,56 @@ void OnINT_ForceExit(int)
 
 
 
-static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream& out, bool print_csv)
+static void PrintSrtStats(int sid, const SRTPerformanceStats& mon, ostream& out)
 {
     std::ostringstream output;
     static bool print_header = true;
 
-    if (print_csv)
+    if (print_header)
     {
-        if (print_header)
-        {
-            output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
-            output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
-            output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
-            output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
-            output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
-            output << endl;
-            print_header = false;
-        }
-
-        output << mon.msTimeStamp << ",";
-        output << sid << ",";
-        output << mon.pktFlowWindow << ",";
-        output << mon.pktCongestionWindow << ",";
-        output << mon.pktFlightSize << ",";
-
-        output << mon.msRTT << ",";
-        output << mon.mbpsBandwidth << ",";
-        output << mon.mbpsMaxBW << ",";
-        output << mon.pktSent << ",";
-        output << mon.pktSndLoss << ",";
-        output << mon.pktSndDrop << ",";
-
-        output << mon.pktRetrans << ",";
-        output << mon.byteSent << ",";
-        output << mon.byteAvailSndBuf << ",";
-        output << mon.byteSndDrop << ",";
-        output << mon.mbpsSendRate << ",";
-        output << mon.usPktSndPeriod << ",";
-
-        output << mon.pktRecv << ",";
-        output << mon.pktRcvLoss << ",";
-        output << mon.pktRcvDrop << ",";
-        output << mon.pktRcvRetrans << ",";
-        output << mon.pktRcvBelated << ",";
-
-        output << mon.byteRecv << ",";
-        output << mon.byteAvailRcvBuf << ",";
-        output << mon.byteRcvLoss << ",";
-        output << mon.byteRcvDrop << ",";
-        output << mon.mbpsRecvRate << ",";
-        output << mon.msRcvTsbPdDelay;
-
+        output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
+        output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
+        output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
+        output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+        output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
         output << endl;
+        print_header = false;
     }
-    else
-    {
-        output << "======= SRT STATS: sid=" << sid << endl;
-        output << "PACKETS     SENT: " << setw(11) << mon.pktSent << "  RECEIVED:   " << setw(11) << mon.pktRecv << endl;
-        output << "LOST PKT    SENT: " << setw(11) << mon.pktSndLoss << "  RECEIVED:   " << setw(11) << mon.pktRcvLoss << endl;
-        output << "REXMIT      SENT: " << setw(11) << mon.pktRetrans << "  RECEIVED:   " << setw(11) << mon.pktRcvRetrans << endl;
-        output << "DROP PKT    SENT: " << setw(11) << mon.pktSndDrop << "  RECEIVED:   " << setw(11) << mon.pktRcvDrop << endl;
-        output << "RATE     SENDING: " << setw(11) << mon.mbpsSendRate << "  RECEIVING:  " << setw(11) << mon.mbpsRecvRate << endl;
-        output << "BELATED RECEIVED: " << setw(11) << mon.pktRcvBelated << "  AVG TIME:   " << setw(11) << mon.pktRcvAvgBelatedTime << endl;
-        output << "REORDER DISTANCE: " << setw(11) << mon.pktReorderDistance << endl;
-        output << "WINDOW      FLOW: " << setw(11) << mon.pktFlowWindow << "  CONGESTION: " << setw(11) << mon.pktCongestionWindow << "  FLIGHT: " << setw(11) << mon.pktFlightSize << endl;
-        output << "LINK         RTT: " << setw(9) << mon.msRTT << "ms  BANDWIDTH:  " << setw(7) << mon.mbpsBandwidth << "Mb/s " << endl;
-        output << "BUFFERLEFT:  SND: " << setw(11) << mon.byteAvailSndBuf << "  RCV:        " << setw(11) << mon.byteAvailRcvBuf << endl;
-    }
+
+    output << mon.msTimeStamp << ",";
+    output << sid << ",";
+    output << mon.pktFlowWindow << ",";
+    output << mon.pktCongestionWindow << ",";
+    output << mon.pktFlightSize << ",";
+
+    output << mon.msRTT << ",";
+    output << mon.mbpsBandwidth << ",";
+    output << mon.mbpsMaxBW << ",";
+    output << mon.pktSent << ",";
+    output << mon.pktSndLoss << ",";
+    output << mon.pktSndDrop << ",";
+
+    output << mon.pktRetrans << ",";
+    output << mon.byteSent << ",";
+    output << mon.byteAvailSndBuf << ",";
+    output << mon.byteSndDrop << ",";
+    output << mon.mbpsSendRate << ",";
+    output << mon.usPktSndPeriod << ",";
+
+    output << mon.pktRecv << ",";
+    output << mon.pktRcvLoss << ",";
+    output << mon.pktRcvDrop << ",";
+    output << mon.pktRcvRetrans << ",";
+    output << mon.pktRcvBelated << ",";
+
+    output << mon.byteRecv << ",";
+    output << mon.byteAvailRcvBuf << ",";
+    output << mon.byteRcvLoss << ",";
+    output << mon.byteRcvDrop << ",";
+    output << mon.mbpsRecvRate << ",";
+    output << mon.msRcvTsbPdDelay;
+
+    output << endl;
 
     out << output.str() << std::flush;
 }
@@ -130,10 +113,9 @@ void receive_message(const char* uri, size_t msg_size, bool reply, bool printmsg
         return;
     }
 
-    //set<int> connections;
     vector<char> message_rcvd(message_size);
 
-    auto stats_func = [&out_stats, &stats_freq](int sock)
+    auto stats_func = [&out_stats, &stats_freq]()
     {
         if (stats_freq == chrono::seconds(0))
             return;
@@ -142,16 +124,24 @@ void receive_message(const char* uri, size_t msg_size, bool reply, bool printmsg
         {
             this_thread::sleep_for(stats_freq);
 
-            SRTPerformanceStats stats;
-            if (-1 == srt_msgn_bstats(&stats, sock, 1))
+            const int max_con = 16;
+            int connections[max_con];
+            const int num_conns = srt_msgn_enum_connections(connections, max_con);
+            if (num_conns <= 0)
+                continue;
+
+            for (int i = 0; i < num_conns; ++i)
             {
-                cerr << "ERROR: Failed to get the stats. ";
-                cerr << srt_msgn_getlasterror_str() << endl;
-                break;
-            }
-            else
-            {
-                PrintSrtStats(-1, stats, out_stats, true);
+                const SRTSOCKET sock = static_cast<SRTSOCKET>(connections[i]);
+                SRTPerformanceStats stats;
+                if (-1 == srt_msgn_bstats(&stats, sock, 1))
+                {
+                    cerr << "ERROR: Failed to get the stats. ";
+                    cerr << srt_msgn_getlasterror_str() << endl;
+                    break;
+                }
+
+                PrintSrtStats(sock, stats, out_stats);
             }
         }
     };
@@ -183,7 +173,7 @@ void receive_message(const char* uri, size_t msg_size, bool reply, bool printmsg
 
         if (!statsth.joinable() && collect_stats)
         {
-            statsth = std::thread(stats_func, connection_id);
+            statsth = std::thread(stats_func);
         }
 
         if (printmsg)
@@ -285,6 +275,7 @@ void send_message(const char* uri, const char* message, size_t length,
                 {
                     this_thread::sleep_for(stats_freq);
 
+                    // TODO: use srt_msgn_enum_connections()
                     SRTPerformanceStats stats;
                     if (-1 == srt_msgn_bstats(&stats, -1, 1))
                     {
@@ -294,7 +285,7 @@ void send_message(const char* uri, const char* message, size_t length,
                     }
                     else
                     {
-                        PrintSrtStats(-1, stats, out_stats, true);
+                        PrintSrtStats(-1, stats, out_stats);
                     }
                 }
             }) : std::thread();
@@ -317,8 +308,8 @@ void send_message(const char* uri, const char* message, size_t length,
                 }
             }
 
-            const long msgs_per_s = static_cast<long long>(target_bitrate_bps / 8) / message_size;
-            const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
+            const size_t msgs_per_s = static_cast<size_t>(target_bitrate_bps / 8) / message_size;
+            const long   msg_interval_us = msgs_per_s ? static_cast<long>(1000000 / msgs_per_s) : 0;
 
             vector<char> message_to_send(message_size);
             char c = 0;
@@ -337,7 +328,10 @@ void send_message(const char* uri, const char* message, size_t length,
 
                 if (target_bitrate_bps && msg_interval_us)
                 {
-                    const long duration_us = time_dev_us > msg_interval_us ? 0 : (msg_interval_us - time_dev_us);
+                    const long duration_us = time_dev_us > msg_interval_us
+                        ? 0
+                        : (msg_interval_us - time_dev_us);
+
                     const auto next_time = time_prev + chrono::microseconds(duration_us);
                     chrono::time_point<chrono::steady_clock> time_now;
                     for (;;)
@@ -406,14 +400,14 @@ void print_help(const vector<OptionScheme>& optargs)
         << "    Send:    srt-test-messaging \"srt://ip:port\" \"first message\"\n"
         << "    Receive: srt-test-messaging \"srt://ip:port\"\n";
 
-    print_option(optargs[0].names, "<0>", "receiver sends reply messages to sender [0|1]");
-    print_option(optargs[1].names, "<0>", "print received and sent messages to stdout");
-    print_option(optargs[2].names, "<level = error>", "log level[fatal, error, info, note, warning]");
+    print_option(optargs[0].names, "<0>\t", "receiver sends reply messages to sender [0|1]");
+    print_option(optargs[1].names, "<0>\t", "print received and sent messages to stdout");
+    print_option(optargs[2].names, "<error>", "log level[fatal, error, info, note, warning]");
     print_option(optargs[3].names, "<filename>", "output stats file name");
     print_option(optargs[4].names, "<seconds=0>", "stats report frequency");
     print_option(optargs[5].names, "<num=60>", "number of messages to send");
-    print_option(optargs[6].names, "0", "sender data generation rate");
-    print_option(optargs[7].names, "<8 MB>", "message size in bytes");
+    print_option(optargs[6].names, "0\t", "sender data generation rate");
+    print_option(optargs[7].names, "<8 MB>\t", "message size in bytes");
 }
 
 
@@ -474,7 +468,7 @@ int main(int argc, char** argv)
 
     const int statsfreq = stoi(Option<OutString>(params, "0", "statsfreq"));
     const bool reply = stoi(Option<OutString>(params, "0", "reply")) != 0;
-    const bool printmsg = stoi(Option<OutString>(params, "1", "printmsg")) != 0;
+    const bool printmsg = stoi(Option<OutString>(params, "0", "printmsg")) != 0;
     const int bitrate = stoi(Option<OutString>(params, "0", "bitrate"));
     const int msg_size = stoi(Option<OutString>(params, "8388608", "msgsize"));    // 8 MB
 

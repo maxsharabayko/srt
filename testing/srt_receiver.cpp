@@ -24,11 +24,7 @@ std::string print_time()
     time_t usec = time % 1000000;
 
     char tmp_buf[512];
-#ifdef _WIN32
     strftime(tmp_buf, 512, "%T.", tm);
-#else
-    strftime(tmp_buf, 512, "%T.", tm);
-#endif
     ostringstream out;
     out << tmp_buf << setfill('0') << setw(6) << usec << " ";
     return out.str();
@@ -59,12 +55,13 @@ SrtReceiver::~SrtReceiver()
 
 int SrtReceiver::Close()
 {
-    m_stop_accept = true;
+    m_closing = true;
 
     if (m_accepting_th.valid())
         m_accepting_th.wait();
 
     lock_guard<mutex> lock(m_recv_mutex);
+    lock_guard<mutex> lock_con(m_connection_mutex);
     return srt_close(m_bindsock);
 }
 
@@ -75,23 +72,26 @@ void SrtReceiver::AcceptingThread(const std::map<string, string> options)
     int rnum = 2;
     SRTSOCKET read_fds[2] = {};
 
-    while (!m_stop_accept)
+    while (!m_closing)
     {
         const int epoll_res
             = srt_epoll_wait(m_epoll_accept, read_fds, &rnum, 0, 0, 3000,
                              0, 0, 0, 0);
 
-        if (epoll_res > 0)
-        {
-            Verb() << "AcceptingThread: epoll res " << epoll_res << " rnum: " << rnum;
-            const SRTSOCKET sock = AcceptNewClient(options);
-            if (sock != SRT_INVALID_SOCK)
-            {
-                const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-                const int res = srt_epoll_add_usock(m_epoll_receive, sock, &events);
-                Verb() << print_time() << "AcceptingThread: added socket " << sock << " tp epoll res " << res;
-            }
-        }
+        if (epoll_res <= 0)
+            continue;
+
+        Verb() << "AcceptingThread: epoll res " << epoll_res << " rnum: " << rnum;
+        const SRTSOCKET sock = AcceptNewClient(options);
+        if (sock == SRT_INVALID_SOCK)
+            continue;
+
+        const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
+        const int res = srt_epoll_add_usock(m_epoll_receive, sock, &events);
+        Verb() << print_time() << "AcceptingThread: added socket " << sock << " tp epoll res " << res;
+
+        lock_guard<mutex> lock_con(m_connection_mutex);
+        m_connections.insert(sock);
     }
 }
 
@@ -231,6 +231,9 @@ int SrtReceiver::EstablishConnection(const std::string &host, int port,
 
         const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
         srt_epoll_add_usock(m_epoll_receive, m_bindsock, &events);
+
+        lock_guard<mutex> lock_con(m_connection_mutex);
+        m_connections.insert(m_bindsock);
     }
     else
     {
@@ -303,7 +306,7 @@ void SrtReceiver::UpdateReadFIFO(const int rnum, const int wnum)
 int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
 {
     const int wait_ms = 3000;
-    while (!m_stop_accept)
+    while (!m_closing)
     {
         lock_guard<mutex> lock(m_recv_mutex);
 
@@ -373,6 +376,8 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
             {
                 Verb() << print_time() << "Socket " << sock << " lost connection. Remove from epoll.";
                 srt_close(sock);
+                lock_guard<mutex> lock_con(m_connection_mutex);
+                m_connections.erase(sock);
                 continue;
             }
             else if (srt_err == SRT_EINVSOCK)
@@ -380,6 +385,8 @@ int SrtReceiver::Receive(char * buffer, size_t buffer_len, int *srt_socket_id)
                 Verb() << print_time() << "Socket " << sock << " is no longer valid (state "
                     << srt_getsockstate(sock) << "). Remove from epoll.";
                 srt_epoll_remove_usock(m_epoll_receive, sock);
+                lock_guard<mutex> lock_con(m_connection_mutex);
+                m_connections.erase(sock);
                 continue;
             }
 
@@ -423,6 +430,27 @@ int SrtReceiver::WaitUndelivered(int wait_ms)
 
     return bytes;
 };
+
+
+
+int SrtReceiver::EnumConnections(int* connections, int size)
+{
+    lock_guard<mutex> lock_con(m_connection_mutex);
+
+    if (size == 0)
+        return m_connections.size();
+
+    int i = 0;
+    for (auto s : m_connections)
+    {
+        if (i >= size)
+            break;
+
+        connections[i++] = s;
+    }
+
+    return i;
+}
 
 
 

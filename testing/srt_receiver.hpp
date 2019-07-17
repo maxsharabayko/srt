@@ -41,6 +41,9 @@ public:
     int Send(const char *buffer, size_t buffer_len);
 
 
+    int EnumConnections(int *connections, int size);
+
+
 public:
 
     SRTSOCKET GetBindSocket() { return m_bindsock; }
@@ -68,6 +71,7 @@ private:    // Reading manipulation helper functions
 private:
 
     std::list<SRTSOCKET>      m_read_fifo;
+    std::set<SRTSOCKET>       m_connections;
 
     std::vector<SRTSOCKET>    m_epoll_read_fds;
     std::vector<SRTSOCKET>    m_epoll_write_fds;
@@ -77,8 +81,9 @@ private:
 
 private:
 
-    std::atomic<bool> m_stop_accept = { false };
+    std::atomic<bool> m_closing = { false };
     std::mutex        m_recv_mutex;
+    std::mutex        m_connection_mutex;
 
     std::future<void> m_accepting_th;
 
