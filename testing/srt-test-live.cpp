@@ -251,6 +251,23 @@ extern "C" int SrtUserPasswordHook(void* , SRTSOCKET listener, int hsv, const so
     return 0;
 }
 
+
+extern "C" int SrtPrintingHook(void*, SRTSOCKET listener, int hsv, const sockaddr*, const char* streamid)
+{
+    if (hsv < 5)
+    {
+        Verb() << "SrtPrintingHook: HS version 4 doesn't support extended handshake";
+        return -1;
+    }
+
+    // Try the "standard interpretation" with username at key u
+    string username;
+
+    cerr << "SrtPrintingHook: Connection attempt with StreamID value: " << streamid << endl;
+
+    return 0;
+}
+
 int main( int argc, char** argv )
 {
     // This is mainly required on Windows to initialize the network system,
@@ -373,6 +390,11 @@ int main( int argc, char** argv )
         if (hook == "user-password")
         {
             transmit_accept_hook_fn = &SrtUserPasswordHook;
+            transmit_accept_hook_op = nullptr;
+        }
+        else if (hook == "print-streamid")
+        {
+            transmit_accept_hook_fn = &SrtPrintingHook;
             transmit_accept_hook_op = nullptr;
         }
     }

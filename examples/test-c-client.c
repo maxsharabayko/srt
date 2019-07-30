@@ -55,6 +55,8 @@ int main(int argc, char** argv)
 
     printf("srt setsockflag\n");
     srt_setsockflag(ss, SRTO_SENDER, &yes, sizeof yes);
+    const char *username_spec = "#!::u=admin";
+    srt_setsockflag(ss, SRTO_STREAMID, username_spec, 11);
 
     printf("srt connect\n");
     st = srt_connect(ss, (struct sockaddr*)&sa, sizeof sa);
