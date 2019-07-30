@@ -18,6 +18,7 @@ test_listen_callback.cpp
 test_muxer.cpp
 test_seqno.cpp
 test_socket_options.cpp
+test_streamid.cpp
 test_sync.cpp
 test_threadname.cpp
 test_timer.cpp
