@@ -1235,7 +1235,8 @@ extern unique_ptr<Base> CreateMedium(const string& uri)
     switch ( u.type() )
     {
     default:
-        break; // do nothing, return nullptr
+        cerr << "ERROR: Unrecognized URO type: " << u.proto() << " \n";
+        return ptr;
     case UriParser::FILE:
         if ( u.host() == "con" || u.host() == "console" )
         {

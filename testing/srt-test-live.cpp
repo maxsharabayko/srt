@@ -252,6 +252,55 @@ extern "C" int SrtUserPasswordHook(void* , SRTSOCKET listener, int hsv, const so
 }
 
 
+
+/// Decode StreamID to key-value pairs
+///
+/// @return >0 - number of decoded elements (should be even)
+/// @return -1 - failure
+///
+int srt_streamid_decode(const char* streamid, size_t streamid_len, char** keyval_pair, size_t num_elems, size_t elem_size)
+{
+    static const char stdhdr[] = "#!::";
+
+    const string str(streamid, streamid_len);
+    size_t keyval_idx = 0;
+    size_t start = 4;
+    string query_pair;
+    while (keyval_idx + 2 <= num_elems)
+    {
+        const size_t next_coma = str.find(",", start);
+        const size_t next_eq = str.find("=", start);
+        const size_t pair_len = next_coma == string::npos ? (str.size() - start) : (next_coma - start);
+
+        if (next_eq > next_coma)
+            return -1;
+
+        const size_t key_len = next_eq - start;
+        if (key_len > elem_size)
+            return -1;
+
+        memcpy(keyval_pair[keyval_idx], str.c_str() + start, key_len);
+        keyval_pair[keyval_idx][key_len] = '\0';
+        ++keyval_idx;
+
+        const size_t value_len = (start + pair_len) - next_eq - 1;
+        if (value_len > elem_size)
+            return -1;
+
+        memcpy(keyval_pair[keyval_idx], str.c_str() + next_eq + 1, value_len);
+        keyval_pair[keyval_idx][value_len] = '\0';
+        ++keyval_idx;
+
+        if (next_coma == string::npos)
+            return (int)keyval_idx;
+
+        start = next_coma + 1;
+    }
+
+    return -1;
+}
+
+
 extern "C" int SrtPrintingHook(void*, SRTSOCKET listener, int hsv, const sockaddr*, const char* streamid)
 {
     if (hsv < 5)
@@ -260,10 +309,29 @@ extern "C" int SrtPrintingHook(void*, SRTSOCKET listener, int hsv, const sockadd
         return -1;
     }
 
-    // Try the "standard interpretation" with username at key u
-    string username;
-
     cerr << "SrtPrintingHook: Connection attempt with StreamID value: " << streamid << endl;
+
+    const size_t elem_size = 64;
+    const size_t num_elems = 10;
+    char buffer[num_elems * elem_size];
+    char* result[num_elems] = {};
+    for (size_t i = 0; i < num_elems; ++i)
+    {
+        result[i] = buffer + i * elem_size;
+    }
+    const size_t res = srt_streamid_decode(streamid, strlen(streamid), result, num_elems, elem_size);
+
+    if (res < 0)
+    {
+        cerr << "SrtPrintingHook: Parsing failed returning " << res << endl;
+        return 0;
+    }
+
+    cerr << "SrtPrintingHook: Parsed " << res / 2 << " key-value pairs:" << endl;
+    for (size_t i = 0; i < res; i += 2)
+    {
+        cerr << "key='" << result[i] << "' value='" << result[i + 1] << "'" << endl;
+    }
 
     return 0;
 }
