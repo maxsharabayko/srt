@@ -7383,6 +7383,7 @@ void CUDT::updateAfterSrtHandshake(int srt_cmd, int hsv)
     {
     case SRT_CMD_HSREQ:
         LOGC(mglog.Note, log << "updateAfterSrtHandshake REQ");
+        break;
     case SRT_CMD_HSRSP:
         LOGC(mglog.Note, log << "updateAfterSrtHandshake RSP");
         break;
