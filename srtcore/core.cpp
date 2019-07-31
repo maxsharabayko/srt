@@ -2105,6 +2105,9 @@ int CUDT::processSrtMsg_HSREQ(const uint32_t* srtdata, size_t len, uint32_t ts, 
     }
 #else
     m_ullRcvPeerStartTime = CTimer::getTime() - (uint64_t)((uint32_t)ts);
+
+    LOGC(mglog.Note,
+         log << "rcvSprocessSrtMsg_HSREQ RcvPeerStartTime=" << FormatTime(m_ullRcvPeerStartTime) << " timestamp=" << ts);
 #endif
 
     // Prepare the initial runtime values of latency basing on the option values.
@@ -2318,6 +2321,7 @@ int CUDT::processSrtMsg_HSRSP(const uint32_t* srtdata, size_t len, uint32_t ts, 
     }
 #else
     m_ullRcvPeerStartTime = CTimer::getTime() - (uint64_t)((uint32_t)ts);
+    LOGC(mglog.Note, log << "rcvSprocessSrtMsg_HSRSP RcvPeerStartTime=" << FormatTime(m_ullRcvPeerStartTime) << " timestamp=" << ts);
 #endif
 
     m_lPeerSrtVersion = srtdata[SRT_HS_VERSION];
@@ -7378,11 +7382,14 @@ void CUDT::updateAfterSrtHandshake(int srt_cmd, int hsv)
     switch (srt_cmd)
     {
     case SRT_CMD_HSREQ:
+        LOGC(mglog.Note, log << "updateAfterSrtHandshake REQ");
     case SRT_CMD_HSRSP:
+        LOGC(mglog.Note, log << "updateAfterSrtHandshake RSP");
         break;
     default:
         return;
     }
+
 
     // The only possibility here is one of these two:
     // - Agent is RESPONDER and it receives HSREQ.

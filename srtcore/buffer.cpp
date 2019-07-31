@@ -791,7 +791,7 @@ int CRcvBuffer::readBuffer(char* data, int len)
    {
       if (m_bTsbPdMode)
       {
-          HLOGC(dlog.Debug, log << CONID() << "readBuffer: chk if time2play: NOW=" << now << " PKT TS=" << getPktTsbPdTime(m_pUnit[p]->m_Packet.getMsgTimeStamp()));
+          LOGC(dlog.Note, log << CONID() << "readBuffer: chk if time2play: NOW=" << now << " PKT TS=" << getPktTsbPdTime(m_pUnit[p]->m_Packet.getMsgTimeStamp()));
           if ((getPktTsbPdTime(m_pUnit[p]->m_Packet.getMsgTimeStamp()) > now))
               break; /* too early for this unit, return whatever was copied */
       }
@@ -1048,7 +1048,7 @@ bool CRcvBuffer::getRcvReadyMsg(ref_t<uint64_t> tsbpdtime, ref_t<int32_t> curpkt
             int64_t towait = (*tsbpdtime - CTimer::getTime());
             if (towait > 0)
             {
-                HLOGC(mglog.Debug, log << "getRcvReadyMsg: found packet, but not ready to play (only in " << (towait/1000.0) << "ms)");
+                LOGC(mglog.Note, log << "getRcvReadyMsg: found packet, but not ready to play (only in " << (towait/1000.0) << "ms)");
                 return false;
             }
 
@@ -1059,7 +1059,7 @@ bool CRcvBuffer::getRcvReadyMsg(ref_t<uint64_t> tsbpdtime, ref_t<int32_t> curpkt
             }
             else
             {
-                HLOGC(mglog.Debug, log << "getRcvReadyMsg: packet seq=" << curpktseq.get() << " ready to play (delayed " << (-towait/1000.0) << "ms)");
+                LOGC(mglog.Note, log << "getRcvReadyMsg: packet seq=" << curpktseq.get() << " ready to play (delayed " << (-towait/1000.0) << "ms)");
                 return true;
             }
         }
@@ -1382,7 +1382,14 @@ uint64_t CRcvBuffer::getTsbPdTimeBase(uint32_t timestamp)
 
 uint64_t CRcvBuffer::getPktTsbPdTime(uint32_t timestamp)
 {
-   return(getTsbPdTimeBase(timestamp) + m_uTsbPdDelay + timestamp + m_DriftTracer.drift());
+    const uint64_t tsbpdtime = getTsbPdTimeBase(timestamp) + m_uTsbPdDelay + timestamp + m_DriftTracer.drift();
+    const int64_t towait = tsbpdtime - CTimer::getTime();
+    LOGC(tslog.Note,
+         log << "getPktTsbPdTime: timestamp " << timestamp << " TsbPdTimeBase "
+             << FormatTime(getTsbPdTimeBase(timestamp))
+             << " m_uTsbPdDelay " << m_uTsbPdDelay << " drift " << m_DriftTracer.drift() << " Target Time " << FormatTime(tsbpdtime),
+             << " to wait " << towait / 1000 << " ms");
+    return tsbpdtime;
 }
 
 int CRcvBuffer::setRcvTsbPdMode(uint64_t timebase, uint32_t delay)
@@ -1396,6 +1403,8 @@ int CRcvBuffer::setRcvTsbPdMode(uint64_t timebase, uint32_t delay)
     //
     // This function is called in the HSREQ reception handler only.
     m_ullTsbPdTimeBase = timebase;
+    LOGC(dlog.Note,
+         log << CONID() << "setRcvTsbPdMode: TSBPD base set to " << FormatTime(timebase) << " delay " << delay);
     // XXX Seems like this may not work correctly.
     // At least this solution this way won't work with application-supplied
     // timestamps. For that case the timestamps should be taken exclusively
@@ -1504,6 +1513,10 @@ void CRcvBuffer::addRcvTsbPdDriftSample(uint32_t timestamp, pthread_mutex_t& mut
 #endif /* SRT_DEBUG_TSBPD_DRIFT */
 
         m_ullTsbPdTimeBase += m_DriftTracer.overdrift();
+
+        LOGC(dlog.Note,
+             log << CONID() << "addRcvTsbPdDriftSample: iDrift " << iDrift << " TSBPD base set to "
+                 << m_ullTsbPdTimeBase);
     }
 
     CGuard::leaveCS(mutex_to_lock);
