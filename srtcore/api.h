@@ -75,7 +75,12 @@ public:
 
    SRT_SOCKSTATUS m_Status;                  //< current socket state
 
-   uint64_t m_TimeStamp;                     //< time when the socket is closed
+   /// Time when the socket is closed.
+   /// When the socket is closed, it is not removed immediately from the list
+   /// of sockets in order to prevent other methods from accessing invalid address.
+   /// A timer is started and the socket will be removed after approximately
+   /// 1 second (see CUDTUnited::checkBrokenSockets()).
+   srt::sync::steady_clock::time_point m_ClosureTimeStamp;
 
    int m_iIPversion;                         //< IP version
    sockaddr* m_pSelfAddr;                    //< pointer to the local address of the socket
@@ -92,14 +97,13 @@ public:
    std::set<SRTSOCKET>* m_pQueuedSockets;    //< set of connections waiting for accept()
    std::set<SRTSOCKET>* m_pAcceptSockets;    //< set of accept()ed connections
 
-   pthread_cond_t m_AcceptCond;              //< used to block "accept" call
-   pthread_mutex_t m_AcceptLock;             //< mutex associated to m_AcceptCond
+   srt::sync::SyncEvent m_AcceptSync;
 
    unsigned int m_uiBackLog;                 //< maximum number of connections in queue
 
    int m_iMuxID;                             //< multiplexer ID
 
-   pthread_mutex_t m_ControlLock;            //< lock this socket exclusively for control APIs: bind/listen/connect
+   srt::sync::Mutex m_ControlLock;            //< lock this socket exclusively for control APIs: bind/listen/connect
 
    static int64_t getPeerSpec(SRTSOCKET id, int32_t isn)
    {
@@ -116,6 +120,7 @@ private:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+
 
 class CUDTUnited
 {
@@ -208,16 +213,17 @@ private:
 private:
    std::map<SRTSOCKET, CUDTSocket*> m_Sockets;       // stores all the socket structures
 
-   pthread_mutex_t m_ControlLock;                    // used to synchronize UDT API
+   srt::sync::Mutex m_ControlLock;                    // used to synchronize UDT API
 
-   pthread_mutex_t m_IDLock;                         // used to synchronize ID generation
+   srt::sync::Mutex m_IDLock;            // used to synchronize ID generation
    SRTSOCKET m_SocketIDGenerator;                             // seed to generate a new unique socket ID
 
    std::map<int64_t, std::set<SRTSOCKET> > m_PeerRec;// record sockets from peers to avoid repeated connection request, int64_t = (socker_id << 30) + isn
 
 private:
-   pthread_key_t m_TLSError;                         // thread local error record (last error)
-   static void TLSDestroy(void* e) {if (NULL != e) delete (CUDTException*)e;}
+
+    pthread_key_t m_TLSError;                         // thread local error record (last error)
+    static void TLSDestroy(void* e) { if (NULL != e) delete (CUDTException*)e; }
 
 private:
    void connect_complete(const SRTSOCKET u);
@@ -228,21 +234,22 @@ private:
 
 private:
    std::map<int, CMultiplexer> m_mMultiplexer;		// UDP multiplexer
-   pthread_mutex_t m_MultiplexerLock;
+   srt::sync::Mutex            m_MultiplexerLock;
 
 private:
    CCache<CInfoBlock>* m_pCache;			// UDT network information cache
 
 private:
-   volatile bool m_bClosing;
-   pthread_mutex_t m_GCStopLock;
-   pthread_cond_t m_GCStopCond;
 
-   pthread_mutex_t m_InitLock;
+   srt::sync::SyncEvent  m_GCState;
+   volatile bool m_bClosing;
+
+   srt::sync::Mutex m_InitLock;
    int m_iInstanceCount;				// number of startup() called by application
    bool m_bGCStatus;					// if the GC thread is working (true)
 
-   pthread_t m_GCThread;
+
+   pthread_t  m_GCThread;
    static void* garbageCollect(void*);
 
    std::map<SRTSOCKET, CUDTSocket*> m_ClosedSockets;   // temporarily store closed sockets

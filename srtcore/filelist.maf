@@ -18,6 +18,7 @@ congctl.cpp
 srt_c_api.cpp
 window.cpp
 srt_compat.c
+sync.cpp
 
 PUBLIC HEADERS
 srt.h
@@ -43,6 +44,7 @@ logging.h
 md5.h
 netinet_any.h
 packet.h
+sync.h
 queue.h
 congctl.h
 srt4udt.h
@@ -50,4 +52,3 @@ srt_compat.h
 threadname.h
 utilities.h
 window.h
-

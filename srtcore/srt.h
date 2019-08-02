@@ -256,7 +256,7 @@ struct CBytePerfMon
    int      pktRecvACKTotal;            // total number of received ACK packets
    int      pktSentNAKTotal;            // total number of sent NAK packets
    int      pktRecvNAKTotal;            // total number of received NAK packets
-   int64_t  usSndDurationTotal;         // total time duration when UDT is sending data (idle time exclusive)
+   int64_t  usSndDurationTotal;         // total time Duration when UDT is sending data (idle time exclusive)
    //>new
    int      pktSndDropTotal;            // number of too-late-to-send dropped packets
    int      pktRcvDropTotal;            // number of too-late-to play missing packets
