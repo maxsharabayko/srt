@@ -67,12 +67,14 @@ int srt_msgn_listen(const char *uri, size_t message_size)
     }
 
     if (!ut["transtype"].exists())
+    {
         ut["transtype"]  = string("file");
+        ut["congestion"] = string("filev2");
+    }
 
     ut["messageapi"] = string("true");
     ut["blocking"]   = string("true");
     ut["mode"]       = string("listener");
-    ut["congestion"] = string("filev2");
 
     int maxconn = 5;
     if (ut["maxconn"].exists())
