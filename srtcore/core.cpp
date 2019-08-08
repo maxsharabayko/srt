@@ -6424,7 +6424,7 @@ static void DebugAck(string hdr, int prev, int ack)
 static inline void DebugAck(string, int, int) {}
 #endif
 
-void CUDT::sendCtrl(UDTMessageType pkttype, void* lparam, void* rparam, int size)
+void CUDT::sendCtrl(UDTMessageType pkttype, const void* lparam, void* rparam, int size)
 {
    CPacket ctrlpkt;
    uint64_t currtime_tk;
@@ -6739,6 +6739,40 @@ void CUDT::sendCtrl(UDTMessageType pkttype, void* lparam, void* rparam, int size
       m_ullLastSndTime_tk = currtime_tk;
 }
 
+
+void CUDT::updateSndLossListOnACK(int32_t ackdata_seqno)
+{
+    // protect packet retransmission
+    CGuard ack_lock(m_AckLock);
+
+    const int offset = CSeqNo::seqoff(m_iSndLastDataAck, ackdata_seqno);
+    // IF distance between m_iSndLastDataAck and ack is nonempty...
+    if (offset <= 0)
+        return;
+
+    // acknowledge the sending buffer (remove data that predate 'ack')
+    m_pSndBuffer->ackData(offset);
+
+    const int64_t currtime = CTimer::getTime();
+    // record total time used for sending
+    CGuard::enterCS(m_StatsLock);
+    m_stats.sndDuration += currtime - m_stats.sndDurationCounter;
+    m_stats.m_sndDurationTotal += currtime - m_stats.sndDurationCounter;
+    m_stats.sndDurationCounter = currtime;
+    CGuard::leaveCS(m_StatsLock);
+
+    HLOGC(mglog.Debug, log << CONID() << "ACK covers: " << m_iSndLastDataAck << " - " << ackdata_seqno
+        << " [ACK=" << m_iSndLastAck << "]");
+
+    // update sending variables
+    m_iSndLastDataAck = ackdata_seqno;
+
+    // remove any loss that predates 'ack' (not to be considered loss anymore)
+    m_pSndLossList->remove(CSeqNo::decseq(m_iSndLastDataAck));
+}
+
+
+
 void CUDT::processCtrl(CPacket& ctrlpkt)
 {
    // Just heard from the peer, reset the expiration count.
@@ -6755,19 +6789,20 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
    {
    case UMSG_ACK: //010 - Acknowledgement
       {
-      int32_t ack;
-      int32_t* ackdata = (int32_t*)ctrlpkt.m_pcData;
+      const int32_t* ackdata      = (const int32_t*)ctrlpkt.m_pcData;
+      const int32_t ackdata_seqno = ackdata[ACKD_RCVLASTACK];
+
+      updateSndLossListOnACK(ackdata_seqno);
 
       // process a lite ACK
       if (ctrlpkt.getLength() == (size_t)SEND_LITE_ACK)
       {
-         ack = *ackdata;
-         if (CSeqNo::seqcmp(ack, m_iSndLastAck) >= 0)
+         if (CSeqNo::seqcmp(ackdata_seqno, m_iSndLastAck) >= 0)
          {
-            m_iFlowWindowSize -= CSeqNo::seqoff(m_iSndLastAck, ack);
-            HLOGC(mglog.Debug, log << CONID() << "ACK covers: " << m_iSndLastDataAck << " - " << ack << " [ACK=" << m_iSndLastAck << "] (FLW: " << m_iFlowWindowSize << ") [LITE]");
+            m_iFlowWindowSize -= CSeqNo::seqoff(m_iSndLastAck, ackdata_seqno);
+            HLOGC(mglog.Debug, log << CONID() << "ACK [LITE]: FLW " << m_iFlowWindowSize);
 
-            m_iSndLastAck = ack;
+            m_iSndLastAck = ackdata_seqno;
             m_ullLastRspAckTime_tk = currtime_tk;
             m_iReXmitCount = 1;       // Reset re-transmit count since last ACK
          }
@@ -6775,44 +6810,43 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
          break;
       }
 
-       // read ACK seq. no.
-      ack = ctrlpkt.getAckSeqNo();
+      // sequence number of the ACK packet
+      const int32_t ack_seqno = ctrlpkt.getAckSeqNo();
 
       // send ACK acknowledgement
       // number of ACK2 can be much less than number of ACK
       uint64_t now = CTimer::getTime();
-      if ((now - m_ullSndLastAck2Time > (uint64_t)COMM_SYN_INTERVAL_US) || (ack == m_iSndLastAck2))
+      if ((now - m_ullSndLastAck2Time > (uint64_t)COMM_SYN_INTERVAL_US) || (ack_seqno == m_iSndLastAck2))
       {
-         sendCtrl(UMSG_ACKACK, &ack);
-         m_iSndLastAck2 = ack;
+         sendCtrl(UMSG_ACKACK, &ack_seqno);
+         m_iSndLastAck2 = ack_seqno;
          m_ullSndLastAck2Time = now;
       }
 
-      // Got data ACK
-      ack = ackdata[ACKD_RCVLASTACK];
-
-      // New code, with TLPKTDROP
+      //
+      // Begin of the new code with TLPKTDROP.
+      //
 
       // protect packet retransmission
       CGuard::enterCS(m_AckLock);
 
       // check the validation of the ack
-      if (CSeqNo::seqcmp(ack, CSeqNo::incseq(m_iSndCurrSeqNo)) > 0)
+      if (CSeqNo::seqcmp(ackdata_seqno, CSeqNo::incseq(m_iSndCurrSeqNo)) > 0)
       {
          CGuard::leaveCS(m_AckLock);
          //this should not happen: attack or bug
-         LOGC(glog.Error, log << CONID() << "ATTACK/IPE: incoming ack seq " << ack << " exceeds current "
-                 << m_iSndCurrSeqNo << " by " << (CSeqNo::seqoff(m_iSndCurrSeqNo, ack)-1) << "!");
+         LOGC(glog.Error, log << CONID() << "ATTACK/IPE: incoming ack seq " << ackdata_seqno << " exceeds current "
+                 << m_iSndCurrSeqNo << " by " << (CSeqNo::seqoff(m_iSndCurrSeqNo, ackdata_seqno)-1) << "!");
          m_bBroken = true;
          m_iBrokenCounter = 0;
          break;
       }
 
-      if (CSeqNo::seqcmp(ack, m_iSndLastAck) >= 0)
+      if (CSeqNo::seqcmp(ackdata_seqno, m_iSndLastAck) >= 0)
       {
          // Update Flow Window Size, must update before and together with m_iSndLastAck
          m_iFlowWindowSize = ackdata[ACKD_BUFFERLEFT];
-         m_iSndLastAck = ack;
+         m_iSndLastAck = ackdata_seqno;
          m_ullLastRspAckTime_tk = currtime_tk;
          m_iReXmitCount = 1;       // Reset re-transmit count since last ACK
       }
@@ -6827,85 +6861,17 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
       * which may go crazy and stay there, preventing proper stream recovery.
       */
 
-      if (CSeqNo::seqoff(m_iSndLastFullAck, ack) <= 0)
+      if (CSeqNo::seqoff(m_iSndLastFullAck, ackdata_seqno) <= 0)
       {
          // discard it if it is a repeated ACK
          CGuard::leaveCS(m_AckLock);
          break;
       }
-      m_iSndLastFullAck = ack;
+      m_iSndLastFullAck = ackdata_seqno;
 
-      int offset = CSeqNo::seqoff(m_iSndLastDataAck, ack);
-      // IF distance between m_iSndLastDataAck and ack is nonempty...
-      if (offset > 0) {
-          // acknowledge the sending buffer (remove data that predate 'ack')
-          m_pSndBuffer->ackData(offset);
-
-          const int64_t currtime = CTimer::getTime();
-          // record total time used for sending
-          CGuard::enterCS(m_StatsLock);
-          m_stats.sndDuration += currtime - m_stats.sndDurationCounter;
-          m_stats.m_sndDurationTotal += currtime - m_stats.sndDurationCounter;
-          m_stats.sndDurationCounter = currtime;
-          CGuard::leaveCS(m_StatsLock);
-
-          HLOGC(mglog.Debug, log << CONID() << "ACK covers: " << m_iSndLastDataAck << " - " << ack
-              << " [ACK=" << m_iSndLastAck << "] BUFr=" << m_iFlowWindowSize
-              << " RTT=" << ackdata[ACKD_RTT] << " RTT*=" << ackdata[ACKD_RTTVAR]
-              << " BW=" << ackdata[ACKD_BANDWIDTH] << " Vrec=" << ackdata[ACKD_RCVSPEED]);
-          // update sending variables
-          m_iSndLastDataAck = ack;
-
-          // remove any loss that predates 'ack' (not to be considered loss anymore)
-          m_pSndLossList->remove(CSeqNo::decseq(m_iSndLastDataAck));
-      }
-
-/* OLD CODE without TLPKTDROP
-
-      // check the validation of the ack
-      if (CSeqNo::seqcmp(ack, CSeqNo::incseq(m_iSndCurrSeqNo)) > 0)
-      {
-         //this should not happen: attack or bug
-         m_bBroken = true;
-         m_iBrokenCounter = 0;
-         break;
-      }
-
-      if (CSeqNo::seqcmp(ack, m_iSndLastAck) >= 0)
-      {
-         // Update Flow Window Size, must update before and together with m_iSndLastAck
-         m_iFlowWindowSize = ackdata[ACKD_BUFFERLEFT];
-         m_iSndLastAck = ack;
-         m_ullLastRspAckTime_tk = currtime_tk;
-         m_iReXmitCount = 1;       // Reset re-transmit count since last ACK
-      }
-
-      // protect packet retransmission
-      CGuard::enterCS(m_AckLock);
-
-      int offset = CSeqNo::seqoff(m_iSndLastDataAck, ack);
-      if (offset <= 0)
-      {
-         // discard it if it is a repeated ACK
-         CGuard::leaveCS(m_AckLock);
-         break;
-      }
-
-      // acknowledge the sending buffer
-      m_pSndBuffer->ackData(offset);
-
-      // record total time used for sending
-      int64_t currtime = currtime_tk/m_ullCPUFrequency;
-
-      m_llSndDuration += currtime - m_llSndDurationCounter;
-      m_llSndDurationTotal += currtime - m_llSndDurationCounter;
-      m_llSndDurationCounter = currtime;
-
-      // update sending variables
-      m_iSndLastDataAck = ack;
-      m_pSndLossList->remove(CSeqNo::decseq(m_iSndLastDataAck));
-
-#endif  SRT_ENABLE_TLPKTDROP */
+      //
+      // END of the new code with TLPKTDROP
+      //
 
       CGuard::leaveCS(m_AckLock);
       if (m_bSynSending)
@@ -6992,7 +6958,7 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
       }
 
       checkSndTimers(REGEN_KM);
-      updateCC(TEV_ACK, ack);
+      updateCC(TEV_ACK, ackdata_seqno);
 
       CGuard::enterCS(m_StatsLock);
       ++ m_stats.recvACK;

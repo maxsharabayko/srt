@@ -710,8 +710,12 @@ private: // Common connection Congestion Control setup
     bool createCrypter(HandshakeSide side, bool bidi);
 
 private: // Generation and processing of packets
-    void sendCtrl(UDTMessageType pkttype, void* lparam = NULL, void* rparam = NULL, int size = 0);
+    void sendCtrl(UDTMessageType pkttype, const void* lparam = NULL, void* rparam = NULL, int size = 0);
     void processCtrl(CPacket& ctrlpkt);
+
+    ///
+    /// @param ackdata_seqno    sequence number of a data packet being acknowledged
+    void updateSndLossListOnACK(int32_t ackdata_seqno);
 
     /// Pack a packet from a list of lost packets.
     ///
