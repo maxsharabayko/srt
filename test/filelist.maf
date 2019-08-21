@@ -1,5 +1,7 @@
 
 SOURCES
+buffer2.cpp
+test_buffer2.cpp
 test_buffer.cpp
 test_bonding.cpp
 test_common.cpp
