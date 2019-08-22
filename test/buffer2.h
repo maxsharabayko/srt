@@ -197,7 +197,7 @@ public:
         , m_pUnit(NULL)
         , m_iStartPos(0)
         , m_iLastAckPos(0)
-        , m_iLastReadablePos(0)
+        , m_iFirstUnreadablePos(0)
         , m_iMaxPos(0)
         , m_iNotch(0)
         , m_BytesCountLock()
@@ -298,6 +298,8 @@ public:
             m_iMaxPos = 0;
 
         m_iLastAckSeqNo = seqno;
+
+        updateReadablePos();
     }
 
 
@@ -331,10 +333,20 @@ public:
     }
 
 
-    size_t countReadable() const;
+    bool cacAck() const;
+
+    size_t countReadable() const
+    {
+        if (m_iFirstUnreadablePos >= m_iStartPos)
+            return m_iFirstUnreadablePos - m_iStartPos;
+        return m_size + m_iFirstUnreadablePos - m_iStartPos;
+    }
 
 
-    bool canRead() const;
+    bool canRead() const
+    {
+        return (m_iFirstUnreadablePos != m_iStartPos);
+    }
 
 
 private:
@@ -370,19 +382,62 @@ private:
     }
 
 
-    void updateReadablePos(const CPacket &packet, const int pos)
+    void updateReadablePos()
     {
-        const PacketBoundary boundary = packet.getMsgBoundary();
+        //const PacketBoundary boundary = packet.getMsgBoundary();
 
-        // The simplest case is when inserting a sequential PB_SOLO packet.
-        if (boundary == PB_SOLO && (m_iLastReadablePos + 1) % m_size == pos)
-        {
-            m_iLastReadablePos = pos;
-            return;
-        }
+        //// The simplest case is when inserting a sequential PB_SOLO packet.
+        //if (boundary == PB_SOLO && (m_iFirstUnreadablePos + 1) % m_size == pos)
+        //{
+        //    m_iFirstUnreadablePos = pos;
+        //    return;
+        //}
 
         // Check if the gap is filled.
-        //if (pos >)
+        SRT_ASSERT(m_pUnit[m_iFirstUnreadablePos]);
+
+        int pos = m_iFirstUnreadablePos;
+        while (m_pUnit[pos]->m_iFlag == CUnit::GOOD
+            && m_pUnit[pos]->m_Packet.getMsgBoundary() & PB_FIRST)
+        {
+            bool good = true;
+
+            // look ahead for the whole message
+
+            // We expect to see either of:
+            // [PB_FIRST] [PB_SUBSEQUENT] [PB_SUBSEQUENT] [PB_LAST]
+            // [PB_SOLO]
+            // but not:
+            // [PB_FIRST] NULL ...
+            // [PB_FIRST] FREE/PASSACK/DROPPED...
+            // If the message didn't look as expected, interrupt this.
+
+            // This begins with a message starting at m_iStartPos
+            // up to m_iLastAckPos OR until the PB_LAST message is found.
+            // If any of the units on this way isn't good, this OUTER loop
+            // will be interrupted.
+            for (int i = pos; i != m_iLastAckPos; i = (i + 1) % m_size)
+            {
+                if (!m_pUnit[i] || m_pUnit[i]->m_iFlag != CUnit::GOOD)
+                {
+                    good = false;
+                    break;
+                }
+
+                // Likewise, boundary() & PB_LAST will be satisfied for last OR solo.
+                if (m_pUnit[i]->m_Packet.getMsgBoundary() & PB_LAST)
+                {
+                    m_iFirstUnreadablePos = (i + 1) % m_size;
+                    break;
+                }
+            }
+
+            if (pos == m_iFirstUnreadablePos || !m_pUnit[m_iFirstUnreadablePos])
+                break;
+
+            pos = m_iFirstUnreadablePos;
+        }
+
 
         // 1. If there is a gap between this packet and m_iLastReadablePos
         // then no sense to update m_iLastReadablePos.
@@ -412,7 +467,7 @@ private:
     int m_iStartPos;                     // the head position for I/O (inclusive)
     int m_iLastAckPos;                   // the last ACKed position (exclusive)
                                          // EMPTY: m_iStartPos = m_iLastAckPos   FULL: m_iStartPos = m_iLastAckPos + 1
-    int m_iLastReadablePos;              // Last position that can be read (>= m_iLastAckPos)
+    int m_iFirstUnreadablePos;           // First position that can't be read (<= m_iLastAckPos)
     int m_iMaxPos;                       // the furthest data position
     int m_iNotch;                        // the starting read point of the first unit
 

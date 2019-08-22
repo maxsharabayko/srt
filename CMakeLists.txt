@@ -1195,6 +1195,7 @@ if (ENABLE_UNITTESTS AND ENABLE_CXX11)
 	endif()
 
 	MafReadDir(test filelist.maf
+		HEADERS SOURCES_unittests
 		SOURCES SOURCES_unittests
 	)
 	
