@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
+#include <array>
 
-#include "buffer2.h"
+#include "rcvbuffer.h"
 
 
 
@@ -72,7 +73,7 @@ TEST(CRcvBuffer2, FullBuffer)
 /// In this test case two packets are inserted in the CRcvBuffer2,
 /// but with a gap in sequence numbers. The test checks that this situation
 /// is handled properly.
-TEST(CRcvBuffer2, HandleSeqNoGap)
+TEST(CRcvBuffer2, HandleSeqGap)
 {
     const int buffer_size_pkts = 16;
     CUnitQueue unit_queue;
@@ -136,8 +137,37 @@ TEST(CRcvBuffer2, OneMessageInSeveralPackets)
         //EXPECT_EQ(rcv_buffer.countReadable(), is_last_packet ? message_len_in_pkts : 0);
     }
 
+    const size_t buf_length = payload_size * message_len_in_pkts;
+    std::array<char, buf_length> buffer;
+    rcv_buffer.readMessage(buffer.data(), buf_length);
+
+
 }
 
+
+
+TEST(CRcvBuffer2, GetFirstValidPacket)
+{
+    const int buffer_size_pkts = 16;
+    CUnitQueue unit_queue;
+    unit_queue.init(buffer_size_pkts, 1500, AF_INET);
+    const int initial_seqno = 1234;
+    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts);
+
+    const size_t payload_size = 1456;
+    // Add a number of units (packets) to the buffer
+    // equal to the buffer size in packets
+    for (int i = 0; i < 2; ++i)
+    {
+        CUnit* unit = unit_queue.getNextAvailUnit();
+        EXPECT_NE(unit, nullptr);
+        unit->m_Packet.setLength(payload_size);
+        unit->m_Packet.m_iSeqNo = initial_seqno + i;
+        EXPECT_EQ(rcv_buffer.insert(unit), 0);
+    }
+
+    EXPECT_EQ(rcv_buffer.getAvailBufSize(), buffer_size_pkts - 1);   // logic
+}
 
 
 
