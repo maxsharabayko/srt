@@ -876,6 +876,9 @@ if (srt_libspec_static)
 	if (USE_GNUSTL)
 		target_link_libraries(${TARGET_srt}_static PRIVATE ${GNUSTL_LIBRARIES} ${GNUSTL_LDFLAGS})
 	endif()
+
+	# Include code-coverage settings:
+	target_link_libraries(${TARGET_srt}_static PRIVATE coverage_config)
 endif()
 
 target_include_directories(srt_virtual PRIVATE  ${SSL_INCLUDE_DIRS})
