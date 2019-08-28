@@ -58,7 +58,7 @@ public:
     /// @param [in] len size of data to be acknowledged.
     /// @return 1 if a user buffer is fulfilled, otherwise 0.
     /// TODO: Should call CTimer::triggerEvent() in the end.
-    void CRcvBuffer2::ack(int32_t seqno);
+    void ack(int32_t seqno);
 
 
     /// Read the whole message from one or several packets.
@@ -68,7 +68,7 @@ public:
     /// @param [out] tsbpdtime localtime-based (uSec) packet time stamp including buffering delay
     ///
     /// @return actuall number of bytes extracted from the buffer.
-    int CRcvBuffer2::readMessage(char* data, int len);
+    int readMessage(char* data, size_t len);
 
 
 public:
@@ -88,13 +88,14 @@ public:
 
     size_t countReadable() const;
 
-
     bool canRead() const;
 
 
 private:
 
+    inline int incPos(int pos) const { return (pos + 1) % m_size; }
 
+private:
     void countBytes(int pkts, int bytes, bool acked = false);
     void updateReadablePos();
 
@@ -130,13 +131,13 @@ private:
 
 private:    // Statistics
 
+    pthread_mutex_t m_BytesCountLock;    // used to protect counters operations
     int m_iBytesCount;                   // Number of payload bytes in the buffer
     int m_iAckedPktsCount;               // Number of acknowledged pkts in the buffer
     int m_iAckedBytesCount;              // Number of acknowledged payload bytes in the buffer
     int m_iAvgPayloadSz;                 // Average payload size for dropped bytes estimation
 
 
-    pthread_mutex_t m_BytesCountLock;    // used to protect counters operations
 
 
 };

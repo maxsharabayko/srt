@@ -33,9 +33,10 @@
 
 
     CRcvBuffer2::CRcvBuffer2(int initSeqNo, size_t size)
-        : m_size(size)
+        : m_pUnit(NULL)
+        , m_size(size)
+        , m_pUnitQueue(NULL)
         , m_iLastAckSeqNo(initSeqNo)
-        , m_pUnit(NULL)
         , m_iStartPos(0)
         , m_iLastAckPos(0)
         , m_iFirstUnreadablePos(0)
@@ -48,7 +49,7 @@
         , m_iAvgPayloadSz(7 * 188)
     {
         m_pUnit = new CUnit * [m_size];
-        for (int i = 0; i < m_size; ++i)
+        for (size_t i = 0; i < m_size; ++i)
             m_pUnit[i] = NULL;
 
         pthread_mutex_init(&m_BytesCountLock, NULL);
@@ -118,7 +119,7 @@
             int pkts = 0;
             int bytes = 0;
             const int end = (m_iLastAckPos + len) % m_size;
-            for (int i = m_iLastAckPos; i != end; i = (i + 1) % m_size)
+            for (int i = m_iLastAckPos; i != end; i = incPos(i))
             {
                 if (m_pUnit[i] == NULL)
                     continue;
@@ -146,18 +147,42 @@
     /// @param [in] len size of the buffer.
     /// @param [out] tsbpdtime localtime-based (uSec) packet time stamp including buffering delay
     /// @return actuall size of data read.
-    int CRcvBuffer2::readMessage(char* data, int len)
+    int CRcvBuffer2::readMessage(char* data, size_t len)
     {
         const int pos_end = findLastMessagePkt();
 
-        for (int i = m_iStartPos; ; i = (i + 1) % m_size)
+        size_t remain = len;
+        char* dst = data;
+        int pkts_read = 0;
+        int bytes_read = 0;
+        for (int i = m_iStartPos; ; i = incPos(i))
         {
+            SRT_ASSERT(m_pUnit[i]);
+
+            const CPacket& packet = m_pUnit[i]->m_Packet;
+            const size_t pktsize  = packet.getLength();
+
+            const size_t unitsize = std::min(remain, pktsize);
+            memcpy(dst, packet.m_pcData, unitsize);
+            dst += unitsize;
+
+            ++pkts_read;
+            bytes_read += pktsize;
+
+            // TODO: make unit free
+            //m_pUnitQueue->makeUnitFree(m_pUnit[i]);
+            m_pUnit[i] = NULL;
 
             if (i == pos_end)
+            {
+                m_iStartPos = incPos(i);
                 break;
+            }
         }
 
-        return 0;
+        countBytes(-pkts_read, -bytes_read, true);
+
+        return (dst - data);
     }
 
 
@@ -246,7 +271,7 @@
         while (m_pUnit[pos]->m_iFlag == CUnit::GOOD
             && m_pUnit[pos]->m_Packet.getMsgBoundary() & PB_FIRST)
         {
-            bool good = true;
+            //bool good = true;
 
             // look ahead for the whole message
 
@@ -266,7 +291,7 @@
             {
                 if (!m_pUnit[i] || m_pUnit[i]->m_iFlag != CUnit::GOOD)
                 {
-                    good = false;
+                    //good = false;
                     break;
                 }
 
@@ -304,7 +329,7 @@
             }
         }
 
-        throw std::exception("CRcvBuffer2: PB_LAST not found. Something wrong with m_iFirstUnreadablePos");
+        throw std::runtime_error(std::string("CRcvBuffer2: PB_LAST not found. Something wrong with m_iFirstUnreadablePos"));
     }
 
 

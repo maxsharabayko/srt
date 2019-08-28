@@ -136,7 +136,7 @@ TEST(CRcvBuffer2, OneMessageInSeveralPackets)
         memcpy(packet.m_pcData, src_buffer.data() + i * payload_size, payload_size);
 
         EXPECT_EQ(rcv_buffer.insert(unit), 0);
-        EXPECT_EQ(rcv_buffer.canRead(), false);
+        EXPECT_FALSE(rcv_buffer.canRead());
 
         rcv_buffer.ack(packet.m_iSeqNo + 1);
 
@@ -149,6 +149,7 @@ TEST(CRcvBuffer2, OneMessageInSeveralPackets)
     const int read_len = rcv_buffer.readMessage(read_buffer.data(), buf_length);
     EXPECT_EQ(read_len, payload_size * message_len_in_pkts);
     EXPECT_TRUE(read_buffer == src_buffer);
+    EXPECT_FALSE(rcv_buffer.canRead());
 }
 
 
