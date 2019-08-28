@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include <array>
+#include <numeric>
 
 #include "rcvbuffer.h"
 
@@ -112,6 +113,10 @@ TEST(CRcvBuffer2, OneMessageInSeveralPackets)
 
     const size_t payload_size = 1456;
     const int message_len_in_pkts = 4;
+    const size_t buf_length = payload_size * message_len_in_pkts;
+    std::array<char, buf_length> src_buffer;
+    std::iota(src_buffer.begin(), src_buffer.end(), (char)0);
+
     for (int i = 0; i < message_len_in_pkts; ++i)
     {
         CUnit* unit = unit_queue.getNextAvailUnit();
@@ -128,6 +133,8 @@ TEST(CRcvBuffer2, OneMessageInSeveralPackets)
         if (is_last_packet)
             packet.m_iMsgNo |= PacketBoundaryBits(PB_LAST);
 
+        memcpy(packet.m_pcData, src_buffer.data() + i * payload_size, payload_size);
+
         EXPECT_EQ(rcv_buffer.insert(unit), 0);
         EXPECT_EQ(rcv_buffer.canRead(), false);
 
@@ -137,11 +144,11 @@ TEST(CRcvBuffer2, OneMessageInSeveralPackets)
         //EXPECT_EQ(rcv_buffer.countReadable(), is_last_packet ? message_len_in_pkts : 0);
     }
 
-    const size_t buf_length = payload_size * message_len_in_pkts;
-    std::array<char, buf_length> buffer;
-    rcv_buffer.readMessage(buffer.data(), buf_length);
-
-
+    // Read the whole message from the buffer
+    std::array<char, buf_length> read_buffer;
+    const int read_len = rcv_buffer.readMessage(read_buffer.data(), buf_length);
+    EXPECT_EQ(read_len, payload_size * message_len_in_pkts);
+    EXPECT_TRUE(read_buffer == src_buffer);
 }
 
 

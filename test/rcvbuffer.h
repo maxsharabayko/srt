@@ -61,11 +61,13 @@ public:
     void CRcvBuffer2::ack(int32_t seqno);
 
 
-    /// read a message.
+    /// Read the whole message from one or several packets.
+    ///
     /// @param [out] data buffer to write the message into.
     /// @param [in] len size of the buffer.
     /// @param [out] tsbpdtime localtime-based (uSec) packet time stamp including buffering delay
-    /// @return actuall size of data read.
+    ///
+    /// @return actuall number of bytes extracted from the buffer.
     int CRcvBuffer2::readMessage(char* data, int len);
 
 
@@ -95,7 +97,10 @@ private:
 
     void countBytes(int pkts, int bytes, bool acked = false);
     void updateReadablePos();
-    void findMessage();
+
+    /// Find position of the last packet of the message.
+    /// 
+    int  findLastMessagePkt();
 
 
 public:

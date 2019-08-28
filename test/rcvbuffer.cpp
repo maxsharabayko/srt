@@ -148,6 +148,15 @@
     /// @return actuall size of data read.
     int CRcvBuffer2::readMessage(char* data, int len)
     {
+        const int pos_end = findLastMessagePkt();
+
+        for (int i = m_iStartPos; ; i = (i + 1) % m_size)
+        {
+
+            if (i == pos_end)
+                break;
+        }
+
         return 0;
     }
 
@@ -283,9 +292,19 @@
     }
 
 
-    void CRcvBuffer2::findMessage()
+    int CRcvBuffer2::findLastMessagePkt()
     {
+        for (int i = m_iStartPos; i != m_iFirstUnreadablePos; i = (i + 1) % m_size)
+        {
+            SRT_ASSERT(m_pUnit[i]);
 
+            if (m_pUnit[i]->m_Packet.getMsgBoundary() & PB_LAST)
+            {
+                return i;
+            }
+        }
+
+        throw std::exception("CRcvBuffer2: PB_LAST not found. Something wrong with m_iFirstUnreadablePos");
     }
 
 
