@@ -84,6 +84,32 @@ public:
     int getRcvDataSize() const;
 
 
+    /// Get information on the 1st message in queue.
+    /// Similar to CRcvBuffer::getRcvFirstMsg
+    /// Parameters (of the 1st packet queue, ready to play or not):
+    /// @param [out] tsbpdtime localtime-based (uSec) packet time stamp including buffering delay of 1st packet or 0 if none
+    /// @param [out] passack   true if 1st ready packet is not yet acknowleged (allowed to be delivered to the app)
+    /// @param [out] skipseqno -1 or seq number of 1st unacknowledged pkt ready to play preceeded by missing packets.
+    /// @retval true 1st packet ready to play (tsbpdtime <= now). Not yet acknowledged if passack == true
+    /// @retval false IF tsbpdtime = 0: rcv buffer empty; ELSE:
+    ///                   IF skipseqno != -1, packet ready to play preceeded by missing packets.;
+    ///                   IF skipseqno == -1, no missing packet but 1st not ready to play.
+
+    struct PacketInfo
+    {
+        int seqno;
+        bool acknowledged;  ///< true if the packet is acknowleged (allowed to be delivered to the app)
+        bool seq_gap;       ///< true if there are missnig packets in the buffer, preceding current packet
+        uint64_t tsbpd_time;
+    };
+
+    PacketInfo getFirstPacketInfo() const;
+
+    /// Get latest packet that can be read.
+    /// Used to determine how many packets can be acknowledged.
+    //int getLatestReadReadyPacket() const;
+
+
     bool canAck() const;
 
     size_t countReadable() const;
@@ -126,8 +152,51 @@ private:
     int m_iLastAckPos;                   // the last ACKed position (exclusive)
                                          // EMPTY: m_iStartPos = m_iLastAckPos   FULL: m_iStartPos = m_iLastAckPos + 1
     int m_iFirstUnreadablePos;           // First position that can't be read (<= m_iLastAckPos)
+    // TODO: rename to m_iNumUnackPackets
     int m_iMaxPos;                       // the furthest data position
     int m_iNotch;                        // the starting read point of the first unit
+
+
+public:     // TSBPD public functions
+
+    /// Set TimeStamp-Based Packet Delivery Rx Mode
+    /// @param [in] timebase localtime base (uSec) of packet time stamps including buffering delay
+    /// @param [in] delay aggreed TsbPD delay
+    ///
+    /// @return 0
+    void setTsbPdMode(uint64_t timebase, uint32_t delay);
+
+    uint64_t getPktTsbPdTime(uint32_t timestamp);
+
+    uint64_t getTsbPdTimeBase(uint32_t timestamp);
+
+private:    // TSBPD member variables
+
+    bool m_bTsbPdMode;                   // true: apply TimeStamp-Based Rx Mode
+    uint32_t m_uTsbPdDelay;              // aggreed delay
+    uint64_t m_ullTsbPdTimeBase;         // localtime base for TsbPd mode
+    // Note: m_ullTsbPdTimeBase cumulates values from:
+    // 1. Initial SRT_CMD_HSREQ packet returned value diff to current time:
+    //    == (NOW - PACKET_TIMESTAMP), at the time of HSREQ reception
+    // 2. Timestamp overflow (@c CRcvBuffer::getTsbPdTimeBase), when overflow on packet detected
+    //    += CPacket::MAX_TIMESTAMP+1 (it's a hex round value, usually 0x1*e8).
+    // 3. Time drift (CRcvBuffer::addRcvTsbPdDriftSample, executed exclusively
+    //    from UMSG_ACKACK handler). This is updated with (positive or negative) TSBPD_DRIFT_MAX_VALUE
+    //    once the value of average drift exceeds this value in whatever direction.
+    //    += (+/-)CRcvBuffer::TSBPD_DRIFT_MAX_VALUE
+    //
+    // XXX Application-supplied timestamps won't work therefore. This requires separate
+    // calculation of all these things above.
+
+    bool m_bTsbPdWrapCheck;              // true: check packet time stamp wrap around
+    static const uint32_t TSBPD_WRAP_PERIOD = (30 * 1000000);    //30 seconds (in usec)
+
+    static const int TSBPD_DRIFT_MAX_VALUE = 5000;   // Max drift (usec) above which TsbPD Time Offset is adjusted
+    static const int TSBPD_DRIFT_MAX_SAMPLES = 1000;  // Number of samples (UMSG_ACKACK packets) to perform drift caclulation and compensation
+    //int m_iTsbPdDrift;                           // recent drift in the packet time stamp
+    //int64_t m_TsbPdDriftSum;                     // Sum of sampled drift
+    //int m_iTsbPdDriftNbSamples;                  // Number of samples in sum and histogram
+    DriftTracer<TSBPD_DRIFT_MAX_SAMPLES, TSBPD_DRIFT_MAX_VALUE> m_DriftTracer;
 
 private:    // Statistics
 
