@@ -166,9 +166,10 @@ public:     // TSBPD public functions
     /// @return 0
     void setTsbPdMode(uint64_t timebase, uint32_t delay);
 
-    uint64_t getPktTsbPdTime(uint32_t timestamp);
+    uint64_t getPktTsbPdTime(uint32_t timestamp) const;
 
-    uint64_t getTsbPdTimeBase(uint32_t timestamp);
+    uint64_t getTsbPdTimeBase(uint32_t timestamp) const;
+    void updateTsbPdTimeBase(uint32_t timestamp);
 
 private:    // TSBPD member variables
 
