@@ -103,7 +103,7 @@ public:
         uint64_t tsbpd_time;
     };
 
-    PacketInfo getFirstPacketInfo() const;
+    PacketInfo getFirstValidPacketInfo() const;
 
     /// Get latest packet that can be read.
     /// Used to determine how many packets can be acknowledged.
@@ -114,7 +114,7 @@ public:
 
     size_t countReadable() const;
 
-    bool canRead() const;
+    bool canRead(uint64_t time_now = 0) const;
 
 
 private:
@@ -165,6 +165,10 @@ public:     // TSBPD public functions
     ///
     /// @return 0
     void setTsbPdMode(uint64_t timebase, uint32_t delay);
+
+    /// TODO
+    /// In TSBPD mode drop late packets from the buffer.
+    void updateState(uint64_t time_now);
 
     uint64_t getPktTsbPdTime(uint32_t timestamp) const;
 

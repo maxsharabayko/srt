@@ -150,6 +150,9 @@ int CRcvBuffer2::readMessage(char *data, size_t len)
         ++pkts_read;
         bytes_read += pktsize;
 
+        if (m_bTsbPdMode)
+            updateTsbPdTimeBase(packet.getMsgTimeStamp());
+
         // TODO: make unit free
         // m_pUnitQueue->makeUnitFree(m_pUnit[i]);
         m_pUnit[i] = NULL;
@@ -180,7 +183,7 @@ int CRcvBuffer2::getRcvDataSize() const
     return m_size + m_iLastAckPos - m_iStartPos;
 }
 
-CRcvBuffer2::PacketInfo CRcvBuffer2::getFirstPacketInfo() const
+CRcvBuffer2::PacketInfo CRcvBuffer2::getFirstValidPacketInfo() const
 {
     bool      acknowledged = true;
     const int end_pos      = (m_iLastAckPos + m_iMaxPos) % m_size;
@@ -207,7 +210,19 @@ size_t CRcvBuffer2::countReadable() const
     return m_size + m_iFirstUnreadablePos - m_iStartPos;
 }
 
-bool CRcvBuffer2::canRead() const { return (m_iFirstUnreadablePos != m_iStartPos); }
+bool CRcvBuffer2::canRead(uint64_t time_now) const
+{
+    const bool haveAckedPackets = (m_iFirstUnreadablePos != m_iStartPos);
+    if (!m_bTsbPdMode)
+        return haveAckedPackets;
+
+    if (!haveAckedPackets)
+        return false;
+
+    const auto info = getFirstValidPacketInfo();
+
+    return info.tsbpd_time <= time_now;
+}
 
 void CRcvBuffer2::countBytes(int pkts, int bytes, bool acked)
 {

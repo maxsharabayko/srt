@@ -179,3 +179,57 @@ TEST(CRcvBuffer2, GetFirstValidPacket)
 
 
 
+TEST(CRcvBuffer2, TsbPdReadMessage)
+{
+    const int buffer_size_pkts = 16;
+    CUnitQueue unit_queue;
+    unit_queue.init(buffer_size_pkts, 1500, AF_INET);
+    const int initial_seqno = 1234;
+    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts);
+
+
+    const uint64_t peer_start_time_us = 100000;  // now() - HS.timestamp, microseconds
+
+    const uint64_t delay_us = 200000; // 200 ms
+    rcv_buffer.setTsbPdMode(peer_start_time_us, delay_us);
+
+    int seqno = initial_seqno;
+    const size_t payload_size = 1456;
+    CUnit* unit = unit_queue.getNextAvailUnit();
+    EXPECT_NE(unit, nullptr);
+    CPacket& pkt = unit->m_Packet;
+    pkt.setLength(payload_size);
+    pkt.m_iSeqNo = seqno;
+    pkt.m_iTimeStamp = static_cast<int32_t>(200);
+    EXPECT_EQ(rcv_buffer.insert(unit), 0);
+
+
+    const auto pkt_info = rcv_buffer.getFirstValidPacketInfo();
+
+    std::cout << "pkt time: " << pkt_info.tsbpd_time << std::endl;
+    EXPECT_EQ(pkt_info.tsbpd_time, peer_start_time_us + pkt.m_iTimeStamp + delay_us);
+
+    // Expect it is not time to read the next packet
+    EXPECT_FALSE(rcv_buffer.canRead());
+
+}
+
+
+/// TSBPD mode = ON.
+/// A packet is acknowledged and is ready to be read.
+
+
+/// TSBPD mode = ON.
+/// A packet is acknowledged, but not ready to be read
+/// In case of blocking RCV call, we can wait directly on the buffer. So no TSBPD thread
+/// is needed. However, the SRTO_RCVSYN mode can be turned on in runtime ( no protection in setOpt()).
+/// In case of non-bocking RCV call, epoll has to be signalled at a certain time.
+/// For blocking 
+
+/// TSBPD mode = ON.
+/// A packet is not acknowledged, but ready to be read, and has some preceeding missing packet.
+/// In that case all missing packets have to be dropped up to the first ready packet. And wait for ACK of that packet.
+/// So those missing packets should be removed from the receiver's loss list, and the receiver's buffer
+/// has to skip m_iStartPos and m_iLastAckPos up to that packet.
+
+
