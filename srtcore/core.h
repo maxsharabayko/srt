@@ -266,7 +266,7 @@ public: // internal API
     int64_t maxBandwidth() { return m_llMaxBW; }
     int MSS() { return m_iMSS; }
     size_t maxPayloadSize() { return m_iMaxSRTPayloadSize; }
-    size_t OPT_PayloadSize() { return m_zOPT_ExpPayloadSize; }
+    size_t expectedPayloadSize() { return m_options.expectedPldSize; }
     uint64_t minNAKInterval() { return m_ullMinNakInt_tk; }
     int32_t ISN() { return m_iISN; }
 
@@ -502,6 +502,65 @@ private:
 
     static CUDTUnited s_UDTUnited;               // UDT global management base
 
+private:
+
+    int m_iMaxSRTPayloadSize;                 // Maximum/regular payload size, in bytes
+
+    struct Options
+    {
+        size_t  expectedPldSize;                      // Expected average payload size (user option)
+        bool    synSending;                           // Sending syncronization mode
+        bool    synRecving;                           // Receiving syncronization mode
+        int     MSS;                                  // Maximum Segment Size, in bytes
+        int     flightFlagSize;                       // Maximum number of packets in flight from the peer side
+        int     sndBufSize;                           // Maximum UDT sender buffer size
+        int     rcvBufSize;                           // Maximum UDT receiver buffer size
+        linger  linger;                               // Linger information on close
+        int     udpSndBufSize;                        // UDP sending buffer size
+        int     udpRcvBufSize;                        // UDP receiving buffer size
+        int     IPversion;                            // IP version
+        bool    rendezvous;                          // Rendezvous connection mode
+    #ifdef SRT_ENABLE_CONNTIMEO
+        int     connTimeOut;                          // connect timeout in milliseconds
+    #endif
+        int     sndTimeOut;                           // sending timeout in milliseconds
+        int     rcvTimeOut;                           // receiving timeout in milliseconds
+        bool    reuseAddr;                           // reuse an exiting port or not, for UDP multiplexer
+        int64_t maxBW;                           // maximum data transfer rate (threshold)
+    #ifdef SRT_ENABLE_IPOPTS
+        int     ipTTL;
+        int     ipToS;
+    #endif
+        bool    useMessageAPI;
+        bool    useTsbPd;               // Whether AGENT will do TSBPD Rx (whether peer does, is not agent's problem)
+        int     tsbPdDelay;           // Agent's Rx latency
+        int     peerTsbPdDelay;       // Peer's Rx latency for the traffic made by Agent's Tx.
+        bool    TLPktDrop;           // Whether Agent WILL DO TLPKTDROP on Rx.
+        int     sndDropDelay;         // Extra delay when deciding to snd-drop for TLPKTDROP, -1 to off
+        bool    strictEncryption;    // Off by default. When on, any connection other than nopw-nopw & pw1-pw1 is rejected.
+        std::string streamName;
+        int     peerIdleTimeout;      // Timeout for hearing anything from the peer.
+
+        int     tsbPdDelay_ms;                           // Rx delay to absorb burst in milliseconds
+        int     peerTsbPdDelay_ms;                       // Tx delay that the peer uses to absorb burst in milliseconds
+        bool    TLPktDrop;                           // Enable Too-late Packet Drop
+        int64_t inputBW;                         // Input stream rate (bytes/sec)
+        int     overheadBW;                           // Percent above input stream rate (applies if m_llMaxBW == 0)
+        bool    rcvNakReport;                        // Enable Receiver Periodic NAK Reports
+        int     ipV6Only;                             // IPV6_V6ONLY option (-1 if not set)
+        // These fields keep the options for encryption
+        // (SRTO_PASSPHRASE, SRTO_PBKEYLEN). Crypto object is
+        // created later and takes values from these.
+        HaiCrypt_Secret cryptoSecret;
+        int sndCryptoKeyLen;
+
+        // HaiCrypt configuration
+        unsigned int kmRefreshRatePkt;
+        unsigned int kmPreAnnouncePkt;
+
+        int m_iMaxReorderTolerance;                  //< Maximum allowed value for dynamic reorder tolerance
+    } m_options;
+
 private: // Identification
     SRTSOCKET m_SocketID;                        // UDT socket number
 
@@ -511,37 +570,9 @@ private: // Identification
     UDTSockType m_iSockType;                     // Type of the UDT connection (SOCK_STREAM or SOCK_DGRAM)
     SRTSOCKET m_PeerID;                          // peer id, for multiplexer
 
-    int m_iMaxSRTPayloadSize;                 // Maximum/regular payload size, in bytes
-    size_t m_zOPT_ExpPayloadSize;                    // Expected average payload size (user option)
+    
 
-    // Options
-    int m_iMSS;                                  // Maximum Segment Size, in bytes
-    bool m_bSynSending;                          // Sending syncronization mode
-    bool m_bSynRecving;                          // Receiving syncronization mode
-    int m_iFlightFlagSize;                       // Maximum number of packets in flight from the peer side
-    int m_iSndBufSize;                           // Maximum UDT sender buffer size
-    int m_iRcvBufSize;                           // Maximum UDT receiver buffer size
-    linger m_Linger;                             // Linger information on close
-    int m_iUDPSndBufSize;                        // UDP sending buffer size
-    int m_iUDPRcvBufSize;                        // UDP receiving buffer size
-    int m_iIPversion;                            // IP version
-    bool m_bRendezvous;                          // Rendezvous connection mode
-#ifdef SRT_ENABLE_CONNTIMEO
-    int m_iConnTimeOut;                          // connect timeout in milliseconds
-#endif
-    int m_iSndTimeOut;                           // sending timeout in milliseconds
-    int m_iRcvTimeOut;                           // receiving timeout in milliseconds
-    bool m_bReuseAddr;                           // reuse an exiting port or not, for UDP multiplexer
-    int64_t m_llMaxBW;                           // maximum data transfer rate (threshold)
-#ifdef SRT_ENABLE_IPOPTS
-    int m_iIpTTL;
-    int m_iIpToS;
-#endif
-    // These fields keep the options for encryption
-    // (SRTO_PASSPHRASE, SRTO_PBKEYLEN). Crypto object is
-    // created later and takes values from these.
-    HaiCrypt_Secret m_CryptoSecret;
-    int m_iSndCryptoKeyLen;
+    
 
     // XXX Consider removing. The m_bDataSender stays here
     // in order to maintain the HS side selection in HSv4.
@@ -551,23 +582,6 @@ private: // Identification
     uint64_t m_ullSndHsLastTime_us;	    //Last SRT handshake request time
     int      m_iSndHsRetryCnt;       //SRT handshake retries left
 
-    bool m_bMessageAPI;
-    bool m_bOPT_TsbPd;               // Whether AGENT will do TSBPD Rx (whether peer does, is not agent's problem)
-    int m_iOPT_TsbPdDelay;           // Agent's Rx latency
-    int m_iOPT_PeerTsbPdDelay;       // Peer's Rx latency for the traffic made by Agent's Tx.
-    bool m_bOPT_TLPktDrop;           // Whether Agent WILL DO TLPKTDROP on Rx.
-    int m_iOPT_SndDropDelay;         // Extra delay when deciding to snd-drop for TLPKTDROP, -1 to off
-    bool m_bOPT_StrictEncryption;    // Off by default. When on, any connection other than nopw-nopw & pw1-pw1 is rejected.
-    std::string m_sStreamName;
-    int m_iOPT_PeerIdleTimeout;      // Timeout for hearing anything from the peer.
-
-    int m_iTsbPdDelay_ms;                           // Rx delay to absorb burst in milliseconds
-    int m_iPeerTsbPdDelay_ms;                       // Tx delay that the peer uses to absorb burst in milliseconds
-    bool m_bTLPktDrop;                           // Enable Too-late Packet Drop
-    int64_t m_llInputBW;                         // Input stream rate (bytes/sec)
-    int m_iOverheadBW;                           // Percent above input stream rate (applies if m_llMaxBW == 0)
-    bool m_bRcvNakReport;                        // Enable Receiver Periodic NAK Reports
-    int m_iIpV6Only;                             // IPV6_V6ONLY option (-1 if not set)
 private:
     UniquePtr<CCryptoControl> m_pCryptoControl;                            // congestion control SRT class (small data extension)
     CCache<CInfoBlock>* m_pCache;                // network information cache
@@ -636,7 +650,7 @@ private: // Receiving related data
     CRcvLossList* m_pRcvLossList;                //< Receiver loss list
     std::deque<CRcvFreshLoss> m_FreshLoss;       //< Lost sequence already added to m_pRcvLossList, but not yet sent UMSG_LOSSREPORT for.
     int m_iReorderTolerance;                     //< Current value of dynamic reorder tolerance
-    int m_iMaxReorderTolerance;                  //< Maximum allowed value for dynamic reorder tolerance
+    
     int m_iConsecEarlyDelivery;                  //< Increases with every OOO packet that came <TTL-2 time, resets with every increased reorder tolerance
     int m_iConsecOrderedDelivery;                //< Increases with every packet coming in order or retransmitted, resets with every out-of-order packet
 
@@ -814,11 +828,6 @@ private: // Timers
     void checkNAKTimer(uint64_t currtime_tk);
     bool checkExpTimer (uint64_t currtime_tk);  // returns true if the connection is expired
     void checkRexmitTimer(uint64_t currtime_tk);
-
-public: // For the use of CCryptoControl
-    // HaiCrypt configuration
-    unsigned int m_uKmRefreshRatePkt;
-    unsigned int m_uKmPreAnnouncePkt;
 
 
 private: // for UDP multiplexer

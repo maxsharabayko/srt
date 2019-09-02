@@ -228,8 +228,8 @@ CUDT::CUDT()
 
    // Default UDT configurations
    m_iMSS = 1500;
-   m_bSynSending = true;
-   m_bSynRecving = true;
+   m_options.synSending = true;
+   m_options.synRecving = true;
    m_iFlightFlagSize = 25600;
    m_iSndBufSize = 8192;
    m_iRcvBufSize = 8192; //Rcv buffer MUST NOT be bigger than Flight Flag size
@@ -264,7 +264,7 @@ CUDT::CUDT()
    m_iOPT_PeerIdleTimeout = COMM_RESPONSE_TIMEOUT_MS;
    m_bTLPktDrop = true;         //Too-late Packet Drop
    m_bMessageAPI = true;
-   m_zOPT_ExpPayloadSize = SRT_LIVE_DEF_PLSIZE;
+   m_options.expectedPldSize = SRT_LIVE_DEF_PLSIZE;
    m_iIpV6Only = -1;
    //Runtime
    m_bRcvNakReport = true;      //Receiver's Periodic NAK Reports
@@ -289,10 +289,10 @@ CUDT::CUDT(const CUDT& ancestor)
    // XXX Consider all below fields (except m_bReuseAddr) to be put
    // into a separate class for easier copying.
 
+   m_options = ancestor.m_options;
+
    // Default UDT configurations
    m_iMSS = ancestor.m_iMSS;
-   m_bSynSending = ancestor.m_bSynSending;
-   m_bSynRecving = ancestor.m_bSynRecving;
    m_iFlightFlagSize = ancestor.m_iFlightFlagSize;
    m_iSndBufSize = ancestor.m_iSndBufSize;
    m_iRcvBufSize = ancestor.m_iRcvBufSize;
@@ -323,7 +323,6 @@ CUDT::CUDT(const CUDT& ancestor)
    m_iOPT_SndDropDelay = ancestor.m_iOPT_SndDropDelay;
    m_bOPT_StrictEncryption = ancestor.m_bOPT_StrictEncryption;
    m_iOPT_PeerIdleTimeout = ancestor.m_iOPT_PeerIdleTimeout;
-   m_zOPT_ExpPayloadSize = ancestor.m_zOPT_ExpPayloadSize;
    m_bTLPktDrop = ancestor.m_bTLPktDrop;
    m_bMessageAPI = ancestor.m_bMessageAPI;
    m_iIpV6Only = ancestor.m_iIpV6Only;
@@ -410,11 +409,11 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void* optval, int optlen)
         break;
 
     case SRTO_SNDSYN:
-        m_bSynSending = bool_int_value(optval, optlen);
+        m_options.synSending = bool_int_value(optval, optlen);
         break;
 
     case SRTO_RCVSYN:
-        m_bSynRecving = bool_int_value(optval, optlen);
+        m_options.synRecving = bool_int_value(optval, optlen);
         break;
 
     case SRTO_FC:
@@ -770,7 +769,7 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void* optval, int optlen)
             throw CUDTException(MJ_NOTSUP, MN_INVAL, 0);
         }
 
-        m_zOPT_ExpPayloadSize = *(int*)optval;
+        m_options.expectedPldSize = *(int*)optval;
         break;
 
    case SRTO_TRANSTYPE:
@@ -795,7 +794,7 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void* optval, int optlen)
           m_iOPT_SndDropDelay = 0;
           m_bMessageAPI = true;
           m_bRcvNakReport = true;
-          m_zOPT_ExpPayloadSize = SRT_LIVE_DEF_PLSIZE;
+          m_options.expectedPldSize = SRT_LIVE_DEF_PLSIZE;
           m_CongCtl.select("live");
           break;
 
@@ -812,7 +811,7 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void* optval, int optlen)
           m_iOPT_SndDropDelay = -1;
           m_bMessageAPI = false;
           m_bRcvNakReport = false;
-          m_zOPT_ExpPayloadSize = 0; // use maximum
+          m_options.expectedPldSize = 0; // use maximum
           m_CongCtl.select("file");
           break;
 
@@ -892,12 +891,12 @@ void CUDT::getOpt(SRT_SOCKOPT optName, void* optval, int& optlen)
       break;
 
    case SRTO_SNDSYN:
-      *(bool*)optval = m_bSynSending;
+      *(bool*)optval = m_options.synSending;
       optlen = sizeof(bool);
       break;
 
    case SRTO_RCVSYN:
-      *(bool*)optval = m_bSynRecving;
+      *(bool*)optval = m_options.synRecving;
       optlen = sizeof(bool);
       break;
 
@@ -1139,7 +1138,7 @@ void CUDT::getOpt(SRT_SOCKOPT optName, void* optval, int& optlen)
 
    case SRTO_PAYLOADSIZE:
       optlen = sizeof (int);
-      *(int*)optval = m_zOPT_ExpPayloadSize;
+      *(int*)optval = m_options.expectedPldSize;
       break;
 
    case SRTO_STRICTENC:
@@ -2959,7 +2958,7 @@ void CUDT::startConnect(const sockaddr* serv_addr, int32_t forced_isn)
     //
 
     // asynchronous connect, return immediately
-    if (!m_bSynRecving)
+    if (!m_options.synRecving)
     {
         HLOGC(mglog.Debug, log << CONID() << "startConnect: ASYNC MODE DETECTED. Deferring the process to RcvQ:worker");
         return;
@@ -4453,7 +4452,7 @@ void* CUDT::tsbpd(void* param)
          * There are packets ready to be delivered
          * signal a waiting "recv" call if there is any data available
          */
-         if (self->m_bSynRecving)
+         if (self->m_options.synRecving)
          {
              pthread_cond_signal(&self->m_RecvDataCond);
          }
@@ -4910,7 +4909,7 @@ bool CUDT::close()
          if (m_ullLingerExpiration >= entertime)
             break;
 
-         if (!m_bSynSending)
+         if (!m_options.synSending)
          {
             // if this socket enables asynchronous sending, return immediately and let GC to close it later
             if (m_ullLingerExpiration == 0)
@@ -5172,7 +5171,7 @@ int CUDT::receiveBuffer(char* data, int len)
 
     if (!m_pRcvBuffer->isRcvDataReady())
     {
-        if (!m_bSynRecving)
+        if (!m_options.synRecving)
         {
             throw CUDTException(MJ_AGAIN, MN_RDAVAIL, 0);
         }
@@ -5424,7 +5423,7 @@ int CUDT::sendmsg2(const char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
     {
         //>>We should not get here if SRT_ENABLE_TLPKTDROP
         // XXX Check if this needs to be removed, or put to an 'else' condition for m_bTLPktDrop.
-        if (!m_bSynSending)
+        if (!m_options.synSending)
             throw CUDTException(MJ_AGAIN, MN_WRAVAIL, 0);
         else
         {
@@ -5640,7 +5639,7 @@ int CUDT::receiveMessage(char* data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
             return res;
     }
 
-    if (!m_bSynRecving)
+    if (!m_options.synRecving)
     {
 
         int res = m_pRcvBuffer->readMsg(data, len, r_mctrl);
@@ -6576,7 +6575,7 @@ void CUDT::sendCtrl(UDTMessageType pkttype, void* lparam, void* rparam, int size
          }
          else
          {
-             if (m_bSynRecving)
+             if (m_options.synRecving)
              {
                  // signal a waiting "recv" call if there is any data available
                  pthread_mutex_lock(&m_RecvDataLock);
@@ -6969,7 +6968,7 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
 #endif  SRT_ENABLE_TLPKTDROP */
 
       CGuard::leaveCS(m_AckLock);
-      if (m_bSynSending)
+      if (m_options.synSending)
       {
           CGuard lk(m_SendBlockLock);
           pthread_cond_signal(&m_SendBlockCond);
