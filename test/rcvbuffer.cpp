@@ -196,11 +196,19 @@ CRcvBuffer2::PacketInfo CRcvBuffer2::getFirstValidPacketInfo() const
             continue;
 
         const CPacket &  packet = m_pUnit[i]->m_Packet;
-        const PacketInfo info   = {i, acknowledged, i != m_iStartPos, getPktTsbPdTime(packet.getMsgTimeStamp())};
+        const PacketInfo info   = {packet.getSeqNo(), acknowledged, i != m_iStartPos, getPktTsbPdTime(packet.getMsgTimeStamp())};
         return info;
     }
 
     return PacketInfo();
+}
+
+bool CRcvBuffer2::canAck() const
+{
+    if (m_iMaxPos == 0)
+        return false;
+
+    return false;
 }
 
 size_t CRcvBuffer2::countReadable() const
@@ -405,6 +413,11 @@ void CRcvBuffer2::updateTsbPdTimeBase(uint32_t timestamp)
         m_bTsbPdWrapCheck = true;
         // tslog.Debug("tsbpd wrap period begins");
     }
+}
+
+void CRcvBuffer2::updateState(uint64_t time_now)
+{
+
 }
 
 uint64_t CRcvBuffer2::getPktTsbPdTime(uint32_t timestamp) const
