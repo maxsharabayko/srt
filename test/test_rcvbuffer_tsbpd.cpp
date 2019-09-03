@@ -118,3 +118,58 @@ TEST_F(TestRcvBufferTSBPD, UnackPreceedsMissing)
 }
 
 
+
+/// In this test case one packet is inserted into the CRcvBuffer2.
+/// TSBPD mode is ON. The packet has a timestamp of 200 us.
+/// The TSBPD delay is set to 200 ms. This means, that the packet can be played
+/// not earlier than after 200200 microseconds from the peer start time.
+/// The peer start time is set to 100000 us.
+TEST_F(TestRcvBufferTSBPD, ReadMessage)
+{
+    int seqno = m_init_seqno;
+    const size_t payload_size = 1456;
+    CUnit* unit = m_unit_queue->getNextAvailUnit();
+    EXPECT_NE(unit, nullptr);
+    unit->m_iFlag = CUnit::GOOD;
+    CPacket& pkt = unit->m_Packet;
+    pkt.setLength(payload_size);
+    pkt.m_iSeqNo = seqno;
+    pkt.m_iMsgNo |= PacketBoundaryBits(PB_SOLO);
+    pkt.m_iTimeStamp = static_cast<int32_t>(200);
+    EXPECT_EQ(m_rcv_buffer->insert(unit), 0);
+
+    const auto pkt_info = m_rcv_buffer->getFirstValidPacketInfo();
+    EXPECT_EQ(pkt_info.tsbpd_time, m_peer_start_time_us + pkt.m_iTimeStamp + m_delay_us);
+
+    // The packet is not yet acknowledges, so we can't read it
+    EXPECT_FALSE(m_rcv_buffer->canRead(pkt_info.tsbpd_time - 1));
+
+    m_rcv_buffer->ack(CSeqNo::incseq(seqno));
+    // Expect it is not time to read the next packet
+    EXPECT_FALSE(m_rcv_buffer->canRead(pkt_info.tsbpd_time - 1));
+    EXPECT_TRUE (m_rcv_buffer->canRead(pkt_info.tsbpd_time));
+    EXPECT_TRUE (m_rcv_buffer->canRead(pkt_info.tsbpd_time + 1));
+}
+
+
+
+/// TSBPD mode = ON.
+/// A packet is acknowledged and is ready to be read.
+
+
+/// TSBPD mode = ON.
+/// A packet is acknowledged, but not ready to be read
+/// In case of blocking RCV call, we can wait directly on the buffer. So no TSBPD thread
+/// is needed. However, the SRTO_RCVSYN mode can be turned on in runtime (no protection in setOpt()).
+/// In case of non-bocking RCV call, epoll has to be signalled at a certain time.
+/// For blocking 
+
+
+
+/// TSBPD mode = ON.
+/// A packet is not acknowledged, but ready to be read, and has some preceeding missing packet.
+/// In that case all missing packets have to be dropped up to the first ready packet. And wait for ACK of that packet.
+/// So those missing packets should be removed from the receiver's loss list, and the receiver's buffer
+/// has to skip m_iStartPos and m_iLastAckPos up to that packet.
+
+
