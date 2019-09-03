@@ -55,8 +55,8 @@ public:
     int insert(CUnit* unit);
 
     /// Update the ACK point of the buffer.
-    /// @param [in] len size of data to be acknowledged.
-    /// @return 1 if a user buffer is fulfilled, otherwise 0.
+    /// @param [in] seqno acknowledge up to the sequence number
+    /// 
     /// TODO: Should call CTimer::triggerEvent() in the end.
     void ack(int32_t seqno);
 
@@ -162,9 +162,10 @@ public:     // TSBPD public functions
     /// Set TimeStamp-Based Packet Delivery Rx Mode
     /// @param [in] timebase localtime base (uSec) of packet time stamps including buffering delay
     /// @param [in] delay aggreed TsbPD delay
+    /// @param [in] tldrop TL packet drop enabled
     ///
     /// @return 0
-    void setTsbPdMode(uint64_t timebase, uint32_t delay);
+    void setTsbPdMode(uint64_t timebase, uint32_t delay, bool tldrop);
 
     /// TODO
     /// In TSBPD mode drop late packets from the buffer.
@@ -177,6 +178,7 @@ public:     // TSBPD public functions
 
 private:    // TSBPD member variables
 
+    bool m_bTLPktDrop;                   // true: drop too late packets
     bool m_bTsbPdMode;                   // true: apply TimeStamp-Based Rx Mode
     uint32_t m_uTsbPdDelay;              // aggreed delay
     uint64_t m_ullTsbPdTimeBase;         // localtime base for TsbPd mode

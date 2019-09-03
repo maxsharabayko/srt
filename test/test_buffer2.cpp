@@ -195,7 +195,7 @@ TEST(CRcvBuffer2, TsbPdReadMessage)
     const uint64_t peer_start_time_us = 100000;  // now() - HS.timestamp, microseconds
 
     const uint64_t delay_us = 200000; // 200 ms
-    rcv_buffer.setTsbPdMode(peer_start_time_us, delay_us);
+    rcv_buffer.setTsbPdMode(peer_start_time_us, delay_us, true);
 
     int seqno = initial_seqno;
     const size_t payload_size = 1456;
@@ -246,7 +246,7 @@ TEST(CRcvBuffer2, TsbPdReadMessage2)
     const uint64_t peer_start_time_us = 100000;  // now() - HS.timestamp, microseconds
 
     const uint64_t delay_us = 200000; // 200 ms
-    rcv_buffer.setTsbPdMode(peer_start_time_us, delay_us);
+    rcv_buffer.setTsbPdMode(peer_start_time_us, delay_us, true);
 
     int seqno = initial_seqno;
     const size_t payload_size = 1456;

@@ -36,6 +36,7 @@ CRcvBuffer2::CRcvBuffer2(int initSeqNo, size_t size)
     , m_iFirstUnreadablePos(0)
     , m_iMaxPos(0)
     , m_iNotch(0)
+    , m_bTLPktDrop(false)
     , m_bTsbPdMode(false)
     , m_uTsbPdDelay(0)
     , m_ullTsbPdTimeBase(0)
@@ -208,7 +209,7 @@ bool CRcvBuffer2::canAck() const
     if (m_iMaxPos == 0)
         return false;
 
-    return false;
+    return m_pUnit[m_iLastAckPos] != NULL;
 }
 
 size_t CRcvBuffer2::countReadable() const
@@ -337,9 +338,10 @@ int CRcvBuffer2::findLastMessagePkt()
     throw std::runtime_error(std::string("CRcvBuffer2: PB_LAST not found. Something wrong with m_iFirstUnreadablePos"));
 }
 
-void CRcvBuffer2::setTsbPdMode(uint64_t timebase, uint32_t delay)
+void CRcvBuffer2::setTsbPdMode(uint64_t timebase, uint32_t delay, bool tldrop)
 {
     m_bTsbPdMode      = true;
+    m_bTLPktDrop      = tldrop;
     m_bTsbPdWrapCheck = false;
 
     // Timebase passed here comes is calculated as:
@@ -417,7 +419,37 @@ void CRcvBuffer2::updateTsbPdTimeBase(uint32_t timestamp)
 
 void CRcvBuffer2::updateState(uint64_t time_now)
 {
+    if (!m_bTLPktDrop)
+        return;
 
+    // Do nothing if there are unread packets.
+    if (m_iStartPos != m_iLastAckPos)
+        return;
+
+    // Do nothing if there are no unacknowledged packets
+    if (m_iMaxPos == 0)
+        return;
+
+    // Nothing to drop
+    if (m_pUnit[m_iLastAckPos] != NULL)
+        return;
+
+    int i;
+    const int end_pos = (m_iLastAckPos + m_iMaxPos) % m_size;
+    for (i = m_iLastAckPos; i != end_pos; i = incPos(i))
+    {
+        if (m_pUnit[i])
+            break;
+    }
+
+    SRT_ASSERT(m_pUnit[i]);
+
+    const CPacket& pkt = m_pUnit[i]->m_Packet;
+    if (getPktTsbPdTime(pkt.getMsgTimeStamp()) > time_now)
+        return;
+
+    m_iFirstUnreadablePos = i;
+    ack(m_pUnit[i]->m_Packet.getSeqNo());
 }
 
 uint64_t CRcvBuffer2::getPktTsbPdTime(uint32_t timestamp) const
