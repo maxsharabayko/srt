@@ -902,6 +902,9 @@ if (ENABLE_EXAMPLES)
 	srt_add_example(test-c-server.c)
 	srt_make_application(test-c-server)
 
+	srt_add_example(test-recv.cpp)
+	srt_make_application(test-recv)
+
 	srt_add_example(testcapi-connect.c)
 	target_link_libraries(testcapi-connect ${srt_link_library} ${DEPENDS_srt})
 
