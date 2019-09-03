@@ -5552,7 +5552,7 @@ int CUDT::receiveMessage(char *data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
     if (!m_CongCtl->checkTransArgs(SrtCongestion::STA_MESSAGE, SrtCongestion::STAD_RECV, data, len, -1, false))
         throw CUDTException(MJ_NOTSUP, MN_INVALMSGAPI, 0);
 
-    ScopedLock recvguard(m_RecvLock);
+    UniqueLock recvguard(m_RecvLock);
 
     /* XXX DEBUG STUFF - enable when required
        char charbool[2] = {'0', '1'};
@@ -5647,7 +5647,7 @@ int CUDT::receiveMessage(char *data, int len, ref_t<SRT_MSGCTRL> r_mctrl)
 
             do
             {
-                if (!m_RecvDataSync.wait_for(recv_timeout))
+                if (!m_RecvDataSync.wait_for(recvguard, recv_timeout))
                 {
                     if (!(m_iRcvTimeOut < 0))
                         timeout = true;

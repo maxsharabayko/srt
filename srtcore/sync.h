@@ -98,7 +98,7 @@ public:
     }
 
 public:
-    inline uint64_t count() const { return m_duration; }
+    inline int64_t count() const { return m_duration; }
 
     static Duration zero() { return Duration(); }
 
@@ -120,7 +120,7 @@ public: // Arythmetic operators
     inline Duration operator*(const int& rhs) const { return Duration(m_duration * rhs); }
 
 private:
-    uint64_t m_duration;
+    int64_t m_duration;
 };
 
 
