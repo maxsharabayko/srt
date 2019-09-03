@@ -26,9 +26,11 @@ protected:
     // SetUp() is run immediately before a test starts.
     void SetUp() override
     {
-        m_unit_queue = make_unique<CUnitQueue>();
+        //m_unit_queue = make_unique<CUnitQueue>();
+        m_unit_queue = unique_ptr<CUnitQueue>(new CUnitQueue);
         m_unit_queue->init(m_buff_size_pkts, 1500, AF_INET);
-        m_rcv_buffer = make_unique<CRcvBuffer2>(m_init_seqno, m_buff_size_pkts);
+        //m_rcv_buffer = make_unique<CRcvBuffer2>(m_init_seqno, m_buff_size_pkts);
+        m_rcv_buffer = unique_ptr<CRcvBuffer2>(new CRcvBuffer2(m_init_seqno, m_buff_size_pkts));
         m_rcv_buffer->setTsbPdMode(m_peer_start_time_us, m_delay_us, true);
     }
 
@@ -109,7 +111,6 @@ TEST_F(TestRcvBufferTSBPD, UnackPreceedsMissing)
     EXPECT_FALSE(m_rcv_buffer->canAck());
 
     // updateState() should drop the missing packet
-    const uint64_t now = m_peer_start_time_us + pkt.m_iTimeStamp + m_delay_us + 1;
     m_rcv_buffer->updateState(readready_timestamp);
 
     // Now the missing packet is droped, so we can acknowledge the existing packet.
@@ -131,11 +132,16 @@ TEST_F(TestRcvBufferTSBPD, ReadMessage)
     CUnit* unit = m_unit_queue->getNextAvailUnit();
     EXPECT_NE(unit, nullptr);
     unit->m_iFlag = CUnit::GOOD;
+
+    std::array<char, payload_size> src_buffer;
+    std::iota(src_buffer.begin(), src_buffer.end(), (char)0);
+
     CPacket& pkt = unit->m_Packet;
     pkt.setLength(payload_size);
     pkt.m_iSeqNo = seqno;
     pkt.m_iMsgNo |= PacketBoundaryBits(PB_SOLO);
     pkt.m_iTimeStamp = static_cast<int32_t>(200);
+    memcpy(pkt.m_pcData, src_buffer.data(), src_buffer.size());
     EXPECT_EQ(m_rcv_buffer->insert(unit), 0);
 
     const auto pkt_info = m_rcv_buffer->getFirstValidPacketInfo();
@@ -149,6 +155,13 @@ TEST_F(TestRcvBufferTSBPD, ReadMessage)
     EXPECT_FALSE(m_rcv_buffer->canRead(pkt_info.tsbpd_time - 1));
     EXPECT_TRUE (m_rcv_buffer->canRead(pkt_info.tsbpd_time));
     EXPECT_TRUE (m_rcv_buffer->canRead(pkt_info.tsbpd_time + 1));
+
+    // Read the message from the buffer
+    std::array<char, payload_size> read_buffer;
+    const int read_len = m_rcv_buffer->readMessage(read_buffer.data(), read_buffer.size());
+    EXPECT_EQ(read_len, read_buffer.size());
+    EXPECT_TRUE(read_buffer == src_buffer);
+    EXPECT_FALSE(m_rcv_buffer->canRead());
 }
 
 
