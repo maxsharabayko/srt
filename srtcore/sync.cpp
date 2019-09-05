@@ -22,9 +22,9 @@ namespace srt
 namespace sync
 {
 
-uint64_t get_cpu_frequency()
+int64_t get_cpu_frequency()
 {
-    uint64_t frequency = 1; // 1 tick per microsecond.
+    int64_t frequency = 1; // 1 tick per microsecond.
 
 #if defined(TIMING_USE_QPC)
 
@@ -36,7 +36,7 @@ uint64_t get_cpu_frequency()
 
     mach_timebase_info_data_t info;
     mach_timebase_info(&info);
-    frequency = info.denom * uint64_t(1000) / info.numer;
+    frequency = info.denom * int64_t(1000) / info.numer;
 
 #elif defined(IA32) || defined(IA64) || defined(AMD64)
     uint64_t t1, t2;
@@ -49,13 +49,13 @@ uint64_t get_cpu_frequency()
     rdtsc(t2);
 
     // CPU clocks per microsecond
-    frequency = (t2 - t1) / 100000;
+    frequency = int64_t(t2 - t1) / 100000;
 #endif
 
     return frequency;
 }
 
-static const uint64_t s_cpu_frequency = get_cpu_frequency();
+static const int64_t s_cpu_frequency = get_cpu_frequency();
 
 void rdtsc(uint64_t &x)
 {
@@ -153,7 +153,7 @@ uint64_t srt::sync::TimePoint<srt::sync::steady_clock>::us_since_epoch() const
 template<>
 srt::sync::Duration< srt::sync::steady_clock> srt::sync::TimePoint<srt::sync::steady_clock>::time_since_epoch() const
 {
-    return m_timestamp;
+    return srt::sync::Duration< srt::sync::steady_clock>(m_timestamp);
 }
 
 srt::sync::TimePoint<srt::sync::steady_clock> srt::sync::steady_clock::now()

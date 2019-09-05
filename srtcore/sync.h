@@ -92,7 +92,7 @@ public:
     {
     }
 
-    Duration(uint64_t d)
+    explicit Duration(int64_t d)
         : m_duration(d)
     {
     }
@@ -197,9 +197,9 @@ inline long long to_microseconds(const TimePoint<steady_clock> tp)
     return static_cast<long long>(tp.us_since_epoch());
 }
 
-long long to_microseconds(const Duration<steady_clock>& t);
-long long to_milliseconds(const Duration<steady_clock>& t);
-long long to_seconds(const Duration<steady_clock>& t);
+long long to_microseconds(const steady_clock::duration& t);
+long long to_milliseconds(const steady_clock::duration& t);
+long long to_seconds(const steady_clock::duration& t);
 
 Duration<steady_clock> from_microseconds(long t_us);
 Duration<steady_clock> from_milliseconds(long t_ms);
