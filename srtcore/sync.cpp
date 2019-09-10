@@ -271,7 +271,6 @@ void srt::sync::SyncEvent::wait(UniqueLock& lk)
     return m_tick_cond.wait(lk);
 }
 
-
 void srt::sync::SyncEvent::wait()
 {
     std::unique_lock<std::mutex> lk(m_tick_lock);
@@ -456,7 +455,7 @@ void srt::sync::SyncEvent::interrupt()
 }
 
 
-bool srt::sync::SyncEvent::wait_for(steady_clock::duration timeout)
+bool srt::sync::SyncEvent::wait_for(Duration<steady_clock> timeout)
 {
     timeval now;
     gettimeofday(&now, 0);
@@ -468,8 +467,7 @@ bool srt::sync::SyncEvent::wait_for(steady_clock::duration timeout)
     return (pthread_cond_timedwait(&m_tick_cond, &m_tick_lock.m_mutex, &targettime) == 0);
 }
 
-
-bool srt::sync::SyncEvent::wait_for(UniqueLock& lk, steady_clock::duration timeout)
+bool srt::sync::SyncEvent::wait_for(UniqueLock& lk, Duration<steady_clock> timeout)
 {
     timeval now;
     gettimeofday(&now, 0);

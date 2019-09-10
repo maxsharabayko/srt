@@ -210,6 +210,12 @@ inline bool is_zero(const TimePoint<steady_clock>& t) { return t.is_zero(); }
 
 #endif  // USE_STL_CHRONO
 
+///////////////////////////////////////////////////////////////////////////////
+//
+// Common pthread/chrono section
+//
+///////////////////////////////////////////////////////////////////////////////
+
 // Mutex section
 #ifdef USE_STL_CHRONO
 // Mutex for C++03 should call pthread init and destroy
@@ -343,9 +349,7 @@ public:
 
     ~SyncCond();
 
-
 public:
-
 
     bool wait_for(UniqueLock& lk, Duration<steady_clock> timeout);
 

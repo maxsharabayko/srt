@@ -127,6 +127,12 @@ TEST(SyncDuration, OperatorMultIntEq)
     EXPECT_EQ(to_milliseconds(a), 7000);
 }
 
+/*****************************************************************************/
+/*
+ * TimePoint tests
+*/
+/*****************************************************************************/
+
 TEST(SyncTimePoint, DefaultConstructorZero)
 {
     steady_clock::time_point a;
@@ -134,6 +140,15 @@ TEST(SyncTimePoint, DefaultConstructorZero)
 }
 
 TEST(SyncTimePoint, UIntMax)
+{
+    const int64_t delta = 1024;
+    steady_clock::time_point a(numeric_limits<uint64_t>::max());
+    steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
+    EXPECT_EQ((a - b).count(), delta);
+    EXPECT_EQ((b - a).count(), -delta);
+}
+
+TEST(SyncTimePoint, OperatorPlus)
 {
     const int64_t delta = 1024;
     steady_clock::time_point a(numeric_limits<uint64_t>::max());
