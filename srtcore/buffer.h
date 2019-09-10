@@ -416,6 +416,14 @@ public:
     srt::sync::steady_clock::time_point getPktTsbPdTime(uint32_t timestamp);
    int debugGetSize() const;
    bool empty() const;
+
+   // Required by PacketFilter facility to use as a storage
+   // for provided packets
+   CUnitQueue* getUnitQueue()
+   {
+       return m_pUnitQueue;
+   }
+
 private:
 
    /// thread safe bytes counter of the Recv & Ack buffer
