@@ -1,18 +1,16 @@
 ﻿#include <iomanip>
+#include <stdexcept>
 #include "sync.h"
 #include "udt.h"
 #include "srt_compat.h"
-#ifdef _WIN32
-#include "win/wintime.h"
-#endif
-
 
 #ifndef USE_STL_CHRONO
-
 #if defined(_WIN32)
 #define TIMING_USE_QPC
+#include "win/wintime.h"
 #elif defined(OSX) || (TARGET_OS_IOS == 1) || (TARGET_OS_TV == 1)
 #define TIMING_USE_MACH_ABS_TIME
+#include <mach/mach_time.h>
 #elif defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_TIMERS > 0
 #define TIMING_USE_MONOTONIC_CLOCK
 #endif
@@ -388,8 +386,10 @@ void srt::sync::UniqueLock::unlock()
 srt::sync::SyncEvent::SyncEvent()
     : m_tick_cond()
 {
-    m_tick_cond = PTHREAD_COND_INITIALIZER;
-    //pthread_cond_init(&m_tick_cond, NULL);
+    //m_tick_cond = PTHREAD_COND_INITIALIZER;
+    const int res = pthread_cond_init(&m_tick_cond, NULL);
+    if (res != 0)
+        throw std::runtime_error("pthread_cond_init failed");
 }
 
 

@@ -157,3 +157,16 @@ TEST(SyncTimePoint, OperatorPlus)
     EXPECT_EQ((b - a).count(), -delta);
 }
 
+/*****************************************************************************/
+/*
+ * SyncEvent tests
+*/
+/*****************************************************************************/
+
+TEST(SyncEvent, Wait)
+{
+    SyncEvent e;
+    EXPECT_FALSE(e.wait_for(from_milliseconds(500)));
+}
+
+

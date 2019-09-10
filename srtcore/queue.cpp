@@ -286,7 +286,7 @@ void CSndUList::update(const CUDT* u, EReschedule reschedule)
         }
 
       remove_(u);
-      insert_norealloc_(1, u);
+      insert_norealloc_(steady_clock::now(), u);
       return;
    }
 
@@ -329,7 +329,7 @@ int CSndUList::pop(sockaddr *&addr, CPacket &pkt)
     addr = u->m_pPeerAddr;
 
    // insert a new entry, ts is the next processing time
-   if (ts > 0)
+   if (!is_zero(ts))
       insert_(ts, u);
 
     return 1;

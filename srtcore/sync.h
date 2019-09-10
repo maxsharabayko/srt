@@ -102,7 +102,7 @@ public:
 
     static Duration zero() { return Duration(); }
 
-public: // Logical operators
+public: // Relational operators
     inline bool operator>=(const Duration &rhs) const { return m_duration >= rhs.m_duration; }
     inline bool operator>(const Duration &rhs) const { return m_duration > rhs.m_duration; }
     inline bool operator==(const Duration &rhs) const { return m_duration == rhs.m_duration; }
@@ -110,7 +110,7 @@ public: // Logical operators
     inline bool operator<=(const Duration &rhs) const { return m_duration <= rhs.m_duration; }
     inline bool operator<(const Duration &rhs) const { return m_duration < rhs.m_duration; }
 
-public: // Arythmetic operators
+public: // Assignment operators
     inline void operator*=(const double mult) { m_duration *= mult; }
     inline void operator+=(const Duration &rhs) { m_duration += rhs.m_duration; }
     inline void operator-=(const Duration &rhs) { m_duration -= rhs.m_duration; }
@@ -150,22 +150,26 @@ public:
     {
     }
 
-    TimePoint(uint64_t tp)
+    explicit TimePoint(uint64_t tp)
         : m_timestamp(tp)
     {
     }
 
-public:
+public: // Relational operators
     inline bool operator<(const TimePoint<_Clock> &rhs) const { return m_timestamp < rhs.m_timestamp; }
     inline bool operator<=(const TimePoint<_Clock> &rhs) const { return m_timestamp <= rhs.m_timestamp; }
     inline bool operator==(const TimePoint<_Clock> &rhs) const { return m_timestamp == rhs.m_timestamp; }
     inline bool operator>=(const TimePoint<_Clock> &rhs) const { return m_timestamp >= rhs.m_timestamp; }
     inline bool operator>(const TimePoint<_Clock> &rhs) const { return m_timestamp > rhs.m_timestamp; }
 
+public: // Arithmetic operators
     inline Duration<_Clock> operator-(const TimePoint<_Clock> &rhs) const { return Duration<_Clock>(m_timestamp - rhs.m_timestamp); }
     inline TimePoint operator+(const Duration<_Clock> &rhs) const { return TimePoint(m_timestamp + rhs.count()); }
     inline TimePoint operator-(const Duration< _Clock>& rhs) const { return TimePoint(m_timestamp - rhs.count()); }
 
+public: // Assignment operators
+
+    inline void operator=(const TimePoint<_Clock>& rhs) { m_timestamp = rhs.m_timestamp; }
     inline void operator+=(const Duration< _Clock>& rhs) { m_timestamp += rhs.count(); }
 
 public:

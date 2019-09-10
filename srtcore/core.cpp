@@ -4484,20 +4484,20 @@ void *CUDT::tsbpd(void *param)
                     LOGC(dlog.Debug, log << "RCV-DROPPED packet delay=" << (timediff_us / 1000) << "ms");
 #endif
 
-                tsbpdtime = 0; //Next sent ack will unblock
+                tsbpdtime = steady_clock::time_point(); //Next sent ack will unblock
                 rxready = false;
              }
              else if (passack)
              {
                 /* Packets ready to play but not yet acknowledged (should happen within 10ms) */
                 rxready = false;
-                tsbpdtime = 0; //Next sent ack will unblock
+                tsbpdtime = steady_clock::time_point(); //Next sent ack will unblock
              } /* else packet ready to play */
           } /* else packets not ready to play */
       }
       else
       {
-          rxready = self->m_pRcvBuffer->isRcvDataReady(Ref(tsbpdtime), Ref(current_pkt_seq));
+          rxready = self->m_pRcvBuffer->isRcvDataReady(tsbpdtime, Ref(current_pkt_seq));
       }
       CriticalSection::leave(self->m_AckLock);
 
