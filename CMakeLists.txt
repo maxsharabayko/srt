@@ -732,7 +732,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/srt.pc DESTINATION ${CMAKE_INSTALL_LIB
 
 if (HAVE_COMPILER_GNU_COMPAT AND ENABLE_CXX11)
 	message(STATUS "C++ VERSION: Setting C++11 compat flag for gnu compiler")
-	set (CFLAGS_CXX_STANDARD "-std=c++11")
+	set (CFLAGS_CXX_STANDARD "-std=c++14")
 else()
 	message(STATUS "C++ VERSION: leaving default, not a GNU compiler, assuming C++11 or newer is default.")
 	set (CFLAGS_CXX_STANDARD "")

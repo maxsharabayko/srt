@@ -1511,14 +1511,14 @@ EConnectStatus CRcvQueue::worker_TryAsyncRend_OrStore(int32_t id, CUnit *unit, c
 
 int CRcvQueue::recvfrom(int32_t id, ref_t<CPacket> r_packet)
 {
-    ScopedLock bufferlock(m_BufferSync.mutex());
+    UniqueLock bufferlock(m_BufferSync.mutex());
     CPacket &  packet = *r_packet;
 
     map<int32_t, std::queue<CPacket *> >::iterator i = m_mBuffer.find(id);
 
     if (i == m_mBuffer.end())
     {
-        m_BufferSync.wait_for(from_seconds(1));
+        m_BufferSync.wait_for(bufferlock, from_seconds(1));
 
         i = m_mBuffer.find(id);
         if (i == m_mBuffer.end())

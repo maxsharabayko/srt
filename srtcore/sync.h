@@ -111,7 +111,7 @@ public: // Relational operators
     inline bool operator<(const Duration &rhs) const { return m_duration < rhs.m_duration; }
 
 public: // Assignment operators
-    inline void operator*=(const double mult) { m_duration *= mult; }
+    inline void operator*=(const double mult) { m_duration = static_cast<int64_t>(m_duration * mult); }
     inline void operator+=(const Duration &rhs) { m_duration += rhs.m_duration; }
     inline void operator-=(const Duration &rhs) { m_duration -= rhs.m_duration; }
 
@@ -373,18 +373,22 @@ private:
 class SyncEvent
 {
 
-  public:
+public:
     SyncEvent();
 
     ~SyncEvent();
 
-  public:
+public:
 
     Mutex &mutex() { return m_tick_lock; }
 
-  public:
-    /// @return true  if condition occured
-    ///         false on timeout
+public:
+
+    /// wait_until causes the current thread to block until
+    /// a specific time is reached.
+    ///
+    /// @return true  if the specified time was reached
+    ///         false should never happen
     bool wait_until(TimePoint<steady_clock> tp);
 
     /// Can have spurious wake ups
@@ -402,6 +406,7 @@ class SyncEvent
 
     void notify_all();
 
+    /// Resets target wait time and interrupts all waits
     void interrupt();
 
   private:

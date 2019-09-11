@@ -1,9 +1,14 @@
 #include "gtest/gtest.h"
 #include <chrono>
 #include <thread>
+#include <future>
 #include <array>
 #include <numeric>   // std::accumulate
 #include "sync.h"
+
+// This test set requires support for C++14
+// * Uses "'" as a separator: 100'000
+// * Uses operator"ms" at al from chrono
 
 using namespace std;
 using namespace srt::sync;
@@ -232,10 +237,192 @@ TEST(SyncTimePoint, OperatorMinusEqDuration)
 */
 /*****************************************************************************/
 
-TEST(SyncEvent, Wait)
+TEST(SyncEvent, WaitFor)
 {
     SyncEvent e;
-    EXPECT_FALSE(e.wait_for(from_milliseconds(500)));
+    for (int tout_us : { 50, 100, 500, 1000, 10'1000, 100'1000 })
+    {
+        const steady_clock::duration timeout = from_microseconds(tout_us);
+        const steady_clock::time_point start = steady_clock::now();
+        EXPECT_FALSE(e.wait_for(timeout));
+        const steady_clock::time_point stop = steady_clock::now();
+        if (tout_us < 1000)
+        {
+            cerr << "SyncEvent::wait_for(" << to_microseconds(timeout) << "us) took "
+                << to_microseconds(stop - start) << "us" << endl;
+        }
+        else
+        {
+            cerr << "SyncEvent::wait_until(" << to_milliseconds(timeout) << " ms) took "
+                << to_microseconds(stop - start) / 1000.0 << " ms" << endl;
+        }
+    }
 }
 
+TEST(SyncEvent, WaitForNotifyOne)
+{
+    SyncEvent e;
+    const steady_clock::duration timeout = from_seconds(5);
+
+    auto wait_async = [](SyncEvent* e, const steady_clock::duration& timeout) {
+        return e->wait_for(timeout);
+    };
+    auto wait_async_res = async(launch::async, wait_async, &e, timeout);
+
+    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    e.notify_one();
+    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::ready);
+    const int wait_for_res = wait_async_res.get();
+    EXPECT_TRUE(wait_for_res);
+}
+
+TEST(SyncEvent, WaitForTwoNotifyOne)
+{
+    SyncEvent e;
+    const steady_clock::duration timeout = from_seconds(3);
+
+    auto wait_async = [](SyncEvent* e, const steady_clock::duration& timeout) {
+        return e->wait_for(timeout);
+    };
+    auto wait_async1_res = async(launch::async, wait_async, &e, timeout);
+    auto wait_async2_res = async(launch::async, wait_async, &e, timeout);
+
+    EXPECT_EQ(wait_async1_res.wait_for(100ms), future_status::timeout);
+    EXPECT_EQ(wait_async2_res.wait_for(100ms), future_status::timeout);
+    e.notify_one();
+    // Now only one waiting thread should become ready
+    const future_status status1 = wait_async1_res.wait_for(100ms);
+    const future_status status2 = wait_async2_res.wait_for(100ms);
+
+    const bool isready1 = (status1 == future_status::ready);
+    EXPECT_EQ(status1, isready1 ? future_status::ready : future_status::timeout);
+    EXPECT_EQ(status2, isready1 ? future_status::timeout : future_status::ready);
+
+    // Expect one thread to be woken up by condition
+    EXPECT_TRUE (isready1 ? wait_async1_res.get() : wait_async2_res.get());
+    // Expect timeout on another thread
+    EXPECT_FALSE(isready1 ? wait_async2_res.get() : wait_async1_res.get());
+}
+
+TEST(SyncEvent, WaitForTwoNotifyAll)
+{
+    SyncEvent e;
+    const steady_clock::duration timeout = from_seconds(3);
+
+    auto wait_async = [](SyncEvent* e, const steady_clock::duration& timeout) {
+        return e->wait_for(timeout);
+    };
+    auto wait_async1_res = async(launch::async, wait_async, &e, timeout);
+    auto wait_async2_res = async(launch::async, wait_async, &e, timeout);
+
+    EXPECT_EQ(wait_async1_res.wait_for(100ms), future_status::timeout);
+    EXPECT_EQ(wait_async2_res.wait_for(100ms), future_status::timeout);
+    e.notify_all();
+    // Now only one waiting thread should become ready
+    const future_status status1 = wait_async1_res.wait_for(100ms);
+    const future_status status2 = wait_async2_res.wait_for(100ms);
+    EXPECT_EQ(status1, future_status::ready);
+    EXPECT_EQ(status2, future_status::ready);
+    // Expect both threads to wake up by condition
+    EXPECT_TRUE(wait_async1_res.get());
+    EXPECT_TRUE(wait_async2_res.get());
+}
+
+TEST(SyncEvent, WaitForNotifyAll)
+{
+    SyncEvent e;
+    const steady_clock::duration timeout = from_seconds(5);
+
+    auto wait_async = [](SyncEvent* e, const steady_clock::duration &timeout) {
+        return e->wait_for(timeout);
+    };
+    auto wait_async_res = async(launch::async, wait_async, &e, timeout);
+
+    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    e.notify_all();
+    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::ready);
+    const int wait_for_res = wait_async_res.get();
+    EXPECT_TRUE(wait_for_res);
+}
+
+TEST(SyncEvent, WaitUntil)
+{
+    SyncEvent e;
+    for (int tout_us : { 50, 100, 500, 1000, 10'1000, 100'1000 })
+    {
+        const steady_clock::duration timeout = from_microseconds(tout_us);
+        const steady_clock::time_point start = steady_clock::now();
+        EXPECT_TRUE(e.wait_until(start + timeout));
+        const steady_clock::time_point stop = steady_clock::now();
+        if (tout_us < 1000)
+        {
+            cerr << "SyncEvent::wait_until(" << to_microseconds(timeout) << " us) took "
+                << to_microseconds(stop - start) << " us" << endl;
+        }
+        else
+        {
+            cerr << "SyncEvent::wait_until(" << to_milliseconds(timeout) << " ms) took "
+                << to_microseconds(stop - start)/1000.0 << " ms" << endl;
+        }
+    }
+}
+
+TEST(SyncEvent, WaitUntilInterrupt)
+{
+    SyncEvent e;
+    const steady_clock::duration timeout = from_seconds(5);
+
+    auto wait_async = [](SyncEvent* e, const steady_clock::duration& timeout) {
+        const steady_clock::time_point start = steady_clock::now();
+        const int res = e->wait_until(start + timeout);
+        return res;
+    };
+    auto wait_async_res = async(launch::async, wait_async, &e, timeout);
+
+    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    e.interrupt();
+    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::ready);
+    const bool wait_for_res = wait_async_res.get();
+    EXPECT_TRUE(wait_for_res);
+}
+
+TEST(SyncEvent, WaitUntilNotifyOne)
+{
+    SyncEvent e;
+    const steady_clock::duration timeout = from_seconds(5);
+
+    auto wait_async = [](SyncEvent* e, const steady_clock::duration& timeout) {
+        const steady_clock::time_point start = steady_clock::now();
+        const int res = e->wait_until(start + timeout);
+        return res;
+    };
+    auto wait_async_res = async(launch::async, wait_async, &e, timeout);
+
+    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    e.notify_one();
+    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    e.interrupt();
+    const bool wait_for_res = wait_async_res.get();
+    EXPECT_TRUE(wait_for_res);
+}
+
+TEST(SyncEvent, WaitUntilNotifyAll)
+{
+    SyncEvent e;
+    const steady_clock::duration timeout = from_seconds(5);
+
+    auto wait_async = [](SyncEvent* e, const steady_clock::duration& timeout) {
+        const steady_clock::time_point start = steady_clock::now();
+        const int res = e->wait_until(start + timeout);
+        return res;
+    };
+    auto wait_async_res = async(launch::async, wait_async, &e, timeout);
+
+    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    e.notify_all();
+    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    e.interrupt();
+    const bool wait_for_res = wait_async_res.get();
+    EXPECT_TRUE(wait_for_res);
+}
 

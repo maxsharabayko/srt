@@ -401,6 +401,7 @@ srt::sync::SyncEvent::~SyncEvent()
 
 bool srt::sync::SyncEvent::wait_until(TimePoint<steady_clock> tp)
 {
+    UniqueLock lck(m_tick_lock);
     // Use class member such that the method can be interrupted by others
     m_sched_time = tp;
 
@@ -417,7 +418,11 @@ bool srt::sync::SyncEvent::wait_until(TimePoint<steady_clock> tp)
         __asm__ volatile("nop; nop; nop; nop; nop;");
 #endif
 #else
-        const uint64_t wait_us = 10000; // 10 ms
+        const uint64_t wait_us = to_microseconds(m_sched_time - cur_tp);
+        // The while loop ensures that (cur_tp < m_sched_time).
+        // Conversion to microseconds may lose precision, therefore check for 0.
+        if (wait_us == 0)
+            return true;
 
         timeval now;
         gettimeofday(&now, 0);
@@ -426,9 +431,7 @@ bool srt::sync::SyncEvent::wait_until(TimePoint<steady_clock> tp)
         timeout.tv_sec  = time_us / 1000000;
         timeout.tv_nsec = (time_us % 1000000) * 1000;
 
-        pthread_mutex_lock(&m_tick_lock.m_mutex);
-        pthread_cond_timedwait(&m_tick_cond, &m_tick_lock.m_mutex, &timeout);
-        pthread_mutex_unlock(&m_tick_lock.m_mutex);
+        pthread_cond_timedwait(&m_tick_cond, &lck.m_Mutex.m_mutex, &timeout);
 #endif
 
         cur_tp = steady_clock::now();
@@ -454,20 +457,13 @@ void srt::sync::SyncEvent::interrupt()
     pthread_cond_broadcast(&m_tick_cond);
 }
 
-
 bool srt::sync::SyncEvent::wait_for(Duration<steady_clock> timeout)
 {
-    timeval now;
-    gettimeofday(&now, 0);
-    const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + to_microseconds(timeout);
-    timespec targettime;
-    targettime.tv_sec = time_us / 1000000;
-    targettime.tv_nsec = (time_us % 1000000) * 1000;
-
-    return (pthread_cond_timedwait(&m_tick_cond, &m_tick_lock.m_mutex, &targettime) == 0);
+    UniqueLock lock(m_tick_lock);
+    return wait_for(lock, timeout);
 }
 
-bool srt::sync::SyncEvent::wait_for(UniqueLock& lk, Duration<steady_clock> timeout)
+bool srt::sync::SyncEvent::wait_for(UniqueLock& lock, Duration<steady_clock> timeout)
 {
     timeval now;
     gettimeofday(&now, 0);
@@ -476,15 +472,13 @@ bool srt::sync::SyncEvent::wait_for(UniqueLock& lk, Duration<steady_clock> timeo
     targettime.tv_sec = time_us / 1000000;
     targettime.tv_nsec = (time_us % 1000000) * 1000;
 
-    return (pthread_cond_timedwait(&m_tick_cond, &lk.m_Mutex.m_mutex, &targettime) == 0);
+    return (pthread_cond_timedwait(&m_tick_cond, &lock.m_Mutex.m_mutex, &targettime) == 0);
 }
-
 
 void srt::sync::SyncEvent::wait()
 {
-    pthread_mutex_lock(&m_tick_lock.m_mutex);
-    pthread_cond_wait(&m_tick_cond, &m_tick_lock.m_mutex);
-    pthread_mutex_unlock(&m_tick_lock.m_mutex);
+    UniqueLock lock(m_tick_lock);
+    wait(lock);
 }
 
 void srt::sync::SyncEvent::wait(UniqueLock& lk)
