@@ -391,12 +391,27 @@ public:
     ///         false should never happen
     bool wait_until(TimePoint<steady_clock> tp);
 
-    /// Can have spurious wake ups
-    /// @return true  if condition occured
+    /// Blocks the current executing thread,
+    /// and adds it to the list of threads waiting on* this.
+    /// The thread will be unblocked when notify_all() or notify_one() is executed,
+    /// or when the relative timeout rel_time expires.
+    /// It may also be unblocked spuriously.
+    /// Uses internal mutex to lock.
+    ///
+    /// @return true  if condition occured or spuriously woken up
     ///         false on timeout
-    bool wait_for(Duration<steady_clock> timeout);
+    bool wait_for(const Duration<steady_clock>& rel_time);
 
-    bool wait_for(UniqueLock &lk, Duration<steady_clock> timeout);
+    /// Atomically releases lock, blocks the current executing thread,
+    /// and adds it to the list of threads waiting on* this.
+    /// The thread will be unblocked when notify_all() or notify_one() is executed,
+    /// or when the relative timeout rel_time expires.
+    /// It may also be unblocked spuriously.
+    /// When unblocked, regardless of the reason, lock is reacquiredand wait_for() exits.
+    ///
+    /// @return true  if condition occured or spuriously woken up
+    ///         false on timeout
+    bool wait_for(UniqueLock &lk, const Duration<steady_clock>& rel_time);
 
     void wait();
 

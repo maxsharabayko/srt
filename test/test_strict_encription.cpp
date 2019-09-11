@@ -403,7 +403,6 @@ public:
             // srt_accept() has no timeout, so we have to close the socket and wait for the thread to exit.
             // Just give it some time and close the socket.
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            std::cout << "Closing the listener socket\n";
             ASSERT_NE(srt_close(m_listener_socket), SRT_ERROR);
             accepting_thread.join();
         }
@@ -421,7 +420,7 @@ private:
     const int s_yes = 1;
     const int s_no  = 0;
 
-    const bool          m_is_tracing = true;
+    const bool          m_is_tracing = false;
     static const char*  m_km_state[];
     static const char*  m_socket_state[];
 };

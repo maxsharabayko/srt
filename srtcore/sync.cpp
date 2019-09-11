@@ -295,19 +295,20 @@ void srt::sync::SyncEvent::notify_all() { m_tick_cond.notify_all(); }
 std::string srt::sync::FormatTime(const steady_clock::time_point &time)
 {
     const int64_t delta_us = to_microseconds(time - steady_clock::now());
+    cerr << "delta_us " << delta_us << endl;
 
     timeval now;
     gettimeofday(&now, NULL);
     const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + delta_us;
 
-    time_t tt = time_us / 1000000000;
+    time_t tt = time_us / 1000000;
     struct tm tm = SysLocalTime(tt);
 
     char tmp_buf[512];
     strftime(tmp_buf, 512, "%X.", &tm);
 
     ostringstream out;
-    out << tmp_buf << setfill('0') << setw(6) << (time_us % 1000000000);
+    out << tmp_buf << setfill('0') << setw(6) << (time_us % 1000000);
     return out.str();
 }
 
@@ -457,17 +458,17 @@ void srt::sync::SyncEvent::interrupt()
     pthread_cond_broadcast(&m_tick_cond);
 }
 
-bool srt::sync::SyncEvent::wait_for(Duration<steady_clock> timeout)
+bool srt::sync::SyncEvent::wait_for(const Duration<steady_clock>& rel_time)
 {
     UniqueLock lock(m_tick_lock);
-    return wait_for(lock, timeout);
+    return wait_for(lock, rel_time);
 }
 
-bool srt::sync::SyncEvent::wait_for(UniqueLock& lock, Duration<steady_clock> timeout)
+bool srt::sync::SyncEvent::wait_for(UniqueLock& lock, const Duration<steady_clock>& rel_time)
 {
     timeval now;
     gettimeofday(&now, 0);
-    const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + to_microseconds(timeout);
+    const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + to_microseconds(rel_time);
     timespec targettime;
     targettime.tv_sec = time_us / 1000000;
     targettime.tv_nsec = (time_us % 1000000) * 1000;

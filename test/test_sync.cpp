@@ -3,7 +3,8 @@
 #include <thread>
 #include <future>
 #include <array>
-#include <numeric>   // std::accumulate
+#include <numeric>  // std::accumulate
+#include <regex>    // Used in FormatTime test
 #include "sync.h"
 
 // This test set requires support for C++14
@@ -12,6 +13,15 @@
 
 using namespace std;
 using namespace srt::sync;
+
+// GNUC supports C++14 starting from version 5
+//#if defined(__GNUC__) && (__GNUC__ < 5)
+////namespace srt
+//constexpr chrono::milliseconds operator"" ms(
+//    unsigned long long _Val) { // return integral milliseconds
+//    return chrono::milliseconds(_Val);
+//}
+//#endif
 
 TEST(SyncDuration, BasicChecks)
 {
@@ -240,7 +250,7 @@ TEST(SyncTimePoint, OperatorMinusEqDuration)
 TEST(SyncEvent, WaitFor)
 {
     SyncEvent e;
-    for (int tout_us : { 50, 100, 500, 1000, 10'1000, 100'1000 })
+    for (int tout_us : { 50, 100, 500, 1000, 101000, 1001000 })
     {
         const steady_clock::duration timeout = from_microseconds(tout_us);
         const steady_clock::time_point start = steady_clock::now();
@@ -269,11 +279,26 @@ TEST(SyncEvent, WaitForNotifyOne)
     };
     auto wait_async_res = async(launch::async, wait_async, &e, timeout);
 
-    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    EXPECT_EQ(wait_async_res.wait_for(chrono::milliseconds(100)), future_status::timeout);
     e.notify_one();
-    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::ready);
+    ASSERT_EQ(wait_async_res.wait_for(chrono::milliseconds(100)), future_status::ready);
     const int wait_for_res = wait_async_res.get();
     EXPECT_TRUE(wait_for_res);
+}
+
+TEST(SyncEvent, WaitNotifyOne)
+{
+    SyncEvent e;
+
+    auto wait_async = [](SyncEvent* e) {
+        return e->wait();
+    };
+    auto wait_async_res = async(launch::async, wait_async, &e);
+
+    EXPECT_EQ(wait_async_res.wait_for(chrono::milliseconds(100)), future_status::timeout);
+    e.notify_one();
+    ASSERT_EQ(wait_async_res.wait_for(chrono::milliseconds(100)), future_status::ready);
+    wait_async_res.get();
 }
 
 TEST(SyncEvent, WaitForTwoNotifyOne)
@@ -287,12 +312,12 @@ TEST(SyncEvent, WaitForTwoNotifyOne)
     auto wait_async1_res = async(launch::async, wait_async, &e, timeout);
     auto wait_async2_res = async(launch::async, wait_async, &e, timeout);
 
-    EXPECT_EQ(wait_async1_res.wait_for(100ms), future_status::timeout);
-    EXPECT_EQ(wait_async2_res.wait_for(100ms), future_status::timeout);
+    EXPECT_EQ(wait_async1_res.wait_for(chrono::milliseconds(100)), future_status::timeout);
+    EXPECT_EQ(wait_async2_res.wait_for(chrono::milliseconds(100)), future_status::timeout);
     e.notify_one();
     // Now only one waiting thread should become ready
-    const future_status status1 = wait_async1_res.wait_for(100ms);
-    const future_status status2 = wait_async2_res.wait_for(100ms);
+    const future_status status1 = wait_async1_res.wait_for(chrono::milliseconds(100));
+    const future_status status2 = wait_async2_res.wait_for(chrono::milliseconds(100));
 
     const bool isready1 = (status1 == future_status::ready);
     EXPECT_EQ(status1, isready1 ? future_status::ready : future_status::timeout);
@@ -315,12 +340,12 @@ TEST(SyncEvent, WaitForTwoNotifyAll)
     auto wait_async1_res = async(launch::async, wait_async, &e, timeout);
     auto wait_async2_res = async(launch::async, wait_async, &e, timeout);
 
-    EXPECT_EQ(wait_async1_res.wait_for(100ms), future_status::timeout);
-    EXPECT_EQ(wait_async2_res.wait_for(100ms), future_status::timeout);
+    EXPECT_EQ(wait_async1_res.wait_for(chrono::milliseconds(100)), future_status::timeout);
+    EXPECT_EQ(wait_async2_res.wait_for(chrono::milliseconds(100)), future_status::timeout);
     e.notify_all();
     // Now only one waiting thread should become ready
-    const future_status status1 = wait_async1_res.wait_for(100ms);
-    const future_status status2 = wait_async2_res.wait_for(100ms);
+    const future_status status1 = wait_async1_res.wait_for(chrono::milliseconds(100));
+    const future_status status2 = wait_async2_res.wait_for(chrono::milliseconds(100));
     EXPECT_EQ(status1, future_status::ready);
     EXPECT_EQ(status2, future_status::ready);
     // Expect both threads to wake up by condition
@@ -338,9 +363,9 @@ TEST(SyncEvent, WaitForNotifyAll)
     };
     auto wait_async_res = async(launch::async, wait_async, &e, timeout);
 
-    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    EXPECT_EQ(wait_async_res.wait_for(chrono::milliseconds(500)), future_status::timeout);
     e.notify_all();
-    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::ready);
+    ASSERT_EQ(wait_async_res.wait_for(chrono::milliseconds(500)), future_status::ready);
     const int wait_for_res = wait_async_res.get();
     EXPECT_TRUE(wait_for_res);
 }
@@ -348,7 +373,7 @@ TEST(SyncEvent, WaitForNotifyAll)
 TEST(SyncEvent, WaitUntil)
 {
     SyncEvent e;
-    for (int tout_us : { 50, 100, 500, 1000, 10'1000, 100'1000 })
+    for (int tout_us : { 50, 100, 500, 1000, 101000, 1001000 })
     {
         const steady_clock::duration timeout = from_microseconds(tout_us);
         const steady_clock::time_point start = steady_clock::now();
@@ -379,9 +404,9 @@ TEST(SyncEvent, WaitUntilInterrupt)
     };
     auto wait_async_res = async(launch::async, wait_async, &e, timeout);
 
-    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    EXPECT_EQ(wait_async_res.wait_for(chrono::milliseconds(500)), future_status::timeout);
     e.interrupt();
-    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::ready);
+    ASSERT_EQ(wait_async_res.wait_for(chrono::milliseconds(500)), future_status::ready);
     const bool wait_for_res = wait_async_res.get();
     EXPECT_TRUE(wait_for_res);
 }
@@ -398,9 +423,9 @@ TEST(SyncEvent, WaitUntilNotifyOne)
     };
     auto wait_async_res = async(launch::async, wait_async, &e, timeout);
 
-    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    EXPECT_EQ(wait_async_res.wait_for(chrono::milliseconds(500)), future_status::timeout);
     e.notify_one();
-    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    ASSERT_EQ(wait_async_res.wait_for(chrono::milliseconds(500)), future_status::timeout);
     e.interrupt();
     const bool wait_for_res = wait_async_res.get();
     EXPECT_TRUE(wait_for_res);
@@ -418,11 +443,31 @@ TEST(SyncEvent, WaitUntilNotifyAll)
     };
     auto wait_async_res = async(launch::async, wait_async, &e, timeout);
 
-    EXPECT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    EXPECT_EQ(wait_async_res.wait_for(chrono::milliseconds(500)), future_status::timeout);
     e.notify_all();
-    ASSERT_EQ(wait_async_res.wait_for(500ms), future_status::timeout);
+    ASSERT_EQ(wait_async_res.wait_for(chrono::milliseconds(500)), future_status::timeout);
     e.interrupt();
     const bool wait_for_res = wait_async_res.get();
     EXPECT_TRUE(wait_for_res);
+}
+
+/*****************************************************************************/
+/*
+ * FormatTime
+*/
+/*****************************************************************************/
+
+TEST(Sync, FormatTime)
+{
+    const steady_clock::time_point a = steady_clock::now();
+    const string time1 = FormatTime(a);
+    const string time2 = FormatTime(a);
+    cerr << "Same time formated twice: " << time1 << " and " << time2 << endl;
+    //EXPECT_TRUE(time1 == time2);
+    regex rex("[[:digit:]]{2}\:[[:digit:]]{2}\:[[:digit:]]{2}\.[[:digit:]]{6}");
+    cerr << "regex_match: " << regex_match(time1, rex) << endl;
+    
+    cerr << FormatTime(a) << endl;
+    cerr << FormatTime(a + from_seconds(1)) << endl;
 }
 
