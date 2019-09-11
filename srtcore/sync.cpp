@@ -295,11 +295,10 @@ void srt::sync::SyncEvent::notify_all() { m_tick_cond.notify_all(); }
 std::string srt::sync::FormatTime(const steady_clock::time_point &time)
 {
     const int64_t delta_us = to_microseconds(time - steady_clock::now());
-    cerr << "delta_us " << delta_us << endl;
 
     timeval now;
     gettimeofday(&now, NULL);
-    const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + delta_us;
+    const long long time_us = now.tv_sec * (long long)(1000000) + now.tv_usec + delta_us;
 
     time_t tt = time_us / 1000000;
     struct tm tm = SysLocalTime(tt);

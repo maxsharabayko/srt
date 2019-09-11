@@ -456,18 +456,42 @@ TEST(SyncEvent, WaitUntilNotifyAll)
  * FormatTime
 */
 /*****************************************************************************/
-
+//#if !defined(__GNUC__) || (__GNUC__ >= 5)
+// g++ before 4.9 (?) does not support regex and crashes on execution.
+// Require at least GCC v5 fo simplicity of condition.
 TEST(Sync, FormatTime)
 {
-    const steady_clock::time_point a = steady_clock::now();
-    const string time1 = FormatTime(a);
-    const string time2 = FormatTime(a);
-    cerr << "Same time formated twice: " << time1 << " and " << time2 << endl;
-    //EXPECT_TRUE(time1 == time2);
-    regex rex("[[:digit:]]{2}\:[[:digit:]]{2}\:[[:digit:]]{2}\.[[:digit:]]{6}");
-    cerr << "regex_match: " << regex_match(time1, rex) << endl;
-    
-    cerr << FormatTime(a) << endl;
-    cerr << FormatTime(a + from_seconds(1)) << endl;
+    auto parse_time = [](const string &timestr) -> long long {
+        const regex rex("([[:digit:]]{2}):([[:digit:]]{2}):([[:digit:]]{2}).([[:digit:]]{6})");
+        std::smatch sm;
+        EXPECT_TRUE(regex_match(timestr, sm, rex));
+        EXPECT_EQ(sm.size(), 5);
+        if (sm.size() != 5)
+            return 0;
+
+        const long long h = std::stoi(sm[1]);
+        const long long m = std::stoi(sm[2]);
+        const long long s = std::stoi(sm[3]);
+        const long long u = std::stoi(sm[4]);
+
+        return u + s * 1000000 + m * 60000000 + h * 60 * 60 * 1000000;
+    };
+
+    const steady_clock::time_point a     = steady_clock::now();
+    const string                   time1 = FormatTime(a);
+    const string                   time2 = FormatTime(a);
+    const string                   time3 = FormatTime(a + from_milliseconds(500));
+    const string                   time4 = FormatTime(a + from_seconds(1));
+    cerr << "Current time formated:    " << time1 << endl;
+    const long long diff_2_1 = parse_time(time2) - parse_time(time1);
+    cerr << "Same time formated again: " << time2 << " (" << diff_2_1 << " us)" << endl;
+    const long long diff_3_1 = parse_time(time3) - parse_time(time1);
+    cerr << "Time +500 ms formated:    " << time3 << " (" << diff_3_1 << " us)" << endl;
+    const long long diff_4_1 = parse_time(time4) - parse_time(time1);
+    cerr << "Time +1  sec formated:    " << time4 << " (" << diff_4_1 << " us)" << endl;
+
+    // EXPECT_TRUE(time1 == time2);
+
 }
+//#endif
 
