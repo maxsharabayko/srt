@@ -4691,7 +4691,7 @@ void *CUDT::tsbpd(void *param)
             int32_t skiptoseqno = -1;
             bool    passack     = true; // Get next packet to wait for even if not acked
 
-          rxready = self->m_pRcvBuffer->getRcvFirstMsg(Ref(tsbpdtime), Ref(passack), Ref(skiptoseqno), Ref(current_pkt_seq));
+          rxready = self->m_pRcvBuffer->getRcvFirstMsg(tsbpdtime, Ref(passack), Ref(skiptoseqno), Ref(current_pkt_seq));
 
           HLOGC(tslog.Debug, log << boolalpha
                   << "NEXT PKT CHECK: rdy=" << rxready
