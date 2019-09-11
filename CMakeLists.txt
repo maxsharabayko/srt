@@ -109,6 +109,7 @@ option(USE_GNUTLS "DEPRECATED. Use USE_ENCLIB=openssl|gnutls|mbedtls instead" OF
 option(ENABLE_CXX_DEPS "Extra library dependencies in srt.pc for the CXX libraries useful with C language" ON)
 option(USE_STATIC_LIBSTDCXX "Should use static rather than shared libstdc++" OFF)
 option(ENABLE_INET_PTON "Set to OFF to prevent usage of inet_pton when building against modern SDKs while still requiring compatibility with older Windows versions, such as Windows XP, Windows Server 2003 etc." ON)
+option(ENABLE_CODE_COVERAGE "Enable code coverage reporting" OFF)
 
 # ENABLE_MONOTONIC_CLOCK: enforces the use of clock_gettime to get the current
 # time, instead of gettimeofday. This function allows to force a monotonic
@@ -303,15 +304,14 @@ if ( USE_GNUSTL )
 	set (SRT_LIBS_PRIVATE ${SRT_LIBS_PRIVATE} ${GNUSTL_LIBRARIES} ${GNUSTL_LDFLAGS})
 endif()
 
-
 # Detect if the compiler is GNU compatable for flags
-set(HAVE_COMPILER_GNU_COMPAT 0)
-foreach (gnid GNU Intel Clang AppleClang)
-	if (${CMAKE_CXX_COMPILER_ID} STREQUAL ${gnid})
-		set(HAVE_COMPILER_GNU_COMPAT 1)
-		break()
-	endif()
-endforeach()
+if(${CMAKE_CXX_COMPILER_ID} MATCHES "gnid|GNU|Intel|Clang|AppleClang")
+	message(STATUS "COMPILER: ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) - GNU compat")
+	set(HAVE_COMPILER_GNU_COMPAT 1)
+else()
+	message(STATUS "COMPILER: ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) - NOT GNU compat")
+	set(HAVE_COMPILER_GNU_COMPAT 0)
+endif()
 
 if (DISABLE_CXX11)
 	set (ENABLE_CXX11 0)
@@ -322,12 +322,6 @@ endif()
 
 if (NOT ENABLE_CXX11)
 	message(WARNING "Parts that require C++11 support will be disabled (srt-live-transmit)")
-endif()
-
-if (HAVE_COMPILER_GNU_COMPAT)
-	message(STATUS "COMPILER: GNU compat: ${CMAKE_CXX_COMPILER}")
-else()
-	message(STATUS "COMPILER: NOT GNU compat: ${CMAKE_CXX_COMPILER}")
 endif()
 
 # add extra warning flags for gccish compilers
@@ -443,30 +437,15 @@ if (ENABLE_THREAD_CHECK)
 	)
 endif()
 
-
-# Code Coverage Configuration
-add_library(coverage_config INTERFACE)
-
-option(CODE_COVERAGE "Enable coverage reporting" OFF)
-if(CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-	# Add required flags (GCC & LLVM/Clang)
-	target_compile_options(coverage_config INTERFACE
-		-O0        # no optimization
-		-g         # generate debug info
-		--coverage # sets all required flags
-	)
-	if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
-		target_link_options(coverage_config INTERFACE --coverage)
-	else()
-		target_link_libraries(coverage_config INTERFACE --coverage)
-	endif()
-endif()
-
-
 if (${ENABLE_PROFILE} AND HAVE_COMPILER_GNU_COMPAT)
 	# They are actually cflags, not definitions, but CMake is stupid enough.
 	add_definitions(-g -pg)
 	link_libraries(-g -pg)
+endif()
+
+if (ENABLE_CODE_COVERAGE AND HAVE_COMPILER_GNU_COMPAT)
+	add_definitions(-g -O0 --coverage)
+	link_libraries(--coverage)
 endif()
 
 if (PTHREAD_LIBRARY AND PTHREAD_INCLUDE_DIR)
@@ -633,9 +612,6 @@ if (srt_libspec_static)
 	if (USE_GNUSTL)
 		target_link_libraries(${TARGET_srt}_static PRIVATE ${GNUSTL_LIBRARIES} ${GNUSTL_LDFLAGS})
 	endif()
-
-	# Include code-coverage settings:
-	target_link_libraries(${TARGET_srt}_static PRIVATE coverage_config)
 endif()
 
 
@@ -946,7 +922,6 @@ if (ENABLE_UNITTESTS AND ENABLE_CXX11)
 	endif()
 
 	MafReadDir(test filelist.maf
-		HEADERS SOURCES_unittests
 		SOURCES SOURCES_unittests
 	)
 	
@@ -960,7 +935,6 @@ if (ENABLE_UNITTESTS AND ENABLE_CXX11)
 		${GTEST_BOTH_LIBRARIES}
 		${srt_link_library}
 		${PTHREAD_LIBRARY}
-		coverage_config
 		)
 
 	add_test(
