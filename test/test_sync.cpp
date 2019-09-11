@@ -31,7 +31,7 @@ TEST(SyncDuration, BasicChecks)
 
 }
 
-TEST(SyncDuration, Operators)
+TEST(SyncDuration, RelOperators)
 {
     const steady_clock::duration a;
 
@@ -139,22 +139,91 @@ TEST(SyncTimePoint, DefaultConstructorZero)
     EXPECT_TRUE(is_zero(a));
 }
 
-TEST(SyncTimePoint, UIntMax)
+TEST(SyncTimePoint, RelOperators)
 {
     const int64_t delta = 1024;
-    steady_clock::time_point a(numeric_limits<uint64_t>::max());
-    steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
+    const steady_clock::time_point a(numeric_limits<uint64_t>::max());
+    const steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
+    EXPECT_TRUE (a == a);
+    EXPECT_FALSE(a == b);
+    EXPECT_TRUE (a != b);
+    EXPECT_TRUE (a != b);
+
+    EXPECT_TRUE (a >= a);
+    EXPECT_FALSE(b >= a);
+    EXPECT_TRUE (a >  b);
+    EXPECT_FALSE(a >  a);
+    EXPECT_TRUE (a <= a);
+    EXPECT_TRUE (b <= a);
+    EXPECT_FALSE(a <= b);
+    EXPECT_FALSE(a <  a);
+    EXPECT_TRUE (b <  a);
+    EXPECT_FALSE(a <  b);
+}
+
+TEST(SyncTimePoint, OperatorMinus)
+{
+    const int64_t delta = 1024;
+    const steady_clock::time_point a(numeric_limits<uint64_t>::max());
+    const steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
     EXPECT_EQ((a - b).count(), delta);
     EXPECT_EQ((b - a).count(), -delta);
 }
 
-TEST(SyncTimePoint, OperatorPlus)
+TEST(SyncTimePoint, OperatorEq)
 {
     const int64_t delta = 1024;
-    steady_clock::time_point a(numeric_limits<uint64_t>::max());
-    steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
-    EXPECT_EQ((a - b).count(), delta);
-    EXPECT_EQ((b - a).count(), -delta);
+    const steady_clock::time_point a(numeric_limits<uint64_t>::max() - delta);
+    const steady_clock::time_point b = a;
+    EXPECT_EQ(a, b);
+}
+
+TEST(SyncTimePoint, OperatorMinusPlusDuration)
+{
+    const int64_t delta = 1024;
+    const steady_clock::time_point a(numeric_limits<uint64_t>::max());
+    const steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
+
+    EXPECT_EQ((a + steady_clock::duration(-delta)), b);
+    EXPECT_EQ((b + steady_clock::duration(+delta)), a);
+
+    EXPECT_EQ((a - steady_clock::duration(+delta)), b);
+    EXPECT_EQ((b - steady_clock::duration(-delta)), a);
+}
+
+TEST(SyncTimePoint, OperatorPlusEqDuration)
+{
+    const int64_t delta = 1024;
+    const steady_clock::time_point a(numeric_limits<uint64_t>::max());
+    const steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
+    steady_clock::time_point r = a;
+    EXPECT_EQ(r, a);
+    r += steady_clock::duration(-delta);
+    EXPECT_EQ(r, b);
+    r = b;
+    EXPECT_EQ(r, b);
+    r += steady_clock::duration(+delta);
+    EXPECT_EQ(r, a);
+    r = a;
+    EXPECT_EQ(r, a);
+    r -= steady_clock::duration(+delta);
+    EXPECT_EQ((a - steady_clock::duration(+delta)), b);
+    EXPECT_EQ((b - steady_clock::duration(-delta)), a);
+}
+
+TEST(SyncTimePoint, OperatorMinusEqDuration)
+{
+    const int64_t delta = 1024;
+    const steady_clock::time_point a(numeric_limits<uint64_t>::max());
+    const steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
+    steady_clock::time_point r = a;
+    EXPECT_EQ(r, a);
+    r -= steady_clock::duration(+delta);
+    EXPECT_EQ(r, b);
+    r = b;
+    EXPECT_EQ(r, b);
+    r -= steady_clock::duration(-delta);
+    EXPECT_EQ(r, a);
 }
 
 /*****************************************************************************/

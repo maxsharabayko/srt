@@ -159,18 +159,20 @@ public: // Relational operators
     inline bool operator<(const TimePoint<_Clock> &rhs) const { return m_timestamp < rhs.m_timestamp; }
     inline bool operator<=(const TimePoint<_Clock> &rhs) const { return m_timestamp <= rhs.m_timestamp; }
     inline bool operator==(const TimePoint<_Clock> &rhs) const { return m_timestamp == rhs.m_timestamp; }
+    inline bool operator!=(const TimePoint<_Clock>& rhs) const { return m_timestamp != rhs.m_timestamp; }
     inline bool operator>=(const TimePoint<_Clock> &rhs) const { return m_timestamp >= rhs.m_timestamp; }
     inline bool operator>(const TimePoint<_Clock> &rhs) const { return m_timestamp > rhs.m_timestamp; }
 
 public: // Arithmetic operators
     inline Duration<_Clock> operator-(const TimePoint<_Clock> &rhs) const { return Duration<_Clock>(m_timestamp - rhs.m_timestamp); }
     inline TimePoint operator+(const Duration<_Clock> &rhs) const { return TimePoint(m_timestamp + rhs.count()); }
-    inline TimePoint operator-(const Duration< _Clock>& rhs) const { return TimePoint(m_timestamp - rhs.count()); }
+    inline TimePoint operator-(const Duration<_Clock>& rhs) const { return TimePoint(m_timestamp - rhs.count()); }
 
 public: // Assignment operators
 
     inline void operator=(const TimePoint<_Clock>& rhs) { m_timestamp = rhs.m_timestamp; }
     inline void operator+=(const Duration< _Clock>& rhs) { m_timestamp += rhs.count(); }
+    inline void operator-=(const Duration< _Clock>& rhs) { m_timestamp -= rhs.count(); }
 
 public:
 
@@ -272,7 +274,6 @@ public:
 
 private:
 
-
     Mutex& m_mutex;
 };
 
@@ -283,12 +284,8 @@ class UniqueLock
     friend class SyncEvent;
 public:
 
-
     UniqueLock(Mutex &m);
-
-
     ~UniqueLock();
-
 
 public:
 
