@@ -456,9 +456,10 @@ TEST(SyncEvent, WaitUntilNotifyAll)
  * FormatTime
 */
 /*****************************************************************************/
+#if !defined(__GNUC__) || (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9))
+//#if !defined(__GNUC__) || (__GNUC__ > 4)
 //#if !defined(__GNUC__) || (__GNUC__ >= 5)
 // g++ before 4.9 (?) does not support regex and crashes on execution.
-// Require at least GCC v5 fo simplicity of condition.
 TEST(Sync, FormatTime)
 {
     auto parse_time = [](const string &timestr) -> long long {
@@ -477,21 +478,29 @@ TEST(Sync, FormatTime)
         return u + s * 1000000 + m * 60000000 + h * 60 * 60 * 1000000;
     };
 
+    auto print_timediff = [&parse_time](const string& desc, const string& time, const string& time_base)
+    {
+        const long long diff = parse_time(time) - parse_time(time_base);
+        cerr << desc << time << " (" << diff << " us)" << endl;
+    };
+
     const steady_clock::time_point a     = steady_clock::now();
     const string                   time1 = FormatTime(a);
     const string                   time2 = FormatTime(a);
     const string                   time3 = FormatTime(a + from_milliseconds(500));
     const string                   time4 = FormatTime(a + from_seconds(1));
+    const string                   time5 = FormatTime(a + from_seconds(5));
+    const string                   time6 = FormatTime(a + from_milliseconds(-4350));
     cerr << "Current time formated:    " << time1 << endl;
     const long long diff_2_1 = parse_time(time2) - parse_time(time1);
     cerr << "Same time formated again: " << time2 << " (" << diff_2_1 << " us)" << endl;
-    const long long diff_3_1 = parse_time(time3) - parse_time(time1);
-    cerr << "Time +500 ms formated:    " << time3 << " (" << diff_3_1 << " us)" << endl;
-    const long long diff_4_1 = parse_time(time4) - parse_time(time1);
-    cerr << "Time +1  sec formated:    " << time4 << " (" << diff_4_1 << " us)" << endl;
+    print_timediff("Same time formated again: ", time2, time1);
+    print_timediff("Time +500 ms formated:    ", time3, time1);
+    print_timediff("Time +1  sec formated:    ", time4, time1);
+    print_timediff("Time +5  sec formated:    ", time5, time1);
+    print_timediff("Time -4350 ms formated:   ", time6, time1);
 
-    // EXPECT_TRUE(time1 == time2);
-
+    EXPECT_TRUE(time1 == time2);
 }
-//#endif
+#endif
 

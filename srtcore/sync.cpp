@@ -1,4 +1,5 @@
 ﻿#include <iomanip>
+#include <math.h>
 #include <stdexcept>
 #include "sync.h"
 #include "udt.h"
@@ -8,6 +9,7 @@
 #if defined(_WIN32)
 #define TIMING_USE_QPC
 #include "win/wintime.h"
+#include <sys/timeb.h>
 #elif defined(OSX) || (TARGET_OS_IOS == 1) || (TARGET_OS_TV == 1)
 #define TIMING_USE_MACH_ABS_TIME
 #include <mach/mach_time.h>
@@ -292,22 +294,25 @@ void srt::sync::SyncEvent::notify_all() { m_tick_cond.notify_all(); }
 #else
 
 
-std::string srt::sync::FormatTime(const steady_clock::time_point &time)
+std::string srt::sync::FormatTime(const steady_clock::time_point &timestamp)
 {
-    const int64_t delta_us = to_microseconds(time - steady_clock::now());
-
-    timeval now;
-    gettimeofday(&now, NULL);
-    const long long time_us = now.tv_sec * (long long)(1000000) + now.tv_usec + delta_us;
-
-    time_t tt = time_us / 1000000;
-    struct tm tm = SysLocalTime(tt);
-
+    const time_t now_s = ::time(NULL);    // get current time in seconds
+    const steady_clock::time_point now_timestamp = steady_clock::now();
+    const int64_t delta_us = to_microseconds(timestamp - now_timestamp);
+    const int64_t delta_s = floor((static_cast<int64_t>(now_timestamp.us_since_epoch() % 1000000) + delta_us) / 1000000.0);
+    const time_t tt = now_s + delta_s;
+    struct tm tm = SysLocalTime(tt);    // in seconds
     char tmp_buf[512];
     strftime(tmp_buf, 512, "%X.", &tm);
 
     ostringstream out;
-    out << tmp_buf << setfill('0') << setw(6) << (time_us % 1000000);
+    out << tmp_buf << setfill('0') << setw(6) << (timestamp.us_since_epoch() % 1000000);
+    //cerr << "now_s=" << now_s << ", now_ts="
+    //    << static_cast<int64_t>(now_timestamp.us_since_epoch() % 1000000)
+    //    << ", ts=" << (timestamp.us_since_epoch() % 1000000)
+    //    << ", tt=" << tt << " : " << out.str()
+    //    << ", delta_us=" << delta_us
+    //    << endl;
     return out.str();
 }
 
