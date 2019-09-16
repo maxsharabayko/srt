@@ -238,7 +238,7 @@ srt::sync::SyncEvent::SyncEvent() {}
 
 srt::sync::SyncEvent::~SyncEvent() {}
 
-bool srt::sync::SyncEvent::wait_until(time_point<steady_clock> tp)
+bool srt::sync::SyncEvent::wait_until(steady_clock::time_point tp)
 {
     // TODO: Add busy waiting
 
@@ -250,17 +250,17 @@ bool srt::sync::SyncEvent::wait_until(time_point<steady_clock> tp)
     return m_tick_cond.wait_until(lk, tp, [this]() { return m_sched_time <= steady_clock::now(); });
 }
 
-bool srt::sync::SyncEvent::wait_for(steady_clock::duration timeout)
+bool srt::sync::SyncEvent::wait_for(const steady_clock::duration& rel_time)
 {
     std::unique_lock<std::mutex> lk(m_tick_lock);
-    return m_tick_cond.wait_for(lk, timeout) != cv_status::timeout;
+    return m_tick_cond.wait_for(lk, rel_time) != cv_status::timeout;
 
     // wait_until(steady_clock::now() + timeout);
 }
 
-bool srt::sync::SyncEvent::wait_for(UniqueLock &lk, steady_clock::duration timeout)
+bool srt::sync::SyncEvent::wait_for(UniqueLock& lk, const steady_clock::duration& rel_time)
 {
-    return m_tick_cond.wait_for(lk, timeout) != cv_status::timeout;
+    return m_tick_cond.wait_for(lk, rel_time) != cv_status::timeout;
 
     // wait_until(steady_clock::now() + timeout);
 }
@@ -290,6 +290,32 @@ void srt::sync::SyncEvent::interrupt()
 void srt::sync::SyncEvent::notify_one() { m_tick_cond.notify_one(); }
 
 void srt::sync::SyncEvent::notify_all() { m_tick_cond.notify_all(); }
+
+
+std::string srt::sync::FormatTime(const steady_clock::time_point& timestamp)
+{
+    const time_t now_s = ::time(NULL);    // get current time in seconds
+    const steady_clock::time_point now_timestamp = steady_clock::now();
+    const int64_t delta_us = to_microseconds(timestamp - now_timestamp);
+    const int64_t now_since_epoch_us = to_microseconds(now_timestamp.time_since_epoch());
+    const int64_t delta_s = floor((static_cast<int64_t>(now_since_epoch_us % 1000000) + delta_us) / 1000000.0);
+    const time_t tt = now_s + delta_s;
+    struct tm tm = SysLocalTime(tt);    // in seconds
+    char tmp_buf[512];
+    strftime(tmp_buf, 512, "%X.", &tm);
+
+    const int64_t ts_since_epoch_us = to_microseconds(timestamp.time_since_epoch());
+    ostringstream out;
+    out << tmp_buf << setfill('0') << setw(6) << (ts_since_epoch_us % 1000000);
+    //cerr << "now_s=" << now_s << ", now_ts="
+    //    << static_cast<int64_t>(now_timestamp.us_since_epoch() % 1000000)
+    //    << ", ts=" << (timestamp.us_since_epoch() % 1000000)
+    //    << ", tt=" << tt << " : " << out.str()
+    //    << ", delta_us=" << delta_us
+    //    << endl;
+    return out.str();
+}
+
 
 #else
 

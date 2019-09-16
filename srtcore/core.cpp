@@ -9050,7 +9050,7 @@ void CUDT::addLossRecord(std::vector<int32_t> &lr, int32_t lo, int32_t hi)
     }
 }
 
-void CUDT::checkACKTimer(const srt::sync::TimePoint<srt::sync::steady_clock> &currtime)
+void CUDT::checkACKTimer(const steady_clock::time_point &currtime)
 {
     if (currtime > m_NextACKTime // ACK time has come
                                  // OR the number of sent packets since last ACK has reached
@@ -9082,7 +9082,7 @@ void CUDT::checkACKTimer(const srt::sync::TimePoint<srt::sync::steady_clock> &cu
     }
 }
 
-void CUDT::checkNAKTimer(const srt::sync::TimePoint<srt::sync::steady_clock> &currtime)
+void CUDT::checkNAKTimer(const steady_clock::time_point& currtime)
 {
     // XXX The problem with working NAKREPORT with SRT_ARQ_ONREQ
     // is not that it would be inappropriate, but because it's not
@@ -9113,12 +9113,12 @@ void CUDT::checkNAKTimer(const srt::sync::TimePoint<srt::sync::steady_clock> &cu
     }
 }
 
-bool CUDT::checkExpTimer(const srt::sync::TimePoint<srt::sync::steady_clock> &currtime)
+bool CUDT::checkExpTimer(const steady_clock::time_point& currtime)
 {
     // In UDT the m_bUserDefinedRTO and m_iRTO were in CCC class.
     // There's nothing in the original code that alters these values.
 
-    srt::sync::TimePoint<srt::sync::steady_clock> next_exp_time;
+    steady_clock::time_point next_exp_time;
     if (m_CongCtl->RTO())
     {
         next_exp_time = m_lastRspTime + srt::sync::from_microseconds(m_CongCtl->RTO());
@@ -9187,7 +9187,7 @@ bool CUDT::checkExpTimer(const srt::sync::TimePoint<srt::sync::steady_clock> &cu
     return false;
 }
 
-void CUDT::checkRexmitTimer(const srt::sync::TimePoint<srt::sync::steady_clock> &currtime)
+void CUDT::checkRexmitTimer(const steady_clock::time_point& currtime)
 {
     /* There are two algorithms of blind packet retransmission: LATEREXMIT and FASTREXMIT.
      *

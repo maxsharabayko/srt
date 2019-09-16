@@ -68,6 +68,11 @@ inline long long to_milliseconds(const steady_clock::duration &t)
     return std::chrono::duration_cast<std::chrono::milliseconds>(t).count();
 }
 
+inline long long to_seconds(const steady_clock::duration& t)
+{
+    return std::chrono::duration_cast<std::chrono::seconds>(t).count();
+}
+
 inline steady_clock::duration from_microseconds(long t_us) { return std::chrono::microseconds(t_us); }
 
 inline steady_clock::duration from_milliseconds(long t_ms) { return std::chrono::milliseconds(t_ms); }
@@ -173,6 +178,11 @@ public: // Assignment operators
     inline void operator=(const TimePoint<_Clock>& rhs) { m_timestamp = rhs.m_timestamp; }
     inline void operator+=(const Duration< _Clock>& rhs) { m_timestamp += rhs.count(); }
     inline void operator-=(const Duration< _Clock>& rhs) { m_timestamp -= rhs.count(); }
+
+public: //
+
+    static inline constexpr TimePoint min() { return TimePoint(numeric_limits<uint64_t>::min()); }
+    static inline constexpr TimePoint max() { return TimePoint(numeric_limits<uint64_t>::max()); }
 
 public:
 
@@ -298,6 +308,15 @@ private:
 };
 
 
+inline void SleepFor(const steady_clock::duration& t)
+{
+#ifndef _WIN32
+    usleep(to_microseconds(t));
+#else
+    Sleep((DWORD)to_milliseconds(t));
+#endif
+}
+
 #endif  // USE_STL_CHRONO
 
 
@@ -331,17 +350,6 @@ class InvertedLock
 };
 
 
-inline void SleepFor(const Duration<steady_clock>& t)
-{
-#ifndef _WIN32
-    usleep(to_microseconds(t));
-#else
-    Sleep((DWORD) to_milliseconds(t));
-#endif
-}
-
-
-
 class SyncCond
 {
 
@@ -352,7 +360,7 @@ public:
 
 public:
 
-    bool wait_for(UniqueLock& lk, Duration<steady_clock> timeout);
+    bool wait_for(UniqueLock& lk, steady_clock::duration timeout);
 
     void wait(UniqueLock& lk);
 
@@ -389,7 +397,7 @@ public:
     ///
     /// @return true  if the specified time was reached
     ///         false should never happen
-    bool wait_until(TimePoint<steady_clock> tp);
+    bool wait_until(steady_clock::time_point tp);
 
     /// Blocks the current executing thread,
     /// and adds it to the list of threads waiting on* this.
@@ -400,7 +408,7 @@ public:
     ///
     /// @return true  if condition occured or spuriously woken up
     ///         false on timeout
-    bool wait_for(const Duration<steady_clock>& rel_time);
+    bool wait_for(const steady_clock::duration& rel_time);
 
     /// Atomically releases lock, blocks the current executing thread,
     /// and adds it to the list of threads waiting on* this.
@@ -411,7 +419,7 @@ public:
     ///
     /// @return true  if condition occured or spuriously woken up
     ///         false on timeout
-    bool wait_for(UniqueLock &lk, const Duration<steady_clock>& rel_time);
+    bool wait_for(UniqueLock &lk, const steady_clock::duration& rel_time);
 
     void wait();
 
@@ -432,14 +440,14 @@ public:
     Mutex              m_tick_lock;
     pthread_cond_t     m_tick_cond;
 #endif
-    TimePoint<steady_clock> m_sched_time;
+    steady_clock::time_point m_sched_time;
 };
 
 static SyncEvent s_SyncEvent;
 
 
 
-std::string FormatTime(const TimePoint<steady_clock>& time);
+std::string FormatTime(const steady_clock::time_point& time);
 
 }; // namespace sync
 }; // namespace srt

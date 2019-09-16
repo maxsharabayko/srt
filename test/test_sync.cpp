@@ -156,9 +156,8 @@ TEST(SyncTimePoint, DefaultConstructorZero)
 
 TEST(SyncTimePoint, RelOperators)
 {
-    const int64_t delta = 1024;
-    const steady_clock::time_point a(numeric_limits<uint64_t>::max());
-    const steady_clock::time_point b(numeric_limits<uint64_t>::max() - delta);
+    const steady_clock::time_point a(steady_clock::time_point::max());
+    const steady_clock::time_point b(steady_clock::time_point::min());
     EXPECT_TRUE (a == a);
     EXPECT_FALSE(a == b);
     EXPECT_TRUE (a != b);
