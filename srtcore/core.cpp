@@ -8247,8 +8247,11 @@ int CUDT::processData(CUnit* in_unit)
    // If the peer doesn't understand REXMIT flag, send rexmit request
    // always immediately.
    int initial_loss_ttl = 0;
-   if ( m_bPeerRexmitFlag )
+   if (m_bPeerRexmitFlag)
+   {
+       m_iReorderTolerance = m_iMaxReorderTolerance;
        initial_loss_ttl = m_iReorderTolerance;
+   }
 
 
    // After introduction of packet filtering, the "recordable loss detection"
