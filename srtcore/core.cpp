@@ -891,9 +891,9 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void *optval, int optlen)
         }
         break;
 
-    case SRTO_STRICTENC:
-        if (m_bConnected)
-            throw CUDTException(MJ_NOTSUP, MN_ISCONNECTED, 0);
+   case SRTO_ENFORCEDENCRYPTION:
+      if (m_bConnected)
+          throw CUDTException(MJ_NOTSUP, MN_ISCONNECTED, 0);
 
         m_bOPT_StrictEncryption = bool_int_value(optval, optlen);
         break;
@@ -1206,10 +1206,10 @@ void CUDT::getOpt(SRT_SOCKOPT optName, void *optval, int &optlen)
         *(int *)optval = m_zOPT_ExpPayloadSize;
         break;
 
-    case SRTO_STRICTENC:
-        optlen             = sizeof(int32_t); // also with TSBPDMODE and SENDER
-        *(int32_t *)optval = m_bOPT_StrictEncryption;
-        break;
+   case SRTO_ENFORCEDENCRYPTION:
+      optlen = sizeof (int32_t); // also with TSBPDMODE and SENDER
+      *(int32_t*)optval = m_bOPT_StrictEncryption;
+      break;
 
     case SRTO_IPV6ONLY:
         optlen         = sizeof(int);
@@ -1363,19 +1363,17 @@ void CUDT::open()
     m_iRTT    = 10 * COMM_SYN_INTERVAL_US;
     m_iRTTVar = m_iRTT >> 1;
 
-    // set up the timers
-    m_SYNInterval = from_microseconds(COMM_SYN_INTERVAL_US);
 
     // set minimum NAK and EXP timeout to 300ms
     m_minNakInterval = from_microseconds(300000);
     m_minExpInterval = from_microseconds(300000);
 
-    m_ACKInterval = m_SYNInterval;
+    m_ACKInterval = from_microseconds(COMM_SYN_INTERVAL_US);
     m_NAKInterval = m_minNakInterval;
 
     const steady_clock::time_point currtime = steady_clock::now();
     m_lastRspTime                        = currtime;
-    m_NextACKTime                        = currtime + m_SYNInterval;
+    m_NextACKTime                        = currtime + m_ACKInterval;
     m_NextNAKTime                        = currtime + m_NAKInterval;
     m_lastRspAckTime                     = currtime;
     m_lastSndTime                        = currtime;
@@ -4730,8 +4728,8 @@ void *CUDT::tsbpd(void *param)
                     self->m_stats.traceRcvBytesDrop += seqlen * avgpayloadsz;
                     CriticalSection::leave(self->m_StatsLock);
 
-                    self->unlose(self->m_iRcvLastSkipAck, CSeqNo::decseq(skiptoseqno)); // remove(from,to-inclusive)
-                    self->m_pRcvBuffer->skipData(seqlen);
+                self->dropFromLossLists(self->m_iRcvLastSkipAck, CSeqNo::decseq(skiptoseqno)); //remove(from,to-inclusive)
+                self->m_pRcvBuffer->skipData(seqlen);
 
                     self->m_iRcvLastSkipAck = skiptoseqno;
 
@@ -5143,7 +5141,7 @@ SRT_REJECT_REASON CUDT::setupCC()
     // Update timers
     const steady_clock::time_point currtime = steady_clock::now();
     m_lastRspTime                        = currtime;
-    m_NextACKTime                        = currtime + m_SYNInterval;
+    m_NextACKTime                        = currtime + m_ACKInterval;
     m_NextNAKTime                        = currtime + m_NAKInterval;
     m_lastRspAckTime                     = currtime;
     m_lastSndTime                        = currtime;
@@ -6864,7 +6862,7 @@ void CUDT::sendCtrl(UDTMessageType pkttype, void *lparam, void *rparam, int size
             if (data[ACKD_BUFFERLEFT] < 2)
                 data[ACKD_BUFFERLEFT] = 2;
 
-            if (srt::sync::steady_clock::now() - m_lastAckTime > m_SYNInterval)
+            if (srt::sync::steady_clock::now() - m_lastAckTime > m_ACKInterval)
             {
                 int rcvRate;
                 int ctrlsz = ACKD_TOTAL_SIZE_UDTBASE * ACKD_FIELD_SIZE; // Minimum required size
@@ -6872,20 +6870,20 @@ void CUDT::sendCtrl(UDTMessageType pkttype, void *lparam, void *rparam, int size
                 data[ACKD_RCVSPEED]  = m_RcvTimeWindow.getPktRcvSpeed(Ref(rcvRate));
                 data[ACKD_BANDWIDTH] = m_RcvTimeWindow.getBandwidth();
 
-                //>>Patch while incompatible (1.0.2) receiver floating around
-                if (m_lPeerSrtVersion == SrtVersion(1, 0, 2))
-                {
-                    data[ACKD_RCVRATE] = rcvRate;                                     // bytes/sec
-                    data[ACKD_XMRATE]  = data[ACKD_BANDWIDTH] * m_iMaxSRTPayloadSize; // bytes/sec
-                    ctrlsz             = ACKD_FIELD_SIZE * ACKD_TOTAL_SIZE_VER102;
-                }
-                else if (m_lPeerSrtVersion >= SrtVersion(1, 0, 3))
-                {
-                    // Normal, currently expected version.
-                    data[ACKD_RCVRATE] = rcvRate; // bytes/sec
-                    ctrlsz             = ACKD_FIELD_SIZE * ACKD_TOTAL_SIZE_VER101;
-                }
-                // ELSE: leave the buffer with ...UDTBASE size.
+             //>>Patch while incompatible (1.0.2) receiver floating around
+             if (m_lPeerSrtVersion == SrtVersion(1, 0, 2))
+             {
+                 data[ACKD_RCVRATE] = rcvRate; //bytes/sec
+                 data[ACKD_XMRATE] = data[ACKD_BANDWIDTH] * m_iMaxSRTPayloadSize; //bytes/sec
+                 ctrlsz = ACKD_FIELD_SIZE * ACKD_TOTAL_SIZE_VER102;
+             }
+             else if (m_lPeerSrtVersion >= SrtVersion(1, 0, 3))
+             {
+                 // Normal, currently expected version.
+                 data[ACKD_RCVRATE] = rcvRate; //bytes/sec
+                 ctrlsz = ACKD_FIELD_SIZE * ACKD_TOTAL_SIZE_VER101;
+             }
+             // ELSE: leave the buffer with ...UDTBASE size.
 
                 ctrlpkt.pack(pkttype, &m_iAckSeqNo, data, ctrlsz);
                 m_lastAckTime = srt::sync::steady_clock::now();
@@ -7551,7 +7549,7 @@ void CUDT::processCtrl(CPacket &ctrlpkt)
         m_pRcvBuffer->dropMsg(ctrlpkt.getMsgSeq(using_rexmit_flag), using_rexmit_flag);
         CriticalSection::leave(m_RecvLock);
 
-        unlose(*(int32_t *)ctrlpkt.m_pcData, *(int32_t *)(ctrlpkt.m_pcData + 4));
+      dropFromLossLists(*(int32_t*)ctrlpkt.m_pcData, *(int32_t*)(ctrlpkt.m_pcData + 4));
 
         // move forward with current recv seq no.
         if ((CSeqNo::seqcmp(*(int32_t *)ctrlpkt.m_pcData, CSeqNo::incseq(m_iRcvCurrSeqNo)) <= 0) &&
@@ -8582,20 +8580,15 @@ void CUDT::unlose(const CPacket &packet)
         HLOGF(mglog.Debug, "received reXmitted or belated packet seq %d (distinction not supported by peer)", sequence);
     }
 
-    int initial_loss_ttl = 0;
-    if (m_bPeerRexmitFlag)
-        initial_loss_ttl = m_iReorderTolerance;
-
     // Don't do anything if "belated loss report" feature is not used.
     // In that case the FreshLoss list isn't being filled in at all, the
     // loss report is sent directly.
-
     // Note that this condition blocks two things being done in this function:
     // - remove given sequence from the fresh loss record
     //   (in this case it's empty anyway)
     // - decrease current reorder tolerance based on whether packets come in order
     //   (current reorder tolerance is 0 anyway)
-    if (!initial_loss_ttl)
+    if (m_bPeerRexmitFlag == 0 || m_iReorderTolerance == 0)
         return;
 
     size_t i       = 0;
@@ -8619,24 +8612,23 @@ void CUDT::unlose(const CPacket &packet)
 
         case CRcvFreshLoss::SPLIT:
             // Oh, this will be more complicated. This means that it was in between.
-            {
-                // So create a new element that will hold the upper part of the range,
-                // and this one modify to be the lower part of the range.
+        {
+            // So create a new element that will hold the upper part of the range,
+            // and this one modify to be the lower part of the range.
 
-                // Keep the current end-of-sequence value for the second element
-                int32_t next_end = m_FreshLoss[i].seq[1];
+            // Keep the current end-of-sequence value for the second element
+            int32_t next_end = m_FreshLoss[i].seq[1];
 
-                // seq-1 set to the end of this element
-                m_FreshLoss[i].seq[1] = CSeqNo::decseq(sequence);
-                // seq+1 set to the begin of the next element
-                int32_t next_begin = CSeqNo::incseq(sequence);
+            // seq-1 set to the end of this element
+            m_FreshLoss[i].seq[1] = CSeqNo::decseq(sequence);
+            // seq+1 set to the begin of the next element
+            int32_t next_begin = CSeqNo::incseq(sequence);
 
-                // Use position of the NEXT element because insertion happens BEFORE pointed element.
-                // Use the same TTL (will stay the same in the other one).
-                m_FreshLoss.insert(m_FreshLoss.begin() + i + 1,
-                                   CRcvFreshLoss(next_begin, next_end, m_FreshLoss[i].ttl));
-            }
-            goto breakbreak;
+            // Use position of the NEXT element because insertion happens BEFORE pointed element.
+            // Use the same TTL (will stay the same in the other one).
+            m_FreshLoss.insert(m_FreshLoss.begin() + i + 1, CRcvFreshLoss(next_begin, next_end, m_FreshLoss[i].ttl));
+        }
+        goto breakbreak;
         }
     }
 
@@ -8682,22 +8674,18 @@ breakbreak:;
     }
 }
 
-void CUDT::unlose(int32_t from, int32_t to)
+void CUDT::dropFromLossLists(int32_t from, int32_t to)
 {
     ScopedLock lock(m_RcvLossLock);
     m_pRcvLossList->remove(from, to);
 
     HLOGF(mglog.Debug, "TLPKTDROP seq %d-%d (%d packets)", from, to, CSeqNo::seqoff(from, to));
 
-    // All code below concerns only "belated lossreport" feature.
-
-    int initial_loss_ttl = 0;
-    if (m_bPeerRexmitFlag)
-        initial_loss_ttl = m_iReorderTolerance;
-
-    if (!initial_loss_ttl)
+    if (m_bPeerRexmitFlag == 0 || m_iReorderTolerance == 0)
         return;
 
+    // All code below concerns only "belated lossreport" feature.
+    
     // It's highly unlikely that this is waiting to send a belated UMSG_LOSSREPORT,
     // so treat it rather as a sanity check.
 
@@ -9052,17 +9040,18 @@ void CUDT::addLossRecord(std::vector<int32_t> &lr, int32_t lo, int32_t hi)
 
 void CUDT::checkACKTimer(const steady_clock::time_point &currtime)
 {
-    if (currtime > m_NextACKTime // ACK time has come
-                                 // OR the number of sent packets since last ACK has reached
-                                 // the congctl-defined value of ACK Interval
-                                 // (note that none of the builtin congctls defines ACK Interval)
-        || (m_CongCtl->ACKInterval() > 0 && m_iPktCount >= m_CongCtl->ACKInterval()))
+    if (currtime > m_NextACKTime  // ACK time has come
+            // OR the number of sent packets since last ACK has reached
+            // the congctl-defined value of ACK Interval
+            // (note that none of the builtin congctls defines ACK Interval)
+            || (m_CongCtl->ACKMaxPackets() > 0 && m_iPktCount >= m_CongCtl->ACKMaxPackets()))
     {
         // ACK timer expired or ACK interval is reached
         sendCtrl(UMSG_ACK);
 
-        const srt::sync::steady_clock::duration ack_interval =
-            m_CongCtl->ACKPeriod() > 0 ? srt::sync::from_microseconds(m_CongCtl->ACKPeriod()) : m_ACKInterval;
+        const srt::sync::steady_clock::duration ack_interval = m_CongCtl->ACKTimeout_us() > 0
+            ? srt::sync::from_microseconds(m_CongCtl->ACKTimeout_us())
+            : m_ACKInterval;
         m_NextACKTime = currtime + ack_interval;
 
         m_iPktCount      = 0;

@@ -200,6 +200,8 @@ public: //API
     static int epoll_update_usock(const int eid, const SRTSOCKET u, const int* events = NULL);
     static int epoll_update_ssock(const int eid, const SYSSOCKET s, const int* events = NULL);
     static int epoll_wait(const int eid, std::set<SRTSOCKET>* readfds, std::set<SRTSOCKET>* writefds, int64_t msTimeOut, std::set<SYSSOCKET>* lrfds = NULL, std::set<SYSSOCKET>* wrfds = NULL);
+    static int epoll_uwait(const int eid, SRT_EPOLL_EVENT* fdsSet, int fdsSize, int64_t msTimeOut);
+    static int32_t epoll_set(const int eid, int32_t flags);
     static int epoll_release(const int eid);
     static CUDTException& getlasterror();
     static int perfmon(SRTSOCKET u, CPerfMon* perf, bool clear = true);
@@ -459,7 +461,7 @@ private:
     /// removes the loss record from both current receiver loss list and
     /// the receiver fresh loss list.
     void unlose(const CPacket& oldpacket);
-    void unlose(int32_t from, int32_t to);
+    void dropFromLossLists(int32_t from, int32_t to);
 
     void checkSndTimers(Whether2RegenKm regen = DONT_REGEN_KM);
     void handshakeDone()
@@ -637,7 +639,6 @@ private:    // Timers
     /*volatile*/ srt::sync::steady_clock::time_point m_NextACKTime;             // Next ACK time, in CPU clock cycles, same below
     /*volatile*/ srt::sync::steady_clock::time_point m_NextNAKTime;             // Next NAK time
 
-    /*volatile*/ srt::sync::steady_clock::duration m_SYNInterval;    // SYN interval
     /*volatile*/ srt::sync::steady_clock::duration m_ACKInterval;    // ACK interval
     /*volatile*/ srt::sync::steady_clock::duration m_NAKInterval;    // NAK interval
     /*volatile*/ srt::sync::steady_clock::time_point m_lastRspTime;    // time stamp of last response from the peer

@@ -38,7 +38,7 @@ if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
 	include(GNUInstallDirs)
 endif()
 
-set (SRT_VERSION 1.3.4)
+set (SRT_VERSION 1.4.0)
 set_version_variables(SRT_VERSION ${SRT_VERSION})
 
 # The CMAKE_BUILD_TYPE seems not to be always set, weird.
@@ -305,7 +305,7 @@ if ( USE_GNUSTL )
 endif()
 
 # Detect if the compiler is GNU compatable for flags
-if(${CMAKE_CXX_COMPILER_ID} MATCHES "gnid|GNU|Intel|Clang|AppleClang")
+if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Intel|Clang|AppleClang")
 	message(STATUS "COMPILER: ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) - GNU compat")
 	set(HAVE_COMPILER_GNU_COMPAT 1)
 else()
@@ -369,6 +369,7 @@ set (haicrypt_libspec VIRTUAL)
 set (srtpack_libspec_common)
 if (srt_libspec_shared)
 	list(APPEND srtpack_libspec_common ${TARGET_srt}_shared)
+
 endif()
 if (srt_libspec_static)
 	list(APPEND srtpack_libspec_common ${TARGET_srt}_static)
@@ -437,10 +438,23 @@ if (ENABLE_THREAD_CHECK)
 	)
 endif()
 
-if (${ENABLE_PROFILE} AND HAVE_COMPILER_GNU_COMPAT)
-	# They are actually cflags, not definitions, but CMake is stupid enough.
-	add_definitions(-g -pg)
-	link_libraries(-g -pg)
+if (ENABLE_PROFILE)
+	if (HAVE_COMPILER_GNU_COMPAT)
+		# They are actually cflags, not definitions, but CMake is stupid enough.
+		add_definitions(-g -pg)
+		link_libraries(-g -pg)
+	else()
+		message(FATAL_ERROR "Profiling option is not supported on this platform")
+	endif()
+endif()
+
+if (ENABLE_CODE_COVERAGE)
+	if (HAVE_COMPILER_GNU_COMPAT)
+		add_definitions(-g -O0 --coverage)
+		link_libraries(--coverage)
+	else()
+		message(FATAL_ERROR "Code coverage option is not supported on this platform")
+	endif()
 endif()
 
 if (ENABLE_CODE_COVERAGE AND HAVE_COMPILER_GNU_COMPAT)
@@ -455,15 +469,29 @@ elseif (WIN32 AND NOT MINGW)
 	find_package(pthreads QUIET)
 
 	if (NOT PTHREAD_INCLUDE_DIR OR NOT PTHREAD_LIBRARY)
-		# find pthread
-		find_path(PTHREAD_INCLUDE_DIR pthread.h HINTS C:/pthread-win32/include)
+		#search package folders with GLOB to add as extra hint for headers
+		file(GLOB PTHREAD_PACKAGE_INCLUDE_HINT ./packages/cinegy.pthreads-win*/sources)
+		if (PTHREAD_PACKAGE_INCLUDE_HINT)
+			message(STATUS "PTHREAD_PACKAGE_INCLUDE_HINT value: ${PTHREAD_PACKAGE_INCLUDE_HINT}")
+		endif()
+
+		# find pthread header
+		find_path(PTHREAD_INCLUDE_DIR pthread.h HINTS C:/pthread-win32/include ${PTHREAD_PACKAGE_INCLUDE_HINT})
+
 		if (PTHREAD_INCLUDE_DIR)
 			message(STATUS "Pthread include dir: ${PTHREAD_INCLUDE_DIR}")
 		else()
 			message(FATAL_ERROR "Failed to find pthread.h. Specify PTHREAD_INCLUDE_DIR.")
 		endif()
-	
-		find_library(PTHREAD_LIBRARY NAMES pthread pthread_dll pthread_lib HINTS C:/pthread-win32/lib C:/pthread-win64/lib)
+
+		#search package folders with GLOB to add as extra hint for libs
+		file(GLOB PTHREAD_PACKAGE_LIB_HINT ./packages/cinegy.pthreads-win*/runtimes/win-*/native/release)
+		if (PTHREAD_PACKAGE_LIB_HINT)
+			message(STATUS "PTHREAD_PACKAGE_LIB_HINT value: ${PTHREAD_PACKAGE_LIB_HINT}")
+		endif()
+
+		#find pthread library
+		find_library(PTHREAD_LIBRARY NAMES pthread pthread_dll pthread_lib HINTS C:/pthread-win32/lib C:/pthread-win64/lib ${PTHREAD_PACKAGE_LIB_HINT})
 		if (PTHREAD_LIBRARY)
 			message(STATUS "Pthread library: ${PTHREAD_LIBRARY}")
 		else()
@@ -543,6 +571,7 @@ MafReadDir(srtcore filelist.maf
 
 # Auto generated version file and add it to the HEADERS_srt list.
 configure_file("srtcore/version.h.in" "version.h" @ONLY)
+
 list(INSERT HEADERS_srt 0 "${CMAKE_CURRENT_BINARY_DIR}/version.h")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -927,11 +956,12 @@ if (ENABLE_UNITTESTS AND ENABLE_CXX11)
 	
 	message(STATUS "Unit test sources: ${SOURCES_unittests}")
 
-	srt_add_program(test_srt ${SOURCES_unittests})
-	srt_make_application(test_srt)
+	srt_add_program(test-srt ${SOURCES_unittests})
+	srt_make_application(test-srt)
+	target_include_directories(test-srt PRIVATE  ${SSL_INCLUDE_DIRS})
 
 	target_link_libraries(
-		test_srt PUBLIC
+		test-srt PRIVATE
 		${GTEST_BOTH_LIBRARIES}
 		${srt_link_library}
 		${PTHREAD_LIBRARY}
@@ -939,9 +969,9 @@ if (ENABLE_UNITTESTS AND ENABLE_CXX11)
 
 	add_test(
 		NAME
-			test_srt
+			test-srt
 		COMMAND
-			${CMAKE_BINARY_DIR}/test_srt
+			${CMAKE_BINARY_DIR}/test-srt
 	)
 
 	enable_testing()
