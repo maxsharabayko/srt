@@ -168,7 +168,7 @@ public:
 
       /// Update the timestamp of the UDT instance on the list.
       /// @param [in] u pointer to the UDT instance
-      /// @param [in] resechedule if the timestampe shoudl be rescheduled
+      /// @param [in] reschedule if the timestamp should be rescheduled
 
    void update(const CUDT* u, EReschedule reschedule);
 
@@ -215,9 +215,9 @@ private:
    int m_iArrayLength;			// physical length of the array
    int m_iLastEntry;			// position of last entry on the heap array
 
-   pthread_mutex_t m_ListLock;
+   srt::sync::Mutex m_ListLock;
 
-   pthread_mutex_t* m_pWindowLock;
+   srt::sync::Mutex* m_pWindowLock;
    pthread_cond_t* m_pWindowCond;
 
    CTimer* m_pTimer;
@@ -325,7 +325,7 @@ public:
    ~CRendezvousQueue();
 
 public:
-   void insert(const SRTSOCKET& id, CUDT* u, int ipv, const sockaddr* addr, uint64_t ttl);
+    void insert(const SRTSOCKET& id, CUDT* u, int ipv, const sockaddr* addr, uint64_t ttl);
 
    // The should_lock parameter is given here to state as to whether
    // the lock should be applied here. If called from some internals
@@ -347,7 +347,7 @@ private:
    };
    std::list<CRL> m_lRendezvousID;      // The sockets currently in rendezvous mode
 
-   pthread_mutex_t m_RIDVectorLock;
+   srt::sync::Mutex m_RIDVectorLock;
 };
 
 class CSndQueue
@@ -407,15 +407,15 @@ private:
 
 
 private:
-   CSndUList* m_pSndUList;		// List of UDT instances for data sending
+   CSndUList* m_pSndUList;              // List of UDT instances for data sending
    CChannel* m_pChannel;                // The UDP channel for data sending
-   CTimer* m_pTimer;			// Timing facility
+   CTimer* m_pTimer;                    // Timing facility
 
-   pthread_mutex_t m_WindowLock;
+   srt::sync::Mutex m_WindowLock;
    pthread_cond_t m_WindowCond;
 
+
    volatile bool m_bClosing;		// closing the worker
-   pthread_cond_t m_ExitCond;
 
 #if defined(SRT_DEBUG_SNDQ_HIGHRATE)//>>debug high freq worker
    uint64_t m_ullDbgPeriod;
@@ -494,7 +494,6 @@ private:
    int m_iPayloadSize;                  // packet payload size
 
    volatile bool m_bClosing;            // closing the worker
-   pthread_cond_t m_ExitCond;
 
 private:
    int setListener(CUDT* u);
@@ -510,15 +509,15 @@ private:
    void storePkt(int32_t id, CPacket* pkt);
 
 private:
-   pthread_mutex_t m_LSLock;
+   srt::sync::Mutex m_LSLock;
    CUDT* m_pListener;                                   // pointer to the (unique, if any) listening UDT entity
    CRendezvousQueue* m_pRendezvousQueue;                // The list of sockets in rendezvous mode
 
    std::vector<CUDT*> m_vNewEntry;                      // newly added entries, to be inserted
-   pthread_mutex_t m_IDLock;
+   srt::sync::Mutex m_IDLock;
 
    std::map<int32_t, std::queue<CPacket*> > m_mBuffer;	// temporary buffer for rendezvous connection request
-   pthread_mutex_t m_PassLock;
+   srt::sync::Mutex m_PassLock;
    pthread_cond_t m_PassCond;
 
 private:

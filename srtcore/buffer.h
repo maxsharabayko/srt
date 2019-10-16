@@ -73,6 +73,8 @@ public:
    CSndBuffer(int size = 32, int mss = 1500);
    ~CSndBuffer();
 
+public:
+
       /// Insert a user buffer into the sending list.
       /// @param [in] data pointer to the user data block.
       /// @param [in] len size of the block.
@@ -106,7 +108,7 @@ public:
       /// @param [out] msglen length of the message
       /// @return Actual length of data read.
 
-   int readData(char** data, const int offset, int32_t& msgno, uint64_t& origintime, int& msglen);
+   int readData(char **data, const int offset, int32_t &msgno, uint64_t &origintime, int &msglen);
 
       /// Update the ACK point and may release/unmap/return the user data according to the flag.
       /// @param [in] offset number of packets acknowledged.
@@ -118,7 +120,7 @@ public:
 
    int getCurrBufSize() const;
 
-   int dropLateData(int &bytes, uint64_t latetime);
+   int dropLateData(int &bytes, uint64_t too_late_time);
 
 #ifdef SRT_ENABLE_SNDBUFSZ_MAVG
    void updAvgBufSize(uint64_t time);
@@ -159,7 +161,7 @@ private:    // Constants
     static const int      INPUTRATE_INITIAL_BYTESPS = BW_INFINITE;
 
 private:
-   pthread_mutex_t m_BufLock;           // used to synchronize buffer operation
+   srt::sync::Mutex m_BufLock;           // used to synchronize buffer operation
 
    struct Block
    {
@@ -167,7 +169,7 @@ private:
       int m_iLength;                    // length of the block
 
       int32_t m_iMsgNoBitset;                 // message number
-      uint64_t m_ullOriginTime_us;            // original request time
+      uint64_t m_OriginTime;            // original request time
       uint64_t m_ullSourceTime_us;
       int m_iTTL;                       // time to live (milliseconds)
 
@@ -244,6 +246,9 @@ public:
       /// @param [in] bufsize_pkts in units (packets)
    CRcvBuffer(CUnitQueue* queue, int bufsize_pkts = 65536);
    ~CRcvBuffer();
+
+
+public:
 
       /// Write data into the buffer.
       /// @param [in] unit pointer to a data unit containing new packet
@@ -361,7 +366,7 @@ public:
       /// @param [in] timestamp packet time stamp
       /// @param [ref] lock Mutex that should be locked for the operation
 
-   void addRcvTsbPdDriftSample(uint32_t timestamp, pthread_mutex_t& lock);
+   void addRcvTsbPdDriftSample(uint32_t timestamp, srt::sync::Mutex& lock);
 
 #ifdef SRT_DEBUG_TSBPD_DRIFT
    void printDriftHistogram(int64_t iDrift);
@@ -395,20 +400,20 @@ private:
       /// @retval false tsbpdtime = 0: no packet ready to play
 
 
-   bool getRcvReadyMsg(ref_t<uint64_t> tsbpdtime, ref_t<int32_t> curpktseq);
+    bool getRcvReadyMsg(ref_t<uint64_t> tsbpdtime, ref_t<int32_t> curpktseq);
 
       /// Get packet delivery local time base (adjusted for wrap around)
       /// @param [in] timestamp packet timestamp (relative to peer StartTime), wrapping around every ~72 min
       /// @return local delivery time (usec)
 
-   uint64_t getTsbPdTimeBase(uint32_t timestamp);
+    uint64_t getTsbPdTimeBase(uint32_t timestamp);
 
       /// Get packet local delivery time
       /// @param [in] timestamp packet timestamp (relative to peer StartTime), wrapping around every ~72 min
       /// @return local delivery time (usec)
 
 public:
-   uint64_t getPktTsbPdTime(uint32_t timestamp);
+    uint64_t getPktTsbPdTime(uint32_t timestamp);
    int debugGetSize() const;
    bool empty() const;
 
@@ -443,7 +448,7 @@ private:
 
    int m_iNotch;                        // the starting read point of the first unit
 
-   pthread_mutex_t m_BytesCountLock;    // used to protect counters operations
+   srt::sync::Mutex m_BytesCountLock;    // used to protect counters operations
    int m_iBytesCount;                   // Number of payload bytes in the buffer
    int m_iAckedPktsCount;               // Number of acknowledged pkts in the buffer
    int m_iAckedBytesCount;              // Number of acknowledged payload bytes in the buffer

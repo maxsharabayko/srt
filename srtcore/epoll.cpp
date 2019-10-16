@@ -76,21 +76,20 @@ modified by
 #include "udt.h"
 
 using namespace std;
+using namespace srt::sync;
 
 CEPoll::CEPoll():
 m_iIDSeed(0)
 {
-   CGuard::createMutex(m_EPollLock);
 }
 
 CEPoll::~CEPoll()
 {
-   CGuard::releaseMutex(m_EPollLock);
 }
 
 int CEPoll::create()
 {
-   CGuard pg(m_EPollLock);
+   ScopedLock pg(m_EPollLock);
 
    int localid = 0;
 
@@ -125,7 +124,7 @@ ENOMEM: There was insufficient memory to create the kernel object.
 
 int CEPoll::add_ssock(const int eid, const SYSSOCKET& s, const int* events)
 {
-   CGuard pg(m_EPollLock);
+   ScopedLock pg(m_EPollLock);
 
    map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
    if (p == m_mPolls.end())
@@ -193,7 +192,7 @@ int CEPoll::add_ssock(const int eid, const SYSSOCKET& s, const int* events)
 
 int CEPoll::remove_ssock(const int eid, const SYSSOCKET& s)
 {
-   CGuard pg(m_EPollLock);
+   ScopedLock pg(m_EPollLock);
 
    map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
    if (p == m_mPolls.end())
@@ -224,7 +223,7 @@ int CEPoll::remove_ssock(const int eid, const SYSSOCKET& s)
 // Need this to atomically modify polled events (ex: remove write/keep read)
 int CEPoll::update_usock(const int eid, const SRTSOCKET& u, const int* events)
 {
-    CGuard pg(m_EPollLock);
+   ScopedLock pg(m_EPollLock);
 
     map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
     if (p == m_mPolls.end())
@@ -263,7 +262,7 @@ int CEPoll::update_usock(const int eid, const SRTSOCKET& u, const int* events)
 
 int CEPoll::update_ssock(const int eid, const SYSSOCKET& s, const int* events)
 {
-   CGuard pg(m_EPollLock);
+   ScopedLock pg(m_EPollLock);
 
    map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
    if (p == m_mPolls.end())
@@ -328,7 +327,7 @@ int CEPoll::update_ssock(const int eid, const SYSSOCKET& s, const int* events)
 
 int CEPoll::setflags(const int eid, int32_t flags)
 {
-    CGuard pg(m_EPollLock);
+    ScopedLock pg(m_EPollLock);
     map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
     if (p == m_mPolls.end())
         throw CUDTException(MJ_NOTSUP, MN_EIDINVAL);
@@ -364,7 +363,7 @@ int CEPoll::uwait(const int eid, SRT_EPOLL_EVENT* fdsSet, int fdsSize, int64_t m
     while (true)
     {
         {
-            CGuard pg(m_EPollLock);
+            ScopedLock pg(m_EPollLock);
             map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
             if (p == m_mPolls.end())
                 throw CUDTException(MJ_NOTSUP, MN_EIDINVAL);
@@ -434,7 +433,7 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
     while (true)
     {
         {
-            CGuard epollock(m_EPollLock);
+            ScopedLock epollock(m_EPollLock);
 
             map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
             if (p == m_mPolls.end())
@@ -486,37 +485,37 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
                 epoll_event ev[max_events];
                 int nfds = ::epoll_wait(ed.m_iLocalID, ev, max_events, 0);
 
-                for (int i = 0; i < nfds; ++ i)
+                for (int i = 0; i < nfds; ++i)
                 {
                     if ((NULL != lrfds) && (ev[i].events & EPOLLIN))
                     {
                         lrfds->insert(ev[i].data.fd);
-                        ++ total;
+                        ++total;
                     }
                     if ((NULL != lwfds) && (ev[i].events & EPOLLOUT))
                     {
                         lwfds->insert(ev[i].data.fd);
-                        ++ total;
+                        ++total;
                     }
                 }
 #elif defined(BSD) || defined(OSX) || (TARGET_OS_IOS == 1) || (TARGET_OS_TV == 1)
-                struct timespec tmout = {0, 0};
+                struct timespec tmout = { 0, 0 };
                 const int max_events = ed.m_sLocals.size();
                 struct kevent ke[max_events];
 
                 int nfds = kevent(ed.m_iLocalID, NULL, 0, ke, max_events, &tmout);
 
-                for (int i = 0; i < nfds; ++ i)
+                for (int i = 0; i < nfds; ++i)
                 {
                     if ((NULL != lrfds) && (ke[i].filter == EVFILT_READ))
                     {
                         lrfds->insert(ke[i].ident);
-                        ++ total;
+                        ++total;
                     }
                     if ((NULL != lwfds) && (ke[i].filter == EVFILT_WRITE))
                     {
                         lwfds->insert(ke[i].ident);
-                        ++ total;
+                        ++total;
                     }
                 }
 #else
@@ -531,13 +530,13 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
                 FD_ZERO(&readfds);
                 FD_ZERO(&writefds);
 
-                for (set<SYSSOCKET>::const_iterator i = ed.m_sLocals.begin(); i != ed.m_sLocals.end(); ++ i)
+                for (set<SYSSOCKET>::const_iterator i = ed.m_sLocals.begin(); i != ed.m_sLocals.end(); ++i)
                 {
                     if (lrfds)
                         FD_SET(*i, &readfds);
                     if (lwfds)
                         FD_SET(*i, &writefds);
-                    if ((int)*i > max_fd)
+                    if ((int)* i > max_fd)
                         max_fd = *i;
                 }
 
@@ -546,17 +545,17 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
                 tv.tv_usec = 0;
                 if (::select(max_fd + 1, &readfds, &writefds, NULL, &tv) > 0)
                 {
-                    for (set<SYSSOCKET>::const_iterator i = ed.m_sLocals.begin(); i != ed.m_sLocals.end(); ++ i)
+                    for (set<SYSSOCKET>::const_iterator i = ed.m_sLocals.begin(); i != ed.m_sLocals.end(); ++i)
                     {
                         if (lrfds && FD_ISSET(*i, &readfds))
                         {
                             lrfds->insert(*i);
-                            ++ total;
+                            ++total;
                         }
                         if (lwfds && FD_ISSET(*i, &writefds))
                         {
                             lwfds->insert(*i);
-                            ++ total;
+                            ++total;
                         }
                     }
                 }
@@ -579,7 +578,7 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
 
 int CEPoll::release(const int eid)
 {
-   CGuard pg(m_EPollLock);
+   ScopedLock pg(m_EPollLock);
 
    map<int, CEPollDesc>::iterator i = m_mPolls.find(eid);
    if (i == m_mPolls.end())
@@ -602,7 +601,7 @@ int CEPoll::update_events(const SRTSOCKET& uid, std::set<int>& eids, const int e
 {
     vector<int> lost;
 
-    CGuard pg(m_EPollLock);
+    ScopedLock pg(m_EPollLock);
     for (set<int>::iterator i = eids.begin(); i != eids.end(); ++ i)
     {
         map<int, CEPollDesc>::iterator p = m_mPolls.find(*i);

@@ -86,63 +86,61 @@ modified by
 bool CTimer::m_bUseMicroSecond = false;
 uint64_t CTimer::s_ullCPUFrequency = CTimer::readCPUFrequency();
 
-pthread_mutex_t CTimer::m_EventLock = PTHREAD_MUTEX_INITIALIZER;
+srt::sync::Mutex CTimer::m_EventLock;
 pthread_cond_t CTimer::m_EventCond = PTHREAD_COND_INITIALIZER;
 
-CTimer::CTimer():
-m_ullSchedTime(),
-m_TickCond(),
-m_TickLock()
+CTimer::CTimer() :
+    m_ullSchedTime(),
+    m_TickCond(),
+    m_TickLock()
 {
-    pthread_mutex_init(&m_TickLock, NULL);
     pthread_cond_init(&m_TickCond, NULL);
 }
 
 CTimer::~CTimer()
 {
-    pthread_mutex_destroy(&m_TickLock);
     pthread_cond_destroy(&m_TickCond);
 }
 
-void CTimer::rdtsc(uint64_t &x)
+void CTimer::rdtsc(uint64_t& x)
 {
-   if (m_bUseMicroSecond)
-   {
-      x = getTime();
-      return;
-   }
+    if (m_bUseMicroSecond)
+    {
+        x = getTime();
+        return;
+    }
 
-   #ifdef IA32
-      uint32_t lval, hval;
-      //asm volatile ("push %eax; push %ebx; push %ecx; push %edx");
-      //asm volatile ("xor %eax, %eax; cpuid");
-      asm volatile ("rdtsc" : "=a" (lval), "=d" (hval));
-      //asm volatile ("pop %edx; pop %ecx; pop %ebx; pop %eax");
-      x = hval;
-      x = (x << 32) | lval;
-   #elif defined(IA64)
-      asm ("mov %0=ar.itc" : "=r"(x) :: "memory");
-   #elif defined(AMD64)
-      uint32_t lval, hval;
-      asm ("rdtsc" : "=a" (lval), "=d" (hval));
-      x = hval;
-      x = (x << 32) | lval;
-   #elif defined(_WIN32)
-      // This function should not fail, because we checked the QPC
-      // when calling to QueryPerformanceFrequency. If it failed,
-      // the m_bUseMicroSecond was set to true.
-      QueryPerformanceCounter((LARGE_INTEGER *)&x);
-   #elif defined(OSX) || (TARGET_OS_IOS == 1) || (TARGET_OS_TV == 1)
-      x = mach_absolute_time();
-   #else
-      // use system call to read time clock for other archs
-      x = getTime();
-   #endif
+#ifdef IA32
+    uint32_t lval, hval;
+    //asm volatile ("push %eax; push %ebx; push %ecx; push %edx");
+    //asm volatile ("xor %eax, %eax; cpuid");
+    asm volatile ("rdtsc" : "=a" (lval), "=d" (hval));
+    //asm volatile ("pop %edx; pop %ecx; pop %ebx; pop %eax");
+    x = hval;
+    x = (x << 32) | lval;
+#elif defined(IA64)
+    asm("mov %0=ar.itc" : "=r"(x) :: "memory");
+#elif defined(AMD64)
+    uint32_t lval, hval;
+    asm("rdtsc" : "=a" (lval), "=d" (hval));
+    x = hval;
+    x = (x << 32) | lval;
+#elif defined(_WIN32)
+    // This function should not fail, because we checked the QPC
+    // when calling to QueryPerformanceFrequency. If it failed,
+    // the m_bUseMicroSecond was set to true.
+    QueryPerformanceCounter((LARGE_INTEGER*)& x);
+#elif defined(OSX) || (TARGET_OS_IOS == 1) || (TARGET_OS_TV == 1)
+    x = mach_absolute_time();
+#else
+    // use system call to read time clock for other archs
+    x = getTime();
+#endif
 }
 
 uint64_t CTimer::readCPUFrequency()
 {
-   uint64_t frequency = 1;  // 1 tick per microsecond.
+    uint64_t frequency = 1;  // 1 tick per microsecond.
 
 #if defined(IA32) || defined(IA64) || defined(AMD64)
     uint64_t t1, t2;
@@ -166,83 +164,83 @@ uint64_t CTimer::readCPUFrequency()
     frequency = info.denom * uint64_t(1000) / info.numer;
 #endif
 
-   // Fall back to microsecond if the resolution is not high enough.
-   if (frequency < 10)
-   {
-      frequency = 1;
-      m_bUseMicroSecond = true;
-   }
-   return frequency;
+    // Fall back to microsecond if the resolution is not high enough.
+    if (frequency < 10)
+    {
+        frequency = 1;
+        m_bUseMicroSecond = true;
+    }
+    return frequency;
 }
 
 uint64_t CTimer::getCPUFrequency()
 {
-   return s_ullCPUFrequency;
+    return s_ullCPUFrequency;
 }
 
 void CTimer::sleep(uint64_t interval)
 {
-   uint64_t t;
-   rdtsc(t);
+    uint64_t t;
+    rdtsc(t);
 
-   // sleep next "interval" time
-   sleepto(t + interval);
+    // sleep next "interval" time
+    sleepto(t + interval);
 }
 
 void CTimer::sleepto(uint64_t nexttime)
 {
-   // Use class member such that the method can be interrupted by others
-   m_ullSchedTime = nexttime;
+    // Use class member such that the method can be interrupted by others
+    m_ullSchedTime = nexttime;
 
-   uint64_t t;
-   rdtsc(t);
+    uint64_t t;
+    rdtsc(t);
 
-   while (t < m_ullSchedTime)
-   {
+    while (t < m_ullSchedTime)
+    {
 #if USE_BUSY_WAITING
 #ifdef IA32
-       __asm__ volatile ("pause; rep; nop; nop; nop; nop; nop;");
+        __asm__ volatile ("pause; rep; nop; nop; nop; nop; nop;");
 #elif IA64
-       __asm__ volatile ("nop 0; nop 0; nop 0; nop 0; nop 0;");
+        __asm__ volatile ("nop 0; nop 0; nop 0; nop 0; nop 0;");
 #elif AMD64
-       __asm__ volatile ("nop; nop; nop; nop; nop;");
+        __asm__ volatile ("nop; nop; nop; nop; nop;");
 #elif defined(_WIN32) && !defined(__MINGW__)
-       __nop ();
-       __nop ();
-       __nop ();
-       __nop ();
-       __nop ();
+        __nop();
+        __nop();
+        __nop();
+        __nop();
+        __nop();
 #endif
 #else
-       const uint64_t wait_us = (m_ullSchedTime - t) / CTimer::getCPUFrequency();
-       // The while loop ensures that (t < m_ullSchedTime).
-       // Division by frequency may lose precision, therefore can be 0.
-       if (wait_us == 0)
-           break;
+        const uint64_t wait_us = (m_ullSchedTime - t) / CTimer::getCPUFrequency();
+        // The while loop ensures that (t < m_ullSchedTime).
+        // Division by frequency may lose precision, therefore can be 0.
+        if (wait_us == 0)
+            break;
 
-       timeval now;
-       gettimeofday(&now, 0);
-       const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + wait_us;
-       timespec timeout;
-       timeout.tv_sec = time_us / 1000000;
-       timeout.tv_nsec = (time_us % 1000000) * 1000;
+        timeval now;
+        gettimeofday(&now, 0);
+        const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + wait_us;
+        timespec timeout;
+        timeout.tv_sec = time_us / 1000000;
+        timeout.tv_nsec = (time_us % 1000000) * 1000;
 
-       THREAD_PAUSED();
-       pthread_mutex_lock(&m_TickLock);
-       pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
-       pthread_mutex_unlock(&m_TickLock);
-       THREAD_RESUMED();
+        THREAD_PAUSED();
+        srt::sync::CriticalSection::enter(m_TickLock);
+        pthread_cond_timedwait(&m_TickCond, &m_TickLock.m_mutex, &timeout);
+        srt::sync::CriticalSection::leave(m_TickLock);
+        THREAD_RESUMED();
 #endif
 
-       rdtsc(t);
-   }
+        rdtsc(t);
+    }
 }
 
 void CTimer::interrupt()
 {
-   // schedule the sleepto time to the current CCs, so that it will stop
-   rdtsc(m_ullSchedTime);
-   tick();
+    // schedule the sleepto time to the current CCs, so that it will stop
+    rdtsc(m_ullSchedTime);
+    tick();
 }
 
 void CTimer::tick()
@@ -293,23 +291,23 @@ CTimer::EWait CTimer::waitForEvent()
         timeout.tv_sec = now.tv_sec + 1;
         timeout.tv_nsec = (now.tv_usec + 10000 - 1000000) * 1000;
     }
-    pthread_mutex_lock(&m_EventLock);
-    int reason = pthread_cond_timedwait(&m_EventCond, &m_EventLock, &timeout);
-    pthread_mutex_unlock(&m_EventLock);
+    srt::sync::CriticalSection::enter(m_EventLock);
+    const int reason = pthread_cond_timedwait(&m_EventCond, &m_EventLock.m_mutex, &timeout);
+    srt::sync::CriticalSection::leave(m_EventLock);
 
     return reason == ETIMEDOUT ? WT_TIMEOUT : reason == 0 ? WT_EVENT : WT_ERROR;
 }
 
 void CTimer::sleep()
 {
-   #ifndef _WIN32
-      usleep(10);
-   #else
-      Sleep(1);
-   #endif
+#ifndef _WIN32
+    usleep(10);
+#else
+    Sleep(1);
+#endif
 }
 
-int CTimer::condTimedWaitUS(pthread_cond_t* cond, pthread_mutex_t* mutex, uint64_t delay) {
+int CTimer::condTimedWaitUS(pthread_cond_t* cond, srt::sync::Mutex* mutex, uint64_t delay) {
     timeval now;
     gettimeofday(&now, 0);
     const uint64_t time_us = now.tv_sec * uint64_t(1000000) + now.tv_usec + delay;
@@ -317,67 +315,9 @@ int CTimer::condTimedWaitUS(pthread_cond_t* cond, pthread_mutex_t* mutex, uint64
     timeout.tv_sec = time_us / 1000000;
     timeout.tv_nsec = (time_us % 1000000) * 1000;
 
-    return pthread_cond_timedwait(cond, mutex, &timeout);
+    return pthread_cond_timedwait(cond, &mutex->m_mutex, &timeout);
 }
 
-
-// Automatically lock in constructor
-CGuard::CGuard(pthread_mutex_t& lock, bool shouldwork):
-    m_Mutex(lock),
-    m_iLocked(-1)
-{
-    if (shouldwork)
-        m_iLocked = pthread_mutex_lock(&m_Mutex);
-}
-
-// Automatically unlock in destructor
-CGuard::~CGuard()
-{
-    if (m_iLocked == 0)
-        pthread_mutex_unlock(&m_Mutex);
-}
-
-// After calling this on a scoped lock wrapper (CGuard),
-// the mutex will be unlocked right now, and no longer
-// in destructor
-void CGuard::forceUnlock()
-{
-    if (m_iLocked == 0)
-    {
-        pthread_mutex_unlock(&m_Mutex);
-        m_iLocked = -1;
-    }
-}
-
-int CGuard::enterCS(pthread_mutex_t& lock)
-{
-    return pthread_mutex_lock(&lock);
-}
-
-int CGuard::leaveCS(pthread_mutex_t& lock)
-{
-    return pthread_mutex_unlock(&lock);
-}
-
-void CGuard::createMutex(pthread_mutex_t& lock)
-{
-    pthread_mutex_init(&lock, NULL);
-}
-
-void CGuard::releaseMutex(pthread_mutex_t& lock)
-{
-    pthread_mutex_destroy(&lock);
-}
-
-void CGuard::createCond(pthread_cond_t& cond)
-{
-    pthread_cond_init(&cond, NULL);
-}
-
-void CGuard::releaseCond(pthread_cond_t& cond)
-{
-    pthread_cond_destroy(&cond);
-}
 
 //
 CUDTException::CUDTException(CodeMajor major, CodeMinor minor, int err):
@@ -879,8 +819,8 @@ std::string FormatTime(uint64_t time)
 {
     using namespace std;
 
-    time_t sec = time/1000000;
-    time_t usec = time%1000000;
+    time_t sec  = time / 1000000;
+    time_t usec = time % 1000000;
 
     time_t tt = sec;
     struct tm tm = SysLocalTime(tt);
