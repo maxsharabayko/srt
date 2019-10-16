@@ -457,6 +457,11 @@ if (ENABLE_CODE_COVERAGE)
 	endif()
 endif()
 
+if (ENABLE_CODE_COVERAGE AND HAVE_COMPILER_GNU_COMPAT)
+	add_definitions(-g -O0 --coverage)
+	link_libraries(--coverage)
+endif()
+
 if (PTHREAD_LIBRARY AND PTHREAD_INCLUDE_DIR)
 	message(STATUS "Pthread library: ${PTHREAD_LIBRARY}")
 	message(STATUS "Pthread include dir: ${PTHREAD_INCLUDE_DIR}")
@@ -807,12 +812,12 @@ macro(srt_make_application name)
 	# We state that Darwin always uses CLANG compiler, which honors this flag the same way.
 	set_target_properties(${name} PROPERTIES COMPILE_FLAGS "${CFLAGS_CXX_STANDARD} ${EXTRA_stransmit}" ${FORCE_RPATH})
 
-	target_link_libraries(${name} ${srt_link_library})
+	target_link_libraries(${name} PUBLIC ${srt_link_library})
 	if (USE_GNUSTL)
 		target_link_libraries(${name} PRIVATE ${GNUSTL_LIBRARIES} ${GNUSTL_LDFLAGS})
 	endif()
 	if (srt_libspec_static AND CMAKE_DL_LIBS)
-		target_link_libraries(${name} ${CMAKE_DL_LIBS})
+		target_link_libraries(${name} PUBLIC ${CMAKE_DL_LIBS})
 	endif()
 endmacro()
 
@@ -956,7 +961,7 @@ if (ENABLE_UNITTESTS AND ENABLE_CXX11)
 	target_include_directories(test-srt PRIVATE  ${SSL_INCLUDE_DIRS})
 
 	target_link_libraries(
-		test-srt
+		test-srt PRIVATE
 		${GTEST_BOTH_LIBRARIES}
 		${srt_link_library}
 		${PTHREAD_LIBRARY}

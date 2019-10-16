@@ -3,7 +3,7 @@
 #include <thread>
 #include <array>
 #include <numeric>   // std::accumulate
-#include "common.h"
+#include "sync.h"
 
 
 
@@ -11,29 +11,25 @@
 TEST(CTimer, DISABLED_SleeptoAccuracy)
 {
     using namespace std;
+    using namespace srt::sync;
 
     const int num_samples = 1000;
     array<uint64_t, num_samples> sleeps_us;
 
-    const uint64_t freq = CTimer::getCPUFrequency();
-    std::cerr << "CPU Frequency: " << freq << "\n";
+    const long sleep_intervals_us[] = { 1, 5, 10, 50, 100, 250, 500, 1000, 5000, 10000 };
 
-    const uint64_t sleep_intervals_us[] = { 1, 5, 10, 50, 100, 250, 500, 1000, 5000, 10000 };
+    srt::sync::SyncEvent timer;
 
-    CTimer timer;
-
-    for (uint64_t interval_us : sleep_intervals_us)
+    for (long interval_us : sleep_intervals_us)
     {
         for (int i = 0; i < num_samples; i++)
         {
-            uint64_t currtime;
-            CTimer::rdtsc(currtime);
+            const auto currtime = steady_clock::now();
 
-            timer.sleepto(currtime + interval_us * freq);
+            timer.wait_until(currtime + from_microseconds(interval_us));
 
-            uint64_t new_time;
-            CTimer::rdtsc(new_time);
-            sleeps_us[i] = (new_time - currtime) / freq;
+            const auto newtime = steady_clock::now();
+            sleeps_us[i] = to_microseconds(newtime - currtime);
         }
 
         cerr << "Target sleep duration: " << interval_us << " us\n";

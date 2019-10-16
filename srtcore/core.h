@@ -271,7 +271,6 @@ public: // internal API
     int MSS() { return m_iMSS; }
     size_t maxPayloadSize() { return m_iMaxSRTPayloadSize; }
     size_t OPT_PayloadSize() { return m_zOPT_ExpPayloadSize; }
-    uint64_t minNAKInterval() { return m_ullMinNakInt_tk; }
     int32_t ISN() { return m_iISN; }
     int sndLossLength() { return m_pSndLossList->getLossLength(); }
 
@@ -464,7 +463,6 @@ private:
     void unlose(const CPacket& oldpacket);
     void dropFromLossLists(int32_t from, int32_t to);
 
-    void considerLegacySrtHandshake(uint64_t timebase);
     void checkSndTimers(Whether2RegenKm regen = DONT_REGEN_KM);
     void handshakeDone()
     {
@@ -532,6 +530,10 @@ private: // Identification
     int m_iUDPRcvBufSize;                        // UDP receiving buffer size
     int m_iIPversion;                            // IP version
     bool m_bRendezvous;                          // Rendezvous connection mode
+
+
+private:
+
 #ifdef SRT_ENABLE_CONNTIMEO
     int m_iConnTimeOut;                          // connect timeout in milliseconds
 #endif
@@ -610,13 +612,12 @@ private:
     int m_iDeliveryRate;                         // Packet arrival rate at the receiver side
     int m_iByteDeliveryRate;                     // Byte arrival rate at the receiver side
 
-    uint64_t m_ullLingerExpiration;              // Linger expiration time (for GC to close a socket with data in sending buffer)
 
     CHandShake m_ConnReq;                        // connection request
     CHandShake m_ConnRes;                        // connection response
     CHandShake::RendezvousState m_RdvState;      // HSv5 rendezvous state
     HandshakeSide m_SrtHsSide;                   // HSv5 rendezvous handshake side resolved from cookie contest (DRAW if not yet resolved)
-    int64_t m_llLastReqTime;                     // last time when a connection request is sent
+
 
 private: // Sending related data
     CSndBuffer* m_pSndBuffer;                    // Sender buffer
@@ -628,6 +629,31 @@ private: // Sending related data
 
     volatile int m_iFlowWindowSize;              // Flow control window size
     volatile double m_dCongestionWindow;         // congestion window size
+
+private:    // Timers
+
+    uint64_t m_ullCPUFrequency;               // CPU clock frequency, used for Timer, ticks per microsecond
+    uint64_t m_ullNextACKTime_tk;             // Next ACK time, in CPU clock cycles, same below
+    uint64_t m_ullNextNAKTime_tk;             // Next NAK time
+
+    volatile uint64_t m_ullACKInt_tk;         // ACK interval
+    volatile uint64_t m_ullNAKInt_tk;         // NAK interval
+    volatile uint64_t m_ullLastRspTime_tk;    // time stamp of last response from the peer
+    volatile uint64_t m_ullLastRspAckTime_tk; // time stamp of last ACK from the peer
+    volatile uint64_t m_ullLastSndTime_tk;    // time stamp of last data/ctrl sent (in system ticks)
+    uint64_t m_ullMinNakInt_tk;               // NAK timeout lower bound; too small value can cause unnecessary retransmission
+    uint64_t m_ullMinExpInt_tk;               // timeout lower bound threshold: too small timeout can cause problem
+
+    uint64_t m_ullLastWarningTime;               // Last time that a warning message is sent
+    int64_t m_llLastReqTime;                     // last time when a connection request is sent
+    uint64_t m_ullRcvPeerStartTime;
+    uint64_t m_ullLingerExpiration;              // Linger expiration time (for GC to close a socket with data in sending buffer)
+    uint64_t m_ullLastAckTime_tk;                // Timestamp of last ACK
+
+    int m_iPktCount;                          // packet counter for ACK
+    int m_iLightACKCount;                     // light ACK counter
+
+    uint64_t m_ullNextSendTime_tk;     // scheduled time of next packet sending
 
     volatile int32_t m_iSndLastFullAck;          // Last full ACK received
     volatile int32_t m_iSndLastAck;              // Last ACK received
@@ -660,16 +686,13 @@ private: // Receiving related data
     int32_t m_iDebugPrevLastAck;
 #endif
     int32_t m_iRcvLastSkipAck;                   // Last dropped sequence ACK
-    uint64_t m_ullLastAckTime_tk;                // Timestamp of last ACK
     int32_t m_iRcvLastAckAck;                    // Last sent ACK that has been acknowledged
     int32_t m_iAckSeqNo;                         // Last ACK sequence number
     int32_t m_iRcvCurrSeqNo;                     // Largest received sequence number
     int32_t m_iRcvCurrPhySeqNo;                  // Same as m_iRcvCurrSeqNo, but physical only (disregarding a filter)
 
-    uint64_t m_ullLastWarningTime;               // Last time that a warning message is sent
-
     int32_t m_iPeerISN;                          // Initial Sequence Number of the peer side
-    uint64_t m_ullRcvPeerStartTime;
+    
 
     uint32_t m_lSrtVersion;
     uint32_t m_lMinimumPeerSrtVersion;
@@ -678,7 +701,7 @@ private: // Receiving related data
 
     bool m_bTsbPd;                               // Peer sends TimeStamp-Based Packet Delivery Packets 
     pthread_t m_RcvTsbPdThread;                  // Rcv TsbPD Thread handle
-    pthread_cond_t m_RcvTsbPdCond;
+    pthread_cond_t m_RcvTsbPdCond;               // TSBPD signals if reading is ready
     bool m_bTsbPdAckWakeup;                      // Signal TsbPd thread on Ack sent
 
     CallbackHolder<srt_listen_callback_fn> m_cbAcceptHook;
@@ -697,22 +720,17 @@ private:
 
 
 private: // synchronization: mutexes and conditions
-    pthread_mutex_t m_ConnectionLock;            // used to synchronize connection operation
 
-    pthread_cond_t m_SendBlockCond;              // used to block "send" call
-    pthread_mutex_t m_SendBlockLock;             // lock associated to m_SendBlockCond
+    srt::sync::Mutex m_ConnectionLock;            // used to synchronize connection operation
+    srt::sync::Mutex m_AckLock;                   // used to protected sender's loss list when processing ACK
+    srt::sync::Mutex m_SendLock;                  // used to synchronize "send" call
+    srt::sync::Mutex m_RecvLock;                  // used to synchronize "recv" call
+    srt::sync::Mutex m_RcvLossLock;               // Protects the receiver loss list (access: CRcvQueue::worker, CUDT::tsbpd)
+    srt::sync::Mutex m_StatsLock;                 // used to synchronize access to trace statistics
 
-    pthread_mutex_t m_AckLock;                   // used to protected sender's loss list when processing ACK
+    srt::sync::SyncEvent m_RecvDataSync;
+    srt::sync::SyncEvent m_SendBlockSync;       // used to block "send" call
 
-    pthread_cond_t m_RecvDataCond;               // used to block "recv" when there is no data
-    pthread_mutex_t m_RecvDataLock;              // lock associated to m_RecvDataCond
-
-    pthread_mutex_t m_SendLock;                  // used to synchronize "send" call
-    pthread_mutex_t m_RecvLock;                  // used to synchronize "recv" call
-
-    pthread_mutex_t m_RcvLossLock;               // Protects the receiver loss list (access: CRcvQueue::worker, CUDT::tsbpd)
-
-    pthread_mutex_t m_StatsLock;                 // used to synchronize access to trace statistics
 
     void initSynch();
     void destroySynch();
@@ -817,28 +835,13 @@ public:
 
     static const size_t MAX_SID_LENGTH = 512;
 
-private: // Timers
-    uint64_t m_ullCPUFrequency;               // CPU clock frequency, used for Timer, ticks per microsecond
-    uint64_t m_ullNextACKTime_tk;             // Next ACK time, in CPU clock cycles, same below
-    uint64_t m_ullNextNAKTime_tk;             // Next NAK time
-
-    volatile uint64_t m_ullACKInt_tk;         // ACK interval
-    volatile uint64_t m_ullNAKInt_tk;         // NAK interval
-    volatile uint64_t m_ullLastRspTime_tk;    // time stamp of last response from the peer
-    volatile uint64_t m_ullLastRspAckTime_tk; // time stamp of last ACK from the peer
-    volatile uint64_t m_ullLastSndTime_tk;    // time stamp of last data/ctrl sent (in system ticks)
-    uint64_t m_ullMinNakInt_tk;               // NAK timeout lower bound; too small value can cause unnecessary retransmission
-    uint64_t m_ullMinExpInt_tk;               // timeout lower bound threshold: too small timeout can cause problem
-
-    int m_iPktCount;                          // packet counter for ACK
-    int m_iLightACKCount;                     // light ACK counter
-
-    uint64_t m_ullTargetTime_tk;              // scheduled time of next packet sending
+private: // Timers functions
 
     void checkTimers();
-    void checkACKTimer (uint64_t currtime_tk);
+    void considerLegacySrtHandshake(uint64_t timebase);
+    void checkACKTimer(uint64_t currtime_tk);
     void checkNAKTimer(uint64_t currtime_tk);
-    bool checkExpTimer (uint64_t currtime_tk);  // returns true if the connection is expired
+    bool checkExpTimer(uint64_t currtime_tk);  // returns true if the connection is expired
     void checkRexmitTimer(uint64_t currtime_tk);
 
 public: // For the use of CCryptoControl
