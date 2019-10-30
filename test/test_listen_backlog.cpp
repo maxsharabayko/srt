@@ -117,19 +117,18 @@ TEST_F(TestListenBacklog, BacklogOne)
 	auto accept_res = async(launch::async, accept_async, m_listen_sock);
 
 	int connect_res = srt_connect(m_caller_sock[0], psa, sizeof sa);
-	EXPECT_EQ(connect_res, SRT_SUCCESS);
+	EXPECT_EQ(connect_res, SRT_SUCCESS) << "First connection atempt should suceed";
 
 	const SRTSOCKET accepted_sock = accept_res.get();
 	ASSERT_NE(accepted_sock, SRT_INVALID_SOCK);
 
 	connect_res = srt_connect(m_caller_sock[1], psa, sizeof sa);
-	EXPECT_EQ(connect_res, SRT_EUNKNOWN);
+	EXPECT_EQ(connect_res, SRT_EUNKNOWN) << "There should aready be one connection, so failer is expected";
 
 	ASSERT_NE(srt_close(accepted_sock), SRT_ERROR);
 
 	connect_res = srt_connect(m_caller_sock[2], psa, sizeof sa);
-	EXPECT_EQ(connect_res, SRT_SUCCESS);
-
+	EXPECT_EQ(connect_res, SRT_SUCCESS) << "Accepted socket is disconnected. A new connection should succeed";
 
 	// Check backlog.
 }
