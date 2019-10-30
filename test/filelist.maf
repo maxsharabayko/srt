@@ -7,5 +7,6 @@ test_enforced_encryption.cpp
 test_epoll.cpp
 test_fec_rebuilding.cpp
 test_listen_callback.cpp
+test_listen_backlog.cpp
 test_seqno.cpp
 test_timer.cpp
