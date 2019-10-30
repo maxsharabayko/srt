@@ -122,8 +122,56 @@ TEST_F(TestListenBacklog, BacklogOne)
 	const SRTSOCKET accepted_sock = accept_res.get();
 	ASSERT_NE(accepted_sock, SRT_INVALID_SOCK);
 
+	auto accept_res2 = async(launch::async, accept_async, m_listen_sock);
+
 	connect_res = srt_connect(m_caller_sock[1], psa, sizeof sa);
-	EXPECT_EQ(connect_res, SRT_EUNKNOWN) << "There should aready be one connection, so failer is expected";
+	EXPECT_EQ(connect_res, SRT_EUNKNOWN) << "There should aready be one connection, so failure is expected";
+
+	ASSERT_NE(srt_close(accepted_sock), SRT_ERROR);
+
+	connect_res = srt_connect(m_caller_sock[2], psa, sizeof sa);
+	EXPECT_EQ(connect_res, SRT_SUCCESS) << "Accepted socket is disconnected. A new connection should succeed";
+
+	const SRTSOCKET accepted_sock2 = accept_res2.get();
+	ASSERT_NE(accepted_sock2, SRT_INVALID_SOCK);
+
+	ASSERT_NE(srt_close(accepted_sock2), SRT_ERROR);
+
+	// Check backlog.
+}
+
+
+TEST_F(TestListenBacklog, BacklogOneNoAcceptSecondTime)
+{
+	const int backlog = 1;
+
+	// Specify address
+	sockaddr_in sa;
+	memset(&sa, 0, sizeof sa);
+	sa.sin_family = AF_INET;
+	sa.sin_port = htons(5200);
+	ASSERT_EQ(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr), 1);
+	sockaddr* psa = (sockaddr*)&sa;
+	ASSERT_NE(srt_bind(m_listen_sock, psa, sizeof sa), SRT_ERROR);
+
+	srt_listen(m_listen_sock, backlog);
+
+	auto accept_async = [](SRTSOCKET listen_sock) {
+		sockaddr_in client_address;
+		int length = sizeof(sockaddr_in);
+		const SRTSOCKET accepted_socket = srt_accept(listen_sock, (sockaddr*)&client_address, &length);
+		return accepted_socket;
+	};
+	auto accept_res = async(launch::async, accept_async, m_listen_sock);
+
+	int connect_res = srt_connect(m_caller_sock[0], psa, sizeof sa);
+	EXPECT_EQ(connect_res, SRT_SUCCESS) << "First connection atempt should suceed";
+
+	const SRTSOCKET accepted_sock = accept_res.get();
+	ASSERT_NE(accepted_sock, SRT_INVALID_SOCK);
+
+	connect_res = srt_connect(m_caller_sock[1], psa, sizeof sa);
+	EXPECT_EQ(connect_res, SRT_EUNKNOWN) << "There should aready be one connection, so failure is expected";
 
 	ASSERT_NE(srt_close(accepted_sock), SRT_ERROR);
 
