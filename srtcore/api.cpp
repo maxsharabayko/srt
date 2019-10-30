@@ -368,6 +368,8 @@ int CUDTUnited::newConnection(const SRTSOCKET listen, const sockaddr* peer, CHan
 
          CGuard::enterCS(ls->m_AcceptLock);
          ls->m_pQueuedSockets->erase(ns->m_SocketID);
+         LOGC(mglog.Note, log << "[QueuedSockets] newConnection: queued connection has already been processed. "
+                              << "Erased. Remaining num=" << ls->m_pQueuedSockets->size());
          ls->m_pAcceptSockets->erase(ns->m_SocketID);
          CGuard::leaveCS(ls->m_AcceptLock);
       }
@@ -389,6 +391,8 @@ int CUDTUnited::newConnection(const SRTSOCKET listen, const sockaddr* peer, CHan
    }
 
    // exceeding backlog, refuse the connection request
+   LOGC(mglog.Note, log << "[QueuedSockets] newConnection: checking. Listen backlog="
+                        << ls->m_uiBackLog << ", queued=" << ls->m_pQueuedSockets->size());
    if (ls->m_pQueuedSockets->size() >= ls->m_uiBackLog)
    {
        *r_error = SRT_REJ_BACKLOG;
@@ -505,6 +509,7 @@ int CUDTUnited::newConnection(const SRTSOCKET listen, const sockaddr* peer, CHan
    try
    {
       ls->m_pQueuedSockets->insert(ns->m_SocketID);
+      LOGC(mglog.Note, log << "[QueuedSockets] newConnection: add to queued. connection=" << ls->m_pQueuedSockets->size());
    }
    catch (...)
    {
@@ -806,6 +811,8 @@ SRTSOCKET CUDTUnited::accept(const SRTSOCKET listen, sockaddr* addr, int* addrle
            u = *(ls->m_pQueuedSockets->begin());
            ls->m_pAcceptSockets->insert(ls->m_pAcceptSockets->end(), u);
            ls->m_pQueuedSockets->erase(ls->m_pQueuedSockets->begin());
+           LOGC(mglog.Note, log << "[QueuedSockets] accept: accept queued connection. Erase queued, remaining="
+                                << ls->m_pQueuedSockets->size());
            accepted = true;
        }
        else if (!ls->m_pUDT->m_bSynRecving)
@@ -1563,6 +1570,8 @@ void CUDTUnited::checkBrokenSockets()
 
          CGuard::enterCS(ls->second->m_AcceptLock);
          ls->second->m_pQueuedSockets->erase(s->m_SocketID);
+         LOGC(mglog.Note, log << "[QueuedSockets] checkBrokenSockets: erase broken. Remaining="
+                              << ls->second->m_pQueuedSockets->size());
          ls->second->m_pAcceptSockets->erase(s->m_SocketID);
          CGuard::leaveCS(ls->second->m_AcceptLock);
       }
@@ -1948,6 +1957,8 @@ void* CUDTUnited::garbageCollect(void* p)
 
       CGuard::enterCS(ls->second->m_AcceptLock);
       ls->second->m_pQueuedSockets->erase(i->second->m_SocketID);
+      LOGC(mglog.Note, log << "[QueuedSockets] garbageCollect: (erase) m_pQueuedSockets="
+                           << ls->second->m_pQueuedSockets->size());
       ls->second->m_pAcceptSockets->erase(i->second->m_SocketID);
       CGuard::leaveCS(ls->second->m_AcceptLock);
    }

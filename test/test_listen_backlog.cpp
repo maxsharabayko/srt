@@ -38,6 +38,7 @@ protected:
 	void SetUp()
 	{
 		ASSERT_EQ(srt_startup(), 0);
+		srt_setloglevel(LOG_NOTICE);
 		const int yes = 1;
 
 		for (size_t i = 0; i < max_callers; ++i)
