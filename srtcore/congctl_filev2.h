@@ -277,8 +277,7 @@ private:
         const int num_pkts_sent = CSeqNo::seqlen(ack_seqno, sent_seqno);
         //const int num_pkts_reached = num_pkts_sent > pktsInFlight ? (num_pkts_sent - pktsInFlight) : num_pkts_sent;
         const int num_pkts_lost = m_parent->sndLossLength();
-        //const int lost_pcent_x10 = (num_pkts_lost * 1000) / num_pkts_reached;
-        const int lost_pcent_x10 = (num_pkts_lost * 1000) / pktsInFlight;
+        const int lost_pcent_x10 = pktsInFlight > 0 ? (num_pkts_lost * 1000) / pktsInFlight : 0;
 
         LOGC(mglog.Debug, log << "FileSmootherV2: LOSS: "
             << "sent=" << num_pkts_sent << ", inFlight=" << pktsInFlight
