@@ -8121,13 +8121,13 @@ int CUDT::packData(CPacket &packet, uint64_t &ts_tk)
     ++m_stats.sentTotal;
     CGuard::leaveCS(m_StatsLock);
 
-    if (probe)
-    {
-        // sends out probing packet pair
-        ts_tk = entertime_tk;
-        probe = false;
-    }
-    else
+    //if (probe)
+    //{
+    //    // sends out probing packet pair
+    //    ts_tk = entertime_tk;
+    //    probe = false;
+    //}
+    //else
     {
 #if USE_BUSY_WAITING
         ts_tk = entertime_tk + m_ullInterval_tk;
@@ -9439,7 +9439,7 @@ void CUDT::checkRexmitTimer(uint64_t currtime_tk)
             m_stats.sndLossTotal += num;
             CGuard::leaveCS(m_StatsLock);
 
-            HLOGC(mglog.Debug,
+            LOGC(mglog.Error,
                   log << CONID() << "ENFORCED " << (is_laterexmit ? "LATEREXMIT" : "FASTREXMIT")
                       << " by ACK-TMOUT (scheduling): " << CSeqNo::incseq(m_iSndLastAck) << "-" << csn << " ("
                       << CSeqNo::seqoff(m_iSndLastAck, csn) << " packets)");
@@ -9453,6 +9453,7 @@ void CUDT::checkRexmitTimer(uint64_t currtime_tk)
     updateCC(TEV_CHECKTIMER, stage);
 
     // immediately restart transmission
+    LOGC(mglog.Error, log << CONID() << "m_pSndQueue->m_pSndUList->update DO_RESCHEDULE");
     m_pSndQueue->m_pSndUList->update(this, CSndUList::DO_RESCHEDULE);
 }
 

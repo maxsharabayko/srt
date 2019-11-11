@@ -535,6 +535,12 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
       int addrsize = m_iSockAddrSize;
       int res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, NULL, NULL);
       res = (0 == res) ? size : -1;
+      if (!packet.isControl())
+      {
+          uint64_t t;
+          CTimer::rdtsc(t);
+          LOGC(mglog.Error, log << "Send time: " << FormatTime(t));
+      }
    #endif
 
    // convert back into local host order
