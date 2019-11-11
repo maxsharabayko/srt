@@ -876,9 +876,6 @@ if (srt_libspec_static)
 	if (USE_GNUSTL)
 		target_link_libraries(${TARGET_srt}_static PRIVATE ${GNUSTL_LIBRARIES} ${GNUSTL_LDFLAGS})
 	endif()
-
-	# Include code-coverage settings:
-	target_link_libraries(${TARGET_srt}_static PRIVATE coverage_config)
 endif()
 
 target_include_directories(srt_virtual PRIVATE  ${SSL_INCLUDE_DIRS})
@@ -1031,12 +1028,12 @@ macro(srt_make_application name)
 		set_target_properties(${name} PROPERTIES ${FORCE_RPATH})
 	endif()
 
-	target_link_libraries(${name} PUBLIC ${srt_link_library})
+	target_link_libraries(${name} ${srt_link_library})
 	if (USE_GNUSTL)
 		target_link_libraries(${name} PRIVATE ${GNUSTL_LIBRARIES} ${GNUSTL_LDFLAGS})
 	endif()
 	if (srt_libspec_static AND CMAKE_DL_LIBS)
-		target_link_libraries(${name} PUBLIC ${CMAKE_DL_LIBS})
+		target_link_libraries(${name} ${CMAKE_DL_LIBS})
 	endif()
 endmacro()
 
