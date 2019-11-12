@@ -201,3 +201,45 @@ TEST(CRcvBuffer, OneMessageInSeveralPackets)
     cout << "Buffer size after reading: " << rcv_buffer.getAvailBufSize() << endl;
 }
 
+
+TEST(CRcvBuffer, OutOfOrderMessage)
+{
+    const int buffer_size_pkts = 16;
+    CUnitQueue unit_queue;
+    unit_queue.init(buffer_size_pkts, 1500, AF_INET);
+    CRcvBuffer rcv_buffer(&unit_queue, buffer_size_pkts);
+
+    const int initial_seqno = 1000;
+    const int message_len_in_pkts = 4;
+    const size_t payload_size = 1456;
+    // Add a number of units (packets) to the buffer
+    // equal to the buffer size in packets
+    for (int i = 0; i < message_len_in_pkts; ++i)
+    {
+        CUnit* unit = unit_queue.getNextAvailUnit();
+        EXPECT_NE(unit, nullptr);
+
+        CPacket& packet = unit->m_Packet;
+        packet.setLength(payload_size);
+        packet.m_iSeqNo = initial_seqno + i;
+        packet.m_iMsgNo = PacketBoundaryBits(PB_SUBSEQUENT);
+        if (i == 0)
+            packet.m_iMsgNo |= PacketBoundaryBits(PB_FIRST);
+        const bool is_last_packet = (i == message_len_in_pkts - 1);
+        if (is_last_packet)
+            packet.m_iMsgNo |= PacketBoundaryBits(PB_LAST);
+        //packet.m_iMsgNo |= MSGNO_PACKET_INORDER::wrap(1);
+        //EXPECT_TRUE(packet.getMsgOrderFlag());
+
+        EXPECT_EQ(rcv_buffer.addData(unit, i), 0);
+    }
+
+    //rcv_buffer.ackData(message_len_in_pkts);
+
+    cout << "Buffer size before reading: " << rcv_buffer.getAvailBufSize() << endl;
+    std::array<char, payload_size> buff;
+    cout << "Reading one packet of the 4-packet message" << endl;
+    const int res = rcv_buffer.readMsg(buff.data(), buff.size());
+    EXPECT_EQ(res, payload_size);
+    cout << "Buffer size after reading: " << rcv_buffer.getAvailBufSize() << endl;
+}

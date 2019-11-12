@@ -153,6 +153,59 @@ TEST(CRcvBuffer2, OneMessageInSeveralPackets)
 }
 
 
+/// In this test case several units are inserted in the CRcvBuffer.
+/// The first message is not full, but the secon message is ready to be extracted.
+///
+TEST(CRcvBuffer2, MessageOutOfOrder)
+{
+    const int buffer_size_pkts = 16;
+    CUnitQueue unit_queue;
+    unit_queue.init(buffer_size_pkts, 1500, AF_INET);
+    const int initial_seqno = 1000;
+    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts);
+
+    const size_t payload_size = 1456;
+    const int message_len_in_pkts = 4;
+    const size_t buf_length = payload_size * message_len_in_pkts;
+    std::array<char, buf_length> src_buffer;
+    std::iota(src_buffer.begin(), src_buffer.end(), (char)0);
+
+    for (int i = 0; i < message_len_in_pkts; ++i)
+    {
+        CUnit* unit = unit_queue.getNextAvailUnit();
+        EXPECT_NE(unit, nullptr);
+        unit->m_iFlag = CUnit::GOOD;
+        CPacket& packet = unit->m_Packet;
+        packet.setLength(payload_size);
+        packet.m_iSeqNo = initial_seqno + message_len_in_pkts + i;
+        
+        packet.m_iMsgNo = PacketBoundaryBits(PB_SUBSEQUENT);
+        if (i == 0)
+            packet.m_iMsgNo |= PacketBoundaryBits(PB_FIRST);
+        const bool is_last_packet = (i == message_len_in_pkts - 1);
+        if (is_last_packet)
+            packet.m_iMsgNo |= PacketBoundaryBits(PB_LAST);
+        packet.m_iMsgNo |= MSGNO_PACKET_INORDER::wrap(1);
+        EXPECT_TRUE(packet.getMsgOrderFlag());
+
+        memcpy(packet.m_pcData, src_buffer.data() + i * payload_size, payload_size);
+
+        EXPECT_EQ(rcv_buffer.insert(unit), 0);
+        EXPECT_FALSE(rcv_buffer.canRead());
+
+        // Due to out of order flag we should be able to read the unacknowledged message
+        EXPECT_EQ(rcv_buffer.canRead(), is_last_packet);
+        //EXPECT_EQ(rcv_buffer.countReadable(), is_last_packet ? message_len_in_pkts : 0);
+    }
+
+    // Read the whole message from the buffer
+    std::array<char, buf_length> read_buffer;
+    const int read_len = rcv_buffer.readMessage(read_buffer.data(), buf_length);
+    EXPECT_EQ(read_len, payload_size * message_len_in_pkts);
+    EXPECT_TRUE(read_buffer == src_buffer);
+    EXPECT_FALSE(rcv_buffer.canRead());
+}
+
 
 TEST(CRcvBuffer2, GetFirstValidPacket)
 {
