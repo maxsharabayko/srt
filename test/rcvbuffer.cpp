@@ -129,9 +129,16 @@ void CRcvBuffer2::ack(int32_t seqno)
     updateReadablePos();
 }
 
+void CRcvBuffer2::drop(int32_t seqno)
+{
+    
+}
+
 int CRcvBuffer2::readMessage(char *data, size_t len)
 {
     const int pos_end = findLastMessagePkt();
+    if (pos_end < 0)
+        return -1;
 
     size_t remain     = len;
     char * dst        = data;
@@ -277,7 +284,7 @@ void CRcvBuffer2::updateReadablePos()
     SRT_ASSERT(m_pUnit[m_iFirstUnreadablePos]);
 
     int pos = m_iFirstUnreadablePos;
-    while (m_pUnit[pos]->m_iFlag == CUnit::GOOD && m_pUnit[pos]->m_Packet.getMsgBoundary() & PB_FIRST)
+    while (m_pUnit[pos]->m_iFlag == CUnit::GOOD && (m_pUnit[pos]->m_Packet.getMsgBoundary() & PB_FIRST))
     {
         // bool good = true;
 
@@ -335,7 +342,8 @@ int CRcvBuffer2::findLastMessagePkt()
         }
     }
 
-    throw std::runtime_error(std::string("CRcvBuffer2: PB_LAST not found. Something wrong with m_iFirstUnreadablePos"));
+    std::cerr << "CRcvBuffer2.findLastMessagePkt(): PB_LAST not found. Ignored canRead() result?" << std::endl;
+    return -1;
 }
 
 void CRcvBuffer2::setTsbPdMode(uint64_t timebase, uint32_t delay, bool tldrop)

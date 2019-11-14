@@ -58,7 +58,14 @@ public:
     /// @param [in] seqno acknowledge up to the sequence number
     /// 
     /// TODO: Should call CTimer::triggerEvent() in the end.
+    /// TODO: Drop first missing packets?
     void ack(int32_t seqno);
+
+
+    /// Drop packets in the receiver buffer up to the seqno
+    /// @param [in] seqno drop units up to this sequence number
+    ///
+    void drop(int32_t seqno);
 
 
     /// Read the whole message from one or several packets.
@@ -68,6 +75,7 @@ public:
     /// @param [out] tsbpdtime localtime-based (uSec) packet time stamp including buffering delay
     ///
     /// @return actuall number of bytes extracted from the buffer.
+    ///         -1 on failure.
     int readMessage(char* data, size_t len);
 
 
@@ -115,6 +123,13 @@ public:
     size_t countReadable() const;
 
     bool canRead(uint64_t time_now = 0) const;
+
+
+public: // Used for testing
+
+
+    /// Peek unit in position of seqno
+    const CUnit* peek(int32_t seqno);
 
 
 private:
@@ -198,8 +213,10 @@ private:    // TSBPD member variables
     bool m_bTsbPdWrapCheck;              // true: check packet time stamp wrap around
     static const uint32_t TSBPD_WRAP_PERIOD = (30 * 1000000);    //30 seconds (in usec)
 
-    static const int TSBPD_DRIFT_MAX_VALUE = 5000;   // Max drift (usec) above which TsbPD Time Offset is adjusted
-    static const int TSBPD_DRIFT_MAX_SAMPLES = 1000;  // Number of samples (UMSG_ACKACK packets) to perform drift caclulation and compensation
+    /// Max drift (usec) above which TsbPD Time Offset is adjusted
+    static const int TSBPD_DRIFT_MAX_VALUE = 5000; 
+    /// Number of samples (UMSG_ACKACK packets) to perform drift caclulation and compensation
+    static const int TSBPD_DRIFT_MAX_SAMPLES = 1000; 
     //int m_iTsbPdDrift;                           // recent drift in the packet time stamp
     //int64_t m_TsbPdDriftSum;                     // Sum of sampled drift
     //int m_iTsbPdDriftNbSamples;                  // Number of samples in sum and histogram
