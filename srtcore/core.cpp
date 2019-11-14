@@ -8118,13 +8118,13 @@ int CUDT::packData(CPacket &packet, uint64_t &ts_tk)
     ++m_stats.sentTotal;
     CGuard::leaveCS(m_StatsLock);
 
-    if (probe)
-    {
-        // sends out probing packet pair
-        ts_tk = entertime_tk;
-        probe = false;
-    }
-    else
+    //if (probe)
+    //{
+    //    // sends out probing packet pair
+    //    ts_tk = entertime_tk;
+    //    probe = false;
+    //}
+    //else
     {
 #if USE_BUSY_WAITING
         ts_tk = entertime_tk + m_ullInterval_tk;
