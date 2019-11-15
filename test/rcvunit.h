@@ -1,9 +1,19 @@
+#include "packet.h"
+
+
+/// A storate unit for a received SRT packet
+/// or a packet being processed by the receiver.
+///
+///
 struct CRcvUnit
 {
    CPacket m_Packet;		// packet
    enum Flag { FREE = 0, GOOD = 1, PASSACK = 2, DROPPED = 3 };
    Flag m_iFlag;			// 0: free, 1: occupied, 2: msg read but not freed (out-of-order), 3: msg dropped
 };
+
+
+
 
 class CUnitPool
 {
