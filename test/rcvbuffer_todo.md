@@ -30,3 +30,10 @@
 
 - [ ] Out of order flag
 - [ ] WinSock Event tracing: [link](https://docs.microsoft.com/en-us/windows/win32/winsock/winsock-tracing)
+
+```
+if (res == SOCKET_ERROR) {
+    LOGC(mglog.Error, log << CONID() << "WSASendTo failed with error: " << WSAGetLastError()
+    << " seqno: " << seqno << " msgno: " << msgno);
+}
+```
