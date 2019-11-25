@@ -200,6 +200,7 @@ void CChannel::setUDPSockOpt()
          ::setsockopt(m_iSocket, SOL_SOCKET, SO_SNDBUF, (char*)&maxsize, sizeof(int));
    #else
       // for other systems, if requested is greated than maximum, the maximum value will be automactally used
+      std::cerr << "Sending SO_SNDBUF to " << m_iSndBufSize << "\n";
       if ((0 != ::setsockopt(m_iSocket, SOL_SOCKET, SO_RCVBUF, (char*)&m_iRcvBufSize, sizeof(int))) ||
           (0 != ::setsockopt(m_iSocket, SOL_SOCKET, SO_SNDBUF, (char*)&m_iSndBufSize, sizeof(int))))
          throw CUDTException(MJ_SETUP, MN_NORES, NET_ERROR);
@@ -504,6 +505,7 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
 #endif
     const unsigned seqno = packet.getSeqNo();
     const unsigned msgno = packet.getMsgSeq();
+    const bool iscontrol = packet.isControl();
    // convert control information into network order
    // XXX USE HtoNLA!
    if (packet.isControl())
@@ -520,6 +522,7 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
       ++ p;
    }
 
+
    #ifndef _WIN32
       msghdr mh;
       mh.msg_name = (sockaddr*)addr;
@@ -532,30 +535,73 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
 
       int res = ::sendmsg(m_iSocket, &mh, 0);
    #else
+      WSAOVERLAPPED SendOverlapped;
+      // Make sure the SendOverlapped struct is zeroed out
+      SecureZeroMemory((PVOID)&SendOverlapped, sizeof(WSAOVERLAPPED));
+      SendOverlapped.hEvent = WSACreateEvent();
+      if (SendOverlapped.hEvent == NULL) {
+          LOGC(mglog.Error, log << CONID() << "WSACreateEvent failed with error: " << NET_ERROR);
+      }
+
       DWORD size = (DWORD) (CPacket::HDR_SIZE + packet.getLength());
       int addrsize = m_iSockAddrSize;
-      int res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, NULL, NULL);
+      int res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, &SendOverlapped, NULL);
+
+      /*if (res == -1)
+      {
+          if (WSA_IO_PENDING != NET_ERROR)
+          {
+              LOGC(mglog.Error, log << CONID() << "WSASendTo failed with error: " << NET_ERROR
+                  << (iscontrol ? " CTRL" : " DATA") << " seqno: " << seqno << " msgno: " << msgno);
+          }
+          else
+          {
+              int rc = WSAWaitForMultipleEvents(1, &SendOverlapped.hEvent, TRUE, INFINITE,
+                  TRUE);
+
+              if (rc == WSA_WAIT_FAILED) {
+                  LOGC(mglog.Error, log << CONID() << "WSAWaitForMultipleEvents failed with error: " << NET_ERROR
+                      << (iscontrol ? " CTRL" : " DATA") << " seqno: " << seqno << " msgno: " << msgno);
+              }
+
+              DWORD SendBytes;
+              DWORD Flags;
+              rc = WSAGetOverlappedResult(m_iSocket, &SendOverlapped, &SendBytes,
+                  FALSE, &Flags);
+              res = SendBytes;
+              if (rc == FALSE) {
+                  LOGC(mglog.Error, log << CONID() << "WSAGetOverlappedResult failed with error: %d\n", WSAGetLastError());
+                  res = -1;
+              }
+          }
+      }
+
+      WSACloseEvent(SendOverlapped.hEvent);*/
+
       res = (0 == res) ? size : -1;
    #endif
-   if (res == -1) {
-       LOGC(mglog.Error, log << CONID() << "WSASendTo failed with error: " << NET_ERROR
-                           << " seqno: " << seqno << " msgno: " << msgno);
-       fd_set set;
-       timeval tv;
-       FD_ZERO(&set);
-       FD_SET(m_iSocket, &set);
-       tv.tv_sec = 1;
-       tv.tv_usec = 0;
-       const int select_ret = ::select((int)m_iSocket + 1, &set, NULL, &set, &tv);
-       LOGC(mglog.Error, log << CONID() << "select result: " << select_ret);
-
-#ifndef _WIN32
-       res = ::sendmsg(m_iSocket, &mh, 0);
-#else
-       res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, NULL, NULL);
-       res = (0 == res) ? size : -1;
-#endif
-   }
+//   if (res == -1) {
+//       /*LOGC(mglog.Error, log << CONID() << "WSASendTo failed with error: " << NET_ERROR
+//                           << " seqno: " << seqno << " msgno: " << msgno);*/
+//       fd_set set;
+//       timeval tv;
+//       FD_ZERO(&set);
+//       FD_SET(m_iSocket, &set);
+//       tv.tv_sec = 0;
+//       tv.tv_usec = 10000;
+//       const int select_ret = ::select((int)m_iSocket + 1, NULL, &set, &set, &tv);
+//       //LOGC(mglog.Error, log << CONID() << "select result: " << select_ret);
+//
+//#ifndef _WIN32
+//       res = ::sendmsg(m_iSocket, &mh, 0);
+//#else
+//       res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, NULL, NULL);
+//       res = (0 == res) ? size : -1;
+//       if (res == -1)
+//           LOGC(mglog.Error, log << CONID() << "WSASendTo failed with error: " << NET_ERROR
+//               << (iscontrol ? " CTRL" : " DATA") << " seqno: " << seqno << " msgno: " << msgno);
+//#endif
+//   }
 
 
    // convert back into local host order
