@@ -502,7 +502,8 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
     }
 
 #endif
-
+    const unsigned seqno = packet.getSeqNo();
+    const unsigned msgno = packet.getMsgSeq();
    // convert control information into network order
    // XXX USE HtoNLA!
    if (packet.isControl())
@@ -536,6 +537,10 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
       int res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, NULL, NULL);
       res = (0 == res) ? size : -1;
    #endif
+   if (res == SOCKET_ERROR) {
+       LOGC(mglog.Error, log << CONID() << "WSASendTo failed with error: " << NET_ERROR
+                           << " seqno: " << seqno << " msgno: " << msgno);
+   }
 
    // convert back into local host order
    //for (int k = 0; k < 4; ++ k)
