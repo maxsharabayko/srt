@@ -537,7 +537,7 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
       int res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, NULL, NULL);
       res = (0 == res) ? size : -1;
    #endif
-   if (res == SOCKET_ERROR) {
+   if (res == -1) {
        LOGC(mglog.Error, log << CONID() << "WSASendTo failed with error: " << NET_ERROR
                            << " seqno: " << seqno << " msgno: " << msgno);
        fd_set set;
