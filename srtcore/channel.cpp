@@ -540,7 +540,23 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
    if (res == SOCKET_ERROR) {
        LOGC(mglog.Error, log << CONID() << "WSASendTo failed with error: " << NET_ERROR
                            << " seqno: " << seqno << " msgno: " << msgno);
+       fd_set set;
+       timeval tv;
+       FD_ZERO(&set);
+       FD_SET(m_iSocket, &set);
+       tv.tv_sec = 1;
+       tv.tv_usec = 0;
+       const int select_ret = ::select((int)m_iSocket + 1, &set, NULL, &set, &tv);
+       LOGC(mglog.Error, log << CONID() << "select result: " << select_ret);
+
+#ifndef _WIN32
+       res = ::sendmsg(m_iSocket, &mh, 0);
+#else
+       res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, NULL, NULL);
+       res = (0 == res) ? size : -1;
+#endif
    }
+
 
    // convert back into local host order
    //for (int k = 0; k < 4; ++ k)
