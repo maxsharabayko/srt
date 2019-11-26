@@ -4,6 +4,8 @@
 
 - [ ] `CPacket::m_iID` - get rid if this reference shit.
 
+- [ ] `CPacket::__pad` delete.
+
 - [ ] `CChannel::sendto(...)` htonl should perform CPacket function
 
 - [ ] Make constant or even delete `addrsize` variable `CChannel::sendto(...)`
@@ -12,7 +14,9 @@
       int res = ::WSASendTo(m_iSocket, (LPWSABUF)packet.m_PacketVector, 2, &size, 0, addr, addrsize, NULL, NULL);
 
 - [ ] Take a look at SRT_ENABLE_SYSTEMBUFFER_TRACE
+
 - [ ] `SRTO_UDP_SNDBUF` use system default???
+
 - [ ] WSASocket instead of `::sock`?
 
 ## To Read
@@ -30,6 +34,7 @@
 
 - [ ] Out of order flag
 - [ ] WinSock Event tracing: [link](https://docs.microsoft.com/en-us/windows/win32/winsock/winsock-tracing)
+- [ ] Edge-triggered epoll example: [link](https://github.com/eklitzke/epollet)
 
 ```
 if (res == SOCKET_ERROR) {
