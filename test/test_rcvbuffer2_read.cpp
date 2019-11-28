@@ -153,7 +153,7 @@ TEST_F(TestRcvBuffer2Read, OnePacket)
     EXPECT_EQ(read_len, msg_bytelen);
 }
 
-/// One packet is added to the buffer after 1-packet gap. Should be read after ACK.
+/// One packet is added to the buffer after 1-packet gap. Should be read only after ACK.
 /// 1. insert
 ///       |
 /// +---+---+  ---+---+---+---+   +---+
@@ -180,12 +180,14 @@ TEST_F(TestRcvBuffer2Read, OnePacketAfterGap)
 
     // 3. ACK first missing packet.
     // canRead should return false. Read attempt should fail.
-    m_rcv_buffer->ack(m_init_seqno + 1);
+    EXPECT_FALSE(m_rcv_buffer->canAck());
+
+    m_rcv_buffer->dropMissing(m_init_seqno + 1);
     EXPECT_FALSE(m_rcv_buffer->canRead()) << "Only one nonexistent packet is acknowledged";
     read_len = m_rcv_buffer->readMessage(buff.data(), buff.size());
-    EXPECT_EQ(read_len, 0);
+    EXPECT_EQ(read_len, -1);
 
-    // 3. ACK first existing packet.
+    // 4. ACK first existing packet.
     // Now can read one packet from the buffer.
     m_rcv_buffer->ack(m_init_seqno + 2);
     EXPECT_TRUE(m_rcv_buffer->canRead());
@@ -194,39 +196,45 @@ TEST_F(TestRcvBuffer2Read, OnePacketAfterGap)
     EXPECT_TRUE(verifyPayload(buff.data(), read_len, m_init_seqno + 1));
 }
 
-#if 0
-TEST_F(TestRcvBuffer2Read, MsgAcked)
+
+/// One message (4 packets) are added to the buffer.
+/// Check if reading is only possible after full ACK of the whole message.
+TEST_F(TestRcvBuffer2Read, MsgPartialAck)
 {
     const size_t msg_pkts = 4;
-    // Adding one message  without acknowledging
+    // 1. Add one message (4 packets) without acknowledging
     addMessage(msg_pkts, m_init_seqno, false);
+    EXPECT_FALSE(m_rcv_buffer->canRead());
 
+    // 2. Confirm reading is not allowed.
     const size_t msg_bytelen = msg_pkts * m_payload_sz;
     std::array<char, 2 * msg_bytelen> buff;
+    int res = m_rcv_buffer->readMessage(buff.data(), buff.size());
+    EXPECT_EQ(res, -1);
 
-    EXPECT_FALSE(m_rcv_buffer->isRcvDataAvailable());
+    // 3. Acknowledge half of the message.
+    // Can read only fully acknowledged message.
+    EXPECT_TRUE(m_rcv_buffer->canAck());
+    m_rcv_buffer->ack(m_init_seqno + 1);
+    EXPECT_FALSE(m_rcv_buffer->canRead());
+    res = m_rcv_buffer->readMessage(buff.data(), buff.size());
+    EXPECT_EQ(res, -1);
 
-    int res = m_rcv_buffer->readMsg(buff.data(), buff.size());
-    EXPECT_EQ(res, 0);
+    // 4. Acknowledge full message. Can read.
+    EXPECT_TRUE(m_rcv_buffer->canAck());
+    m_rcv_buffer->ack(m_init_seqno + msg_pkts);
+    EXPECT_TRUE(m_rcv_buffer->canRead());
 
-    // Half ACK
-    m_rcv_buffer->ackData(2);
-
-    EXPECT_TRUE(m_rcv_buffer->isRcvDataAvailable());
-
-    res = m_rcv_buffer->readMsg(buff.data(), buff.size());
-    EXPECT_EQ(res, 0);
-
-    // Full ACK
-    m_rcv_buffer->ackData(2);
-
-    EXPECT_FALSE(m_rcv_buffer->isRcvDataAvailable());
-
-    res = m_rcv_buffer->readMsg(buff.data(), buff.size());
-    EXPECT_EQ(res, 0);
+    res = m_rcv_buffer->readMessage(buff.data(), buff.size());
+    EXPECT_EQ(res, msg_bytelen);
+    for (int i = 0; i < msg_pkts; ++i)
+    {
+        EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + i));
+    }
 }
 
 
+#if 0
 TEST_F(TestRcvBuffer2Read, MsgHalfAck)
 {
     const size_t msg_pkts = 4;
@@ -255,4 +263,5 @@ TEST_F(TestRcvBuffer2Read, OutOfOrderMsgNoACK)
     const int res = m_rcv_buffer->readMsg(buff.data(), buff.size());
     EXPECT_EQ(res, msg_bytelen);
 }
+
 #endif

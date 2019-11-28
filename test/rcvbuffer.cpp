@@ -101,7 +101,13 @@ int CRcvBuffer2::insert(CUnit *unit)
 /// TODO: Should call CTimer::triggerEvent() in the end.
 void CRcvBuffer2::ack(int32_t seqno)
 {
+    SRT_ASSERT(canAck());   // Sanity check only for debug build
+
     const int len = CSeqNo::seqoff(m_iLastAckSeqNo, seqno);
+
+    SRT_ASSERT(len > 0);
+    if (len <= 0)
+        return;
 
     {
         int       pkts  = 0;
@@ -129,9 +135,34 @@ void CRcvBuffer2::ack(int32_t seqno)
     updateReadablePos();
 }
 
-void CRcvBuffer2::drop(int32_t seqno)
+void CRcvBuffer2::dropMissing(int32_t seqno)
 {
-    
+    // Can drop only when nothing to read, and 
+    // first unacknowledged packet is missing.
+    SRT_ASSERT(m_iLastAckPos == m_iFirstUnreadablePos);
+    SRT_ASSERT(m_iLastAckPos == m_iStartPos);
+
+    int len = CSeqNo::seqoff(m_iLastAckSeqNo, seqno);
+    SRT_ASSERT(len > 0);
+    if (len <= 0)
+        return;
+
+    m_iMaxPos -= len;
+    if (m_iMaxPos < 0)
+        m_iMaxPos = 0;
+
+    // Check that all packets being dropped are missing.
+    while (len > 0)
+    {
+        SRT_ASSERT(m_pUnit[m_iStartPos] == nullptr);
+        m_iStartPos = incPos(m_iStartPos);
+        --len;
+    }
+
+    // Update positions
+    m_iLastAckPos   = m_iStartPos;
+    m_iLastAckSeqNo = seqno;
+    m_iFirstUnreadablePos = m_iStartPos;
 }
 
 int CRcvBuffer2::readMessage(char *data, size_t len)

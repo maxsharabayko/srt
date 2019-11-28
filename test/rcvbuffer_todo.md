@@ -9,6 +9,7 @@ CRcvUnit is a storate unit for a received SRT packet or a packet being processed
 ## CRcvBuffer2
 
 - [ ] Add `skip` or `drop` function. Can ack only existing packets.
+- [ ] What to to if several packets can be read, then a  gap, and then a packet is ready to play?
 
 
 

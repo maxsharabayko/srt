@@ -54,7 +54,9 @@ public:
     /// @return  0 on success, -1 if packet is already in buffer, -2 if packet is before m_iLastAckSeqNo.
     int insert(CUnit* unit);
 
+    /// Aknowledge up to seqno.
     /// Update the ACK point of the buffer.
+    ///
     /// @param [in] seqno acknowledge up to the sequence number
     /// 
     /// TODO: Should call CTimer::triggerEvent() in the end.
@@ -65,7 +67,7 @@ public:
     /// Drop packets in the receiver buffer up to the seqno
     /// @param [in] seqno drop units up to this sequence number
     ///
-    void drop(int32_t seqno);
+    void dropMissing(int32_t seqno);
 
 
     /// Read the whole message from one or several packets.
