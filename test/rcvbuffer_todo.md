@@ -1,3 +1,17 @@
+# CRcvBuffer2 TODO
+
+## Adding CRcvUnit
+
+CRcvUnit is a storate unit for a received SRT packet or a packet being processed by the receiver.
+
+## Adding CUnitPool
+
+## CRcvBuffer2
+
+- [ ] Add `skip` or `drop` function. Can ack only existing packets.
+
+
+
 ## CPacket To Fix
 
 - [ ] `CSndQueue::sendto(...)` should return send result.

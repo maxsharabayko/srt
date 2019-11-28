@@ -48,7 +48,7 @@ public:     // Operations on units
       /// find an available unit for incoming packet.
       /// @return Pointer to the available unit, NULL if not found.
 
-    CRcvUnit* getNextAvailUnit();
+   CRcvUnit* getNextAvailUnit();
 
 
    void makeUnitFree(CRcvUnit* unit);
@@ -63,7 +63,7 @@ public:
 private:
    struct CQEntry
    {
-      CUnit* m_pUnit;		// unit queue
+      CRcvUnit* m_pUnit;		// unit queue
       char* m_pBuffer;		// data buffer
       int m_iSize;		// size of each queue
 

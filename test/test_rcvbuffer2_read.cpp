@@ -2,6 +2,7 @@
 #include <array>
 #include <numeric>
 
+
 #include "rcvbuffer.h"
 
 using namespace std;
@@ -60,8 +61,11 @@ public:
             EXPECT_NE(unit, nullptr);
 
             CPacket& packet = unit->m_Packet;
-            packet.setLength(m_payload_sz);
             packet.m_iSeqNo = start_seqno + i;
+
+            packet.setLength(m_payload_sz);
+            generatePayload(packet.data(), packet.getLength(), packet.m_iSeqNo);
+
             packet.m_iMsgNo = PacketBoundaryBits(PB_SUBSEQUENT);
             if (i == 0)
                 packet.m_iMsgNo |= PacketBoundaryBits(PB_FIRST);
@@ -74,11 +78,28 @@ public:
                 packet.m_iMsgNo |= MSGNO_PACKET_INORDER::wrap(1);
                 EXPECT_TRUE(packet.getMsgOrderFlag());
             }
-
+            
             m_unit_queue->makeUnitGood(unit);
             EXPECT_EQ(m_rcv_buffer->insert(unit), 0);
             // TODOL checkPacketPos(unit);
         }
+    }
+
+    void generatePayload(char* dst, size_t len, int seqno)
+    {
+        std::iota(dst, dst + len, (char)seqno);
+    }
+
+    bool verifyPayload(char* dst, size_t len, int seqno)
+    {
+        // Note. A more consistent way would be to use generatePayload function,
+        // but I don't want to create another buffer for the data.
+        for (size_t i = 0; i < len; ++i)
+        {
+            if (dst[i] != static_cast<char>(seqno + i))
+                return false;
+        }
+        return true;
     }
 
     void checkPacketPos(CUnit* unit)
@@ -146,30 +167,31 @@ TEST_F(TestRcvBuffer2Read, OnePacket)
 TEST_F(TestRcvBuffer2Read, OnePacketAfterGap)
 {
     const size_t msg_pkts = 1;
-    // Adding one message  without acknowledging
+    // 1. Add one message (1 packet) without acknowledging
+    // with a gap of one packet.
     addMessage(msg_pkts, m_init_seqno + 1, false);
+    EXPECT_FALSE(m_rcv_buffer->canRead()) << "No packet to read at this point";
 
+    // 2. Try to read message. Expect to get an error due to the missing first packet.
     const size_t msg_bytelen = msg_pkts * m_payload_sz;
     std::array<char, 2 * msg_bytelen> buff;
-
-    EXPECT_FALSE(m_rcv_buffer->canRead());
-
     int read_len = m_rcv_buffer->readMessage(buff.data(), buff.size());
-    EXPECT_EQ(read_len, -1);
+    EXPECT_EQ(read_len, -1) << "No packet to read due to the gap";
 
-    // ACK first missing packet
+    // 3. ACK first missing packet.
+    // canRead should return false. Read attempt should fail.
     m_rcv_buffer->ack(m_init_seqno + 1);
-
-    EXPECT_FALSE(m_rcv_buffer->canRead());
-
+    EXPECT_FALSE(m_rcv_buffer->canRead()) << "Only one nonexistent packet is acknowledged";
     read_len = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(read_len, 0);
 
+    // 3. ACK first existing packet.
+    // Now can read one packet from the buffer.
     m_rcv_buffer->ack(m_init_seqno + 2);
     EXPECT_TRUE(m_rcv_buffer->canRead());
-
     read_len = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(read_len, msg_bytelen);
+    EXPECT_TRUE(verifyPayload(buff.data(), read_len, m_init_seqno + 1));
 }
 
 #if 0
