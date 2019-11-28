@@ -194,6 +194,10 @@ TEST_F(TestRcvBuffer2Read, OnePacketAfterGap)
     read_len = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(read_len, msg_bytelen);
     EXPECT_TRUE(verifyPayload(buff.data(), read_len, m_init_seqno + 1));
+
+    // 5. Further read is not possible
+    EXPECT_FALSE(m_rcv_buffer->canAck());
+    EXPECT_FALSE(m_rcv_buffer->canRead());
 }
 
 
@@ -231,37 +235,32 @@ TEST_F(TestRcvBuffer2Read, MsgPartialAck)
     {
         EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + i));
     }
+
+    // 5. Further read is not possible
+    EXPECT_FALSE(m_rcv_buffer->canAck());
+    EXPECT_FALSE(m_rcv_buffer->canRead());
 }
 
 
-#if 0
-TEST_F(TestRcvBuffer2Read, MsgHalfAck)
+/// One message (4 packets) are added to the buffer. Can be read out of order.
+/// Reading should be possible even before full ACK of the whole message.
+TEST_F(TestRcvBuffer2Read, MsgPartialAckOutOfOrder)
 {
     const size_t msg_pkts = 4;
-    // Adding one message  without acknowledging
-    addMessage(msg_pkts, m_init_seqno, false);
+    // 1. Add one message (4 packets) without acknowledging
+    addMessage(msg_pkts, m_init_seqno, true);
+    EXPECT_TRUE(m_rcv_buffer->canRead());
 
-    m_rcv_buffer->ackData(2);
-
+    // 2. Read full unacknowledged message.
     const size_t msg_bytelen = msg_pkts * m_payload_sz;
     std::array<char, 2 * msg_bytelen> buff;
-
-    const int res = m_rcv_buffer->readMsg(buff.data(), buff.size());
-    EXPECT_EQ(res, 0);
-}
-
-
-TEST_F(TestRcvBuffer2Read, OutOfOrderMsgNoACK)
-{
-    const size_t msg_pkts = 4;
-    // Adding one message  without acknowledging
-    addMessage(msg_pkts, m_init_seqno, false);
-
-    const size_t msg_bytelen = msg_pkts * m_payload_sz;
-    std::array<char, 2 * msg_bytelen> buff;
-
-    const int res = m_rcv_buffer->readMsg(buff.data(), buff.size());
+    int res = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(res, msg_bytelen);
+    for (int i = 0; i < msg_pkts; ++i)
+    {
+        EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + i));
+    }
+
+    // 3. Further read is not possible
 }
 
-#endif
