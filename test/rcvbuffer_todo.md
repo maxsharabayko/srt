@@ -6,6 +6,8 @@ CRcvUnit is a storate unit for a received SRT packet or a packet being processed
 
 ## Adding CUnitPool
 
+- [ ] CUnit free and good flags should not impact the packet
+
 ## CRcvBuffer2
 
 - [ ] Working no TestRcvBuffer2Read.MsgPartialAckOutOfOrder
