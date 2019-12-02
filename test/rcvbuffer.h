@@ -150,7 +150,7 @@ private:
     /// Scan for availability of out of order packets.
     void onInsertNotInOrderPacket(int insertpos);
     bool scanNotInOrderMessageRight(int startPos, int msgNo);
-    bool scanNotInOrderMessageLeft(int startPos, int msgNo);
+    int  scanNotInOrderMessageLeft(int startPos, int msgNo);
 
 
 public:

@@ -1,7 +1,8 @@
 #include "rcvbuffer.h"
 #include "logging.h"
 
-#using namespace srt_logging;
+using namespace srt_logging;
+extern Logger mglog;
 #define rbuflog mglog
 
 //
@@ -420,12 +421,13 @@ void CRcvBuffer2::onInsertNotInOrderPacket(int insertPos)
     //    return;
     //}
 
+    const int msgNo = pkt.getMsgSeq();
     // First check last packet, because it is expected to be received last.
-    const bool hasLast = (boundary & PB_LAST) || scanNotInOrderPacketRight(insertPos);
+    const bool hasLast = (boundary & PB_LAST) || scanNotInOrderMessageRight(insertPos, msgNo);
     if (!hasLast)
         return;
 
-    const bool hasFirst = (boundary & PB_FIRST) || scanNotInOrderPacketLeft(insertPos);
+    const bool hasFirst = (boundary & PB_FIRST) || scanNotInOrderMessageLeft(insertPos, msgNo);
     if (!hasFirst)
         return;
 
@@ -433,7 +435,7 @@ void CRcvBuffer2::onInsertNotInOrderPacket(int insertPos)
     return;
 }
 
-bool CRcvBuffer2::scanNotInOrderPacketRight(const int startPos, int msgNo)
+bool CRcvBuffer2::scanNotInOrderMessageRight(const int startPos, int msgNo)
 {
     // Search further packets to the right.
     // First check if there are packets to the right.
@@ -441,15 +443,15 @@ bool CRcvBuffer2::scanNotInOrderPacketRight(const int startPos, int msgNo)
     if (startPos == lastPos)
         return false;
 
-    int i = startPos;
+    int pos = startPos;
     do
     {
-        i = incPos(i);
+        pos = incPos(pos);
 
-        if (!m_pUnit[i])
+        if (!m_pUnit[pos])
             break;
 
-        const CPacket& pkt = m_pUnit[i]->m_Packet;
+        const CPacket& pkt = m_pUnit[pos]->m_Packet;
 
         if (pkt.getMsgSeq() != msgNo)
         {
@@ -460,40 +462,40 @@ bool CRcvBuffer2::scanNotInOrderPacketRight(const int startPos, int msgNo)
         const PacketBoundary boundary = pkt.getMsgBoundary();
         if (boundary & PB_LAST)
             return true;
-    } while (i != lastPos);
+    } while (pos != lastPos);
 
     return false;
 }
 
-bool CRcvBuffer2::scanNotInOrderPacketLeft(const int startPos, int msgNo)
+int CRcvBuffer2::scanNotInOrderMessageLeft(const int startPos, int msgNo)
 {
     // Search preceeding packets to the left.
     // First check if there are packets to the left.
     if (startPos == m_iStartPos)
-        return false;
+        return -1;
 
-    int i = startPos;
+    int pos = startPos;
     do
     {
-        i = decPos(i);
+        pos = decPos(pos);
 
-        if (!m_pUnit[i])
-            return false;
+        if (!m_pUnit[pos])
+            return -1;
 
-        const CPacket& pkt = m_pUnit[i]->m_Packet;
+        const CPacket& pkt = m_pUnit[pos]->m_Packet;
 
         if (pkt.getMsgSeq() != msgNo)
         {
             LOGC(rbuflog.Error, log << "Missing PB_FIRST packet for msgNo " << msgNo);
-            return false;
+            return -1;
         }
 
         const PacketBoundary boundary = pkt.getMsgBoundary();
         if (boundary & PB_FIRST)
-            return true;
-    } while (i != m_iStartPos);
+            return pos;
+    } while (pos != m_iStartPos);
 
-    return false;
+    return -1;
 }
 
 
