@@ -2,7 +2,7 @@
 
 ## Adding CRcvUnit
 
-CRcvUnit is a storate unit for a received SRT packet or a packet being processed by the receiver.
+CRcvUnit is a storage unit for a received SRT packet or a packet being processed by the receiver.
 
 ## Adding CUnitPool
 
