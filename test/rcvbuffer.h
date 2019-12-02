@@ -137,6 +137,7 @@ public: // Used for testing
 private:
 
     inline int incPos(int pos) const { return (pos + 1) % m_size; }
+    inline int decPos(int pos) const { return (pos - 1) >= 0 ? (pos - 1) : (m_size - 1); }
 
 private:
     void countBytes(int pkts, int bytes, bool acked = false);
@@ -145,6 +146,11 @@ private:
     /// Find position of the last packet of the message.
     /// 
     int  findLastMessagePkt();
+
+    /// Scan for availability of out of order packets.
+    void onInsertNotInOrderPacket(int insertpos);
+    bool scanNotInOrderMessageRight(int startPos, int msgNo);
+    bool scanNotInOrderMessageLeft(int startPos, int msgNo);
 
 
 public:
@@ -172,6 +178,9 @@ private:
     // TODO: rename to m_iNumUnackPackets
     int m_iMaxPos;                       // the furthest data position
     int m_iNotch;                        // the starting read point of the first unit
+
+    size_t m_numOutOfOrderPackets;       // The number of stored packets with "inorder" flag set to false
+    int m_iFirstReadableOutOfOrder;      // In case of out ouf order packet, points to a position of the first such packet to read
 
 
 public:     // TSBPD public functions

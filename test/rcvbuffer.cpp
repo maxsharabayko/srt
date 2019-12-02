@@ -1,4 +1,8 @@
 #include "rcvbuffer.h"
+#include "logging.h"
+
+#using namespace srt_logging;
+#define rbuflog mglog
 
 //
 // TODO: Use enum class if C++11 is available.
@@ -36,6 +40,8 @@ CRcvBuffer2::CRcvBuffer2(int initSeqNo, size_t size)
     , m_iFirstUnreadablePos(0)
     , m_iMaxPos(0)
     , m_iNotch(0)
+    , m_numOutOfOrderPackets(0)
+    , m_iFirstReadableOutOfOrder(-1)
     , m_bTLPktDrop(false)
     , m_bTsbPdMode(false)
     , m_uTsbPdDelay(0)
@@ -47,6 +53,7 @@ CRcvBuffer2::CRcvBuffer2(int initSeqNo, size_t size)
     , m_iAckedBytesCount(0)
     , m_iAvgPayloadSz(7 * 188)
 {
+    SRT_ASSERT(size < INT_MAX); // All position pointers are integers
     m_pUnit = new CUnit *[m_size];
     for (size_t i = 0; i < m_size; ++i)
         m_pUnit[i] = NULL;
@@ -88,6 +95,10 @@ int CRcvBuffer2::insert(CUnit *unit)
     // Packet already exists
     if (m_pUnit[pos] != NULL)
         return -1;
+
+    // If packet "in order" flag is zero, it can be read out of order
+    if (!unit->m_Packet.getMsgOrderFlag())
+        ++m_numOutOfOrderPackets;
 
     m_pUnit[pos] = unit;
     countBytes(1, (int)unit->m_Packet.getLength());
@@ -191,6 +202,9 @@ int CRcvBuffer2::readMessage(char *data, size_t len)
 
         if (m_bTsbPdMode)
             updateTsbPdTimeBase(packet.getMsgTimeStamp());
+
+        if (m_numOutOfOrderPackets && ~packet.getMsgOrderFlag())
+            --m_numOutOfOrderPackets;
 
         // TODO: make unit free
         // m_pUnitQueue->makeUnitFree(m_pUnit[i]);
@@ -376,6 +390,112 @@ int CRcvBuffer2::findLastMessagePkt()
     std::cerr << "CRcvBuffer2.findLastMessagePkt(): PB_LAST not found. Ignored canRead() result?" << std::endl;
     return -1;
 }
+
+
+void CRcvBuffer2::onInsertNotInOrderPacket(int insertPos)
+{
+    if (m_numOutOfOrderPackets == 0)
+        return;
+
+    // If the following condition is true, there is alreadt a packet,
+    // that can be read out of order. We don't need to search for
+    // another one. The search should be done when that packet is read out from the buffer.
+    //
+    // There might happen that the packet being added precedes the previously found one.
+    // However, it is allowed to re bead out of order, so no need to update the position.
+    if (m_iFirstReadableOutOfOrder >= 0)
+        return;
+
+    // Just a sanity check. This function is called when a new packet is added.
+    // So the should be unacknowledged packets.
+    SRT_ASSERT(m_iMaxPos > 0);
+    SRT_ASSERT(m_pUnit[insertPos]);
+    const CPacket &pkt = m_pUnit[insertPos]->m_Packet;
+    const PacketBoundary boundary = pkt.getMsgBoundary();
+
+    //if ((boundary & PB_FIRST) && (boundary & PB_LAST))
+    //{
+    //    // This packet can be read out of order
+    //    m_iFirstReadableOutOfOrder = insertPos;
+    //    return;
+    //}
+
+    // First check last packet, because it is expected to be received last.
+    const bool hasLast = (boundary & PB_LAST) || scanNotInOrderPacketRight(insertPos);
+    if (!hasLast)
+        return;
+
+    const bool hasFirst = (boundary & PB_FIRST) || scanNotInOrderPacketLeft(insertPos);
+    if (!hasFirst)
+        return;
+
+    m_iFirstReadableOutOfOrder = insertPos;
+    return;
+}
+
+bool CRcvBuffer2::scanNotInOrderPacketRight(const int startPos, int msgNo)
+{
+    // Search further packets to the right.
+    // First check if there are packets to the right.
+    const int lastPos = (m_iLastAckPos + m_iMaxPos - 1) % m_size;
+    if (startPos == lastPos)
+        return false;
+
+    int i = startPos;
+    do
+    {
+        i = incPos(i);
+
+        if (!m_pUnit[i])
+            break;
+
+        const CPacket& pkt = m_pUnit[i]->m_Packet;
+
+        if (pkt.getMsgSeq() != msgNo)
+        {
+            LOGC(rbuflog.Error, log << "Missing PB_LAST packet for msgNo " << msgNo);
+            return false;
+        }
+
+        const PacketBoundary boundary = pkt.getMsgBoundary();
+        if (boundary & PB_LAST)
+            return true;
+    } while (i != lastPos);
+
+    return false;
+}
+
+bool CRcvBuffer2::scanNotInOrderPacketLeft(const int startPos, int msgNo)
+{
+    // Search preceeding packets to the left.
+    // First check if there are packets to the left.
+    if (startPos == m_iStartPos)
+        return false;
+
+    int i = startPos;
+    do
+    {
+        i = decPos(i);
+
+        if (!m_pUnit[i])
+            return false;
+
+        const CPacket& pkt = m_pUnit[i]->m_Packet;
+
+        if (pkt.getMsgSeq() != msgNo)
+        {
+            LOGC(rbuflog.Error, log << "Missing PB_FIRST packet for msgNo " << msgNo);
+            return false;
+        }
+
+        const PacketBoundary boundary = pkt.getMsgBoundary();
+        if (boundary & PB_FIRST)
+            return true;
+    } while (i != m_iStartPos);
+
+    return false;
+}
+
 
 void CRcvBuffer2::setTsbPdMode(uint64_t timebase, uint32_t delay, bool tldrop)
 {
