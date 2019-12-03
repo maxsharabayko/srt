@@ -198,12 +198,13 @@ int CRcvBuffer2::readMessage(char *data, size_t len)
     char * dst        = data;
     int    pkts_read  = 0;
     int    bytes_read = 0;
+    bool updateStartPos = (readPos == m_iStartPos);
     for (int i = readPos;; i = incPos(i))
     {
         SRT_ASSERT(m_pUnit[i]);
         if (!m_pUnit[i])
         {
-            LOGC(rbuflog.Error, log << "CRcvBuffer2::readMessage(): numm packet encountered.");
+            LOGC(rbuflog.Error, log << "CRcvBuffer2::readMessage(): null packet encountered.");
             break;
         }
 
@@ -227,21 +228,24 @@ int CRcvBuffer2::readMessage(char *data, size_t len)
         // m_pUnitQueue->makeUnitFree(m_pUnit[i]);
         m_pUnit[i] = NULL;
 
+        if (updateStartPos)
+        {
+            if (i == m_iLastAckPos)
+                updateStartPos = false;
+            else
+                m_iStartPos = i;
+        }
+
         if (packet.getMsgBoundary() & PB_LAST)
         {
-            if (readPos == m_iStartPos)
-                m_iStartPos = i;
+            if (readPos == m_iFirstReadableOutOfOrder)
+                m_iFirstReadableOutOfOrder = -1;
             break;
         }
     }
 
     countBytes(-pkts_read, -bytes_read, true);
-
-    if (!hasReadableAckPkts() && m_numOutOfOrderPackets > 0 && m_iFirstReadableOutOfOrder >= 0)
-    {
-        // TODO: Find next out of order packet to read
-
-    }
+    updateFirstReadableOutOfOrder();
 
     return (dst - data);
 }
@@ -461,6 +465,69 @@ void CRcvBuffer2::onInsertNotInOrderPacket(int insertPos)
         return;
 
     m_iFirstReadableOutOfOrder = firstPktPos;
+    return;
+}
+
+void CRcvBuffer2::updateFirstReadableOutOfOrder()
+{
+    if (hasReadableAckPkts() || m_numOutOfOrderPackets <= 0 || m_iFirstReadableOutOfOrder >= 0)
+        return;
+
+    if (m_iMaxPos == 0)
+        return;
+
+    int outOfOrderPktsRemain = m_numOutOfOrderPackets;
+
+    // Search further packets to the right.
+    // First check if there are packets to the right.
+    const int lastPos = (m_iLastAckPos + m_iMaxPos - 1) % m_size;
+
+    int pos = m_iStartPos;
+    int posFirst = -1;
+    int posLast  = -1;
+    int msgNo    = -1;
+
+    for (int pos = m_iStartPos; outOfOrderPktsRemain; pos = incPos(pos))
+    {
+        if (!m_pUnit[pos])
+        {
+            posFirst = posLast = msgNo = -1;
+            continue;
+        }
+
+        const CPacket& pkt = m_pUnit[pos]->m_Packet;
+
+        if (pkt.getMsgOrderFlag())   // Skip in order packet
+        {
+            posFirst = posLast = msgNo = -1;
+            continue;
+        }
+
+        --outOfOrderPktsRemain;
+
+        const PacketBoundary boundary = pkt.getMsgBoundary();
+        if (boundary & PB_FIRST)
+        {
+            posFirst = pos;
+            msgNo = pkt.getMsgSeq();
+        }
+
+        if (pkt.getMsgSeq() != msgNo)
+        {
+            posFirst = posLast = msgNo = -1;
+            continue;
+        }
+
+        if (boundary & PB_LAST)
+        {
+            m_iFirstReadableOutOfOrder = posFirst;
+            return;
+        }
+
+        if (pos == lastPos)
+            break;
+    }
+
     return;
 }
 

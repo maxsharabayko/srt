@@ -148,10 +148,10 @@ private:
     /// Find position of the last packet of the message.
     /// 
     int  findLastMessagePkt();
-    int  findLastMessagePktOutOfOrder();
 
     /// Scan for availability of out of order packets.
     void onInsertNotInOrderPacket(int insertpos);
+    void updateFirstReadableOutOfOrder();
     int  scanNotInOrderMessageRight(int startPos, int msgNo) const;
     int  scanNotInOrderMessageLeft(int startPos, int msgNo) const;
 

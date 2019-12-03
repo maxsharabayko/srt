@@ -262,5 +262,7 @@ TEST_F(TestRcvBuffer2Read, MsgPartialAckOutOfOrder)
     }
 
     // 3. Further read is not possible
+    EXPECT_FALSE(m_rcv_buffer->canAck());
+    EXPECT_FALSE(m_rcv_buffer->canRead());
 }
 
