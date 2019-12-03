@@ -2,7 +2,10 @@
 #include "logging.h"
 
 using namespace srt_logging;
-extern Logger mglog;
+namespace srt_logging
+{
+    extern Logger mglog;
+}
 #define rbuflog mglog
 
 //
@@ -97,12 +100,15 @@ int CRcvBuffer2::insert(CUnit *unit)
     if (m_pUnit[pos] != NULL)
         return -1;
 
-    // If packet "in order" flag is zero, it can be read out of order
-    if (!unit->m_Packet.getMsgOrderFlag())
-        ++m_numOutOfOrderPackets;
-
     m_pUnit[pos] = unit;
     countBytes(1, (int)unit->m_Packet.getLength());
+
+    // If packet "in order" flag is zero, it can be read out of order
+    if (!unit->m_Packet.getMsgOrderFlag())
+    {
+        ++m_numOutOfOrderPackets;
+        onInsertNotInOrderPacket(pos);
+    }
 
     // TODO: Don't want m_pUnitQueue here
     // m_pUnitQueue->makeUnitGood(unit);
@@ -276,7 +282,12 @@ bool CRcvBuffer2::canRead(uint64_t time_now) const
 {
     const bool haveAckedPackets = (m_iFirstUnreadablePos != m_iStartPos);
     if (!m_bTsbPdMode)
-        return haveAckedPackets;
+    {
+        if (haveAckedPackets)
+            return true;
+
+        return (m_numOutOfOrderPackets > 0 && m_iFirstReadableOutOfOrder != -1);
+    }
 
     if (!haveAckedPackets)
         return false;
@@ -427,11 +438,13 @@ void CRcvBuffer2::onInsertNotInOrderPacket(int insertPos)
     if (!hasLast)
         return;
 
-    const bool hasFirst = (boundary & PB_FIRST) || scanNotInOrderMessageLeft(insertPos, msgNo);
-    if (!hasFirst)
+    const int firstPktPos = (boundary & PB_FIRST)
+        ? insertPos
+        : scanNotInOrderMessageLeft(insertPos, msgNo);
+    if (firstPktPos < 0)
         return;
 
-    m_iFirstReadableOutOfOrder = insertPos;
+    m_iFirstReadableOutOfOrder = firstPktPos;
     return;
 }
 
