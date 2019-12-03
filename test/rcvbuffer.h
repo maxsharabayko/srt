@@ -143,14 +143,17 @@ private:
     void countBytes(int pkts, int bytes, bool acked = false);
     void updateReadablePos();
 
+    bool hasReadableAckPkts() const { return (m_iFirstUnreadablePos != m_iStartPos); }
+
     /// Find position of the last packet of the message.
     /// 
     int  findLastMessagePkt();
+    int  findLastMessagePktOutOfOrder();
 
     /// Scan for availability of out of order packets.
     void onInsertNotInOrderPacket(int insertpos);
-    bool scanNotInOrderMessageRight(int startPos, int msgNo);
-    int  scanNotInOrderMessageLeft(int startPos, int msgNo);
+    int  scanNotInOrderMessageRight(int startPos, int msgNo) const;
+    int  scanNotInOrderMessageLeft(int startPos, int msgNo) const;
 
 
 public:

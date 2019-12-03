@@ -104,7 +104,7 @@ int CRcvBuffer2::insert(CUnit *unit)
     countBytes(1, (int)unit->m_Packet.getLength());
 
     // If packet "in order" flag is zero, it can be read out of order
-    if (!unit->m_Packet.getMsgOrderFlag())
+    if (!m_bTsbPdMode && !unit->m_Packet.getMsgOrderFlag())
     {
         ++m_numOutOfOrderPackets;
         onInsertNotInOrderPacket(pos);
@@ -185,17 +185,27 @@ void CRcvBuffer2::dropMissing(int32_t seqno)
 
 int CRcvBuffer2::readMessage(char *data, size_t len)
 {
-    const int pos_end = findLastMessagePkt();
-    if (pos_end < 0)
+    const bool readAcknowledged = hasReadableAckPkts();
+    if (!readAcknowledged && m_iFirstReadableOutOfOrder < 0)
+    {
+        LOGC(rbuflog.Error, log << "CRcvBuffer2.readMessage(): nothing to read. Ignored canRead() result?");
         return -1;
+    }
+
+    const int readPos = readAcknowledged ? m_iStartPos : m_iFirstReadableOutOfOrder;
 
     size_t remain     = len;
     char * dst        = data;
     int    pkts_read  = 0;
     int    bytes_read = 0;
-    for (int i = m_iStartPos;; i = incPos(i))
+    for (int i = readPos;; i = incPos(i))
     {
         SRT_ASSERT(m_pUnit[i]);
+        if (!m_pUnit[i])
+        {
+            LOGC(rbuflog.Error, log << "CRcvBuffer2::readMessage(): numm packet encountered.");
+            break;
+        }
 
         const CPacket &packet  = m_pUnit[i]->m_Packet;
         const size_t   pktsize = packet.getLength();
@@ -217,14 +227,21 @@ int CRcvBuffer2::readMessage(char *data, size_t len)
         // m_pUnitQueue->makeUnitFree(m_pUnit[i]);
         m_pUnit[i] = NULL;
 
-        if (i == pos_end)
+        if (packet.getMsgBoundary() & PB_LAST)
         {
-            m_iStartPos = incPos(i);
+            if (readPos == m_iStartPos)
+                m_iStartPos = i;
             break;
         }
     }
 
     countBytes(-pkts_read, -bytes_read, true);
+
+    if (!hasReadableAckPkts() && m_numOutOfOrderPackets > 0 && m_iFirstReadableOutOfOrder >= 0)
+    {
+        // TODO: Find next out of order packet to read
+
+    }
 
     return (dst - data);
 }
@@ -280,7 +297,7 @@ size_t CRcvBuffer2::countReadable() const
 
 bool CRcvBuffer2::canRead(uint64_t time_now) const
 {
-    const bool haveAckedPackets = (m_iFirstUnreadablePos != m_iStartPos);
+    const bool haveAckedPackets = hasReadableAckPkts();
     if (!m_bTsbPdMode)
     {
         if (haveAckedPackets)
@@ -399,7 +416,6 @@ int CRcvBuffer2::findLastMessagePkt()
         }
     }
 
-    std::cerr << "CRcvBuffer2.findLastMessagePkt(): PB_LAST not found. Ignored canRead() result?" << std::endl;
     return -1;
 }
 
@@ -434,7 +450,7 @@ void CRcvBuffer2::onInsertNotInOrderPacket(int insertPos)
 
     const int msgNo = pkt.getMsgSeq();
     // First check last packet, because it is expected to be received last.
-    const bool hasLast = (boundary & PB_LAST) || scanNotInOrderMessageRight(insertPos, msgNo);
+    const bool hasLast = (boundary & PB_LAST) || (-1 < scanNotInOrderMessageRight(insertPos, msgNo));
     if (!hasLast)
         return;
 
@@ -448,13 +464,13 @@ void CRcvBuffer2::onInsertNotInOrderPacket(int insertPos)
     return;
 }
 
-bool CRcvBuffer2::scanNotInOrderMessageRight(const int startPos, int msgNo)
+int CRcvBuffer2::scanNotInOrderMessageRight(const int startPos, int msgNo) const
 {
     // Search further packets to the right.
     // First check if there are packets to the right.
     const int lastPos = (m_iLastAckPos + m_iMaxPos - 1) % m_size;
     if (startPos == lastPos)
-        return false;
+        return -1;
 
     int pos = startPos;
     do
@@ -469,18 +485,18 @@ bool CRcvBuffer2::scanNotInOrderMessageRight(const int startPos, int msgNo)
         if (pkt.getMsgSeq() != msgNo)
         {
             LOGC(rbuflog.Error, log << "Missing PB_LAST packet for msgNo " << msgNo);
-            return false;
+            return -1;
         }
 
         const PacketBoundary boundary = pkt.getMsgBoundary();
         if (boundary & PB_LAST)
-            return true;
+            return pos;
     } while (pos != lastPos);
 
-    return false;
+    return -1;
 }
 
-int CRcvBuffer2::scanNotInOrderMessageLeft(const int startPos, int msgNo)
+int CRcvBuffer2::scanNotInOrderMessageLeft(const int startPos, int msgNo) const
 {
     // Search preceeding packets to the left.
     // First check if there are packets to the left.
