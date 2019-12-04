@@ -37,7 +37,7 @@ class CRcvBuffer2
 public:
 
 
-    CRcvBuffer2(int initSeqNo, size_t size);
+    CRcvBuffer2(int initSeqNo, size_t size, CUnitQueue *unitqueue);
 
     ~CRcvBuffer2();
 

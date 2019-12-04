@@ -34,10 +34,10 @@ namespace srt_logging
  *    m_iMaxPos:     none? (modified on add and ack
  */
 
-CRcvBuffer2::CRcvBuffer2(int initSeqNo, size_t size)
+CRcvBuffer2::CRcvBuffer2(int initSeqNo, size_t size, CUnitQueue* unitqueue)
     : m_pUnit(NULL)
     , m_size(size)
-    , m_pUnitQueue(NULL)
+    , m_pUnitQueue(unitqueue)
     , m_iLastAckSeqNo(initSeqNo)
     , m_iStartPos(0)
     , m_iLastAckPos(0)
@@ -67,13 +67,13 @@ CRcvBuffer2::CRcvBuffer2(int initSeqNo, size_t size)
 
 CRcvBuffer2::~CRcvBuffer2()
 {
-    /*for (int i = 0; i < m_size; ++i)
+    for (int i = 0; i < m_size; ++i)
     {
         if (m_pUnit[i] != NULL)
         {
             m_pUnitQueue->makeUnitFree(m_pUnit[i]);
         }
-    }*/
+    }
 
     delete[] m_pUnit;
 
@@ -111,7 +111,7 @@ int CRcvBuffer2::insert(CUnit *unit)
     }
 
     // TODO: Don't want m_pUnitQueue here
-    // m_pUnitQueue->makeUnitGood(unit);
+    m_pUnitQueue->makeUnitGood(unit);
 
     return 0;
 }
@@ -208,7 +208,7 @@ int CRcvBuffer2::readMessage(char *data, size_t len)
             break;
         }
 
-        const CPacket &packet  = m_pUnit[i]->m_Packet;
+        const CPacket& packet = m_pUnit[i]->m_Packet;
         const size_t   pktsize = packet.getLength();
 
         const size_t unitsize = std::min(remain, pktsize);
@@ -224,19 +224,25 @@ int CRcvBuffer2::readMessage(char *data, size_t len)
         if (m_numOutOfOrderPackets && ~packet.getMsgOrderFlag())
             --m_numOutOfOrderPackets;
 
-        // TODO: make unit free
-        // m_pUnitQueue->makeUnitFree(m_pUnit[i]);
-        m_pUnit[i] = NULL;
+        if (i == m_iLastAckPos)
+            updateStartPos = false;
+
+        const bool pbLast = packet.getMsgBoundary() & PB_LAST;
 
         if (updateStartPos)
         {
-            if (i == m_iLastAckPos)
-                updateStartPos = false;
-            else
-                m_iStartPos = i;
+            CUnit* tmp = m_pUnit[i];
+            m_pUnit[i] = NULL;
+            m_pUnitQueue->makeUnitFree(tmp);
+            m_iStartPos = incPos(i);
+        }
+        else
+        {
+            m_pUnit[i]->m_iFlag = CUnit::PASSACK;
         }
 
-        if (packet.getMsgBoundary() & PB_LAST)
+
+        if (pbLast)
         {
             if (readPos == m_iFirstReadableOutOfOrder)
                 m_iFirstReadableOutOfOrder = -1;

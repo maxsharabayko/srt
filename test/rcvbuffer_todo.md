@@ -10,7 +10,7 @@ CRcvUnit is a storage unit for a received SRT packet or a packet being processed
 
 ## CRcvBuffer2
 
-- [ ] Working no TestRcvBuffer2Read.MsgPartialAckOutOfOrder
+- [ ] Remove PASSACK and DROPPED packets
 - [ ] m_pUnitQueue->makeUnitFree(m_pUnit[i]) ignored
 - [ ] Consider `m_iNotch` when reading out data.
 - [ ] Add `skip` or `drop` function. Can ack only existing packets.
