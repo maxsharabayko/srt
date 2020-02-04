@@ -206,6 +206,7 @@ void CSndBuffer::addBuffer(const char* data, int len, SRT_MSGCTRL& w_mctrl)
 
         s->m_ullSourceTime_us = w_srctime;
         s->m_tsOriginTime = time;
+        s->m_tsRexmitTime = steady_clock::zero();
         s->m_iTTL = w_ttl;
 
         // XXX unchecked condition: s->m_pNext == NULL.
@@ -477,11 +478,32 @@ int CSndBuffer::readData(const int offset, CPacket& w_packet, steady_clock::time
       p->m_ullSourceTime_us ? p->m_ullSourceTime_us :
       p->m_tsOriginTime;*/
 
+   // This function is called when packet retransmission is triggered.
+   // Therefore we are setting the rexmit time.
+   p->m_tsRexmitTime = steady_clock::now();
+
    HLOGC(dlog.Debug, log << CONID() << "CSndBuffer: getting packet %"
            << p->m_iSeqNo << " as per %" << w_packet.m_iSeqNo
            << " size=" << readlen << " to send [REXMIT]");
 
    return readlen;
+}
+
+int CSndBuffer::getPacketTime(const int offset, srt::sync::steady_clock::time_point& tsLastRextim)
+{
+    CGuard bufferguard(m_BufLock);
+    const Block* p = m_pFirstBlock;
+
+    // XXX Suboptimal procedure to keep the blocks identifiable
+    // by sequence number. Consider using some circular buffer.
+    for (int i = 0; i < offset; ++i)
+        p = p->m_pNext;
+
+    if ((p->m_iTTL >= 0) && (count_milliseconds(steady_clock::now() - p->m_tsOriginTime) > p->m_iTTL))
+        return -1;
+
+    tsLastRextim = p->m_tsRexmitTime;
+    return 0;
 }
 
 void CSndBuffer::ackData(int offset)

@@ -7539,7 +7539,7 @@ void CUDT::processCtrlLossReport(const CPacket& ctrlpkt)
                 // <lo, hi> specification means that the consecutive cell has been already interpreted.
                 ++i;
 
-                HLOGF(mglog.Debug,
+                LOGF(mglog.Debug,
                     "%sreceived UMSG_LOSSREPORT: %d-%d (%d packets)...", CONID().c_str(),
                     losslist_lo,
                     losslist_hi,
@@ -7560,9 +7560,35 @@ void CUDT::processCtrlLossReport(const CPacket& ctrlpkt)
                 //   IF losslist_lo %>= m_iSndLastAck
                 if (CSeqNo::seqcmp(losslist_lo, m_iSndLastAck) >= 0)
                 {
-                    HLOGC(mglog.Debug, log << CONID() << "LOSSREPORT: adding "
+                    LOGC(mglog.Note, log << CONID() << "LOSSREPORT: adding "
                         << losslist_lo << " - " << losslist_hi << " to loss list");
-                    num = m_pSndLossList->insert(losslist_lo, losslist_hi);
+
+                    if (m_bRcvNakReport)
+                    {
+                        int seqstart = losslist_lo;
+                        int seqend = losslist_hi;
+                        const steady_clock::time_point time_now = steady_clock::now();
+                        const steady_clock::time_point time_nak = time_now - microseconds_from(m_iRTT + 4 * m_iRTTVar);
+
+                        int seqno = losslist_lo;
+                        do {
+                            const int offset = CSeqNo::seqoff(m_iSndLastDataAck, seqno);
+                            steady_clock::time_point tsLastRexmit;
+                            m_pSndBuffer->getPacketTime(offset, tsLastRexmit);
+                            if (is_zero(tsLastRexmit) || tsLastRexmit >= time_nak)
+                                num += m_pSndLossList->insert(seqno, -1);
+                            else
+                            {
+                                LOGC(mglog.Note, log << CONID() << "LOSSREPORT: ignored seqno"
+                                    << seqno << ", last rexmit " << FormatTimeSys(tsLastRexmit)
+                                    << " RTT=" << m_iRTT << " RTTVar=" << m_iRTTVar);
+                            }
+
+                            seqno = CSeqNo::incseq(seqno);
+                        } while (seqno <= losslist_hi);
+                    }
+                    else
+                        num = m_pSndLossList->insert(losslist_lo, losslist_hi);
                 }
                 // ELSE IF losslist_hi %>= m_iSndLastAck
                 else if (CSeqNo::seqcmp(losslist_hi, m_iSndLastAck) >= 0)
@@ -7575,7 +7601,33 @@ void CUDT::processCtrlLossReport(const CPacket& ctrlpkt)
                     // more important, so simply drop the part that predates ACK.
                     HLOGC(mglog.Debug, log << CONID() << "LOSSREPORT: adding "
                         << m_iSndLastAck << "[ACK] - " << losslist_hi << " to loss list");
-                    num = m_pSndLossList->insert(m_iSndLastAck, losslist_hi);
+
+                    if (m_bRcvNakReport)
+                    {
+                        const steady_clock::time_point time_now = steady_clock::now();
+                        const steady_clock::time_point time_nak = time_now - microseconds_from(m_iRTT + 4 * m_iRTTVar);
+
+                        int seqno = m_iSndLastAck;
+                        do {
+                            const int offset = CSeqNo::seqoff(m_iSndLastDataAck, seqno);
+                            steady_clock::time_point tsLastRexmit;
+                            m_pSndBuffer->getPacketTime(offset, tsLastRexmit);
+                            if (is_zero(tsLastRexmit) || tsLastRexmit >= time_nak)
+                                num += m_pSndLossList->insert(seqno, -1);
+                            else
+                            {
+                                LOGC(mglog.Note, log << CONID() << "LOSSREPORT: ignored seqno"
+                                    << seqno << ", last rexmit " << FormatTimeSys(tsLastRexmit)
+                                    << " RTT=" << m_iRTT << " RTTVar=" << m_iRTTVar);
+                            }
+
+                            seqno = CSeqNo::incseq(seqno);
+                        } while (seqno <= losslist_hi);
+                    }
+                    else
+                    {
+                        num = m_pSndLossList->insert(m_iSndLastAck, losslist_hi);
+                    }
                 }
                 else
                 {

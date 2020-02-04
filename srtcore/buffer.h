@@ -131,6 +131,9 @@ public:
 
    int readData(const int offset, CPacket& w_packet, srt::sync::steady_clock::time_point& w_origintime, int& w_msglen);
 
+
+   int getPacketTime(const int offset, srt::sync::steady_clock::time_point& tsLastRextim);
+
       /// Update the ACK point and may release/unmap/return the user data according to the flag.
       /// @param [in] offset number of packets acknowledged.
 
@@ -192,6 +195,7 @@ private:
       int32_t m_iMsgNoBitset;           // message number
       int32_t m_iSeqNo;                       // sequence number for scheduling
       srt::sync::steady_clock::time_point m_tsOriginTime;            // original request time
+      srt::sync::steady_clock::time_point m_tsRexmitTime;            // packet retransmission time
       uint64_t m_ullSourceTime_us;
       int m_iTTL;                       // time to live (milliseconds)
 
