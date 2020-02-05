@@ -1270,6 +1270,8 @@ private: // Generation and processing of packets
     void sendLossReport(const std::vector< std::pair<int32_t, int32_t> >& losslist);
     void processCtrlAck(const CPacket& ctrlpkt, const time_point &currtime);
     void processCtrlLossReport(const CPacket& ctrlpkt);
+    /// @return number of added packets
+    int processLossSeq(const int seqno, const time_point& time_nak, const time_point& time_now);
 
     ///
     /// @param ackdata_seqno    sequence number of a data packet being acknowledged
