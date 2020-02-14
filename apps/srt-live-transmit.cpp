@@ -707,6 +707,9 @@ int main(int argc, char** argv)
     try {
         // Now loop until broken
         establish(src, tar, cfg, pollid);
+
+        Target* ptar = tar.get();
+        Source* psrc = src.get();
         
         while (!int_state && !timer_state)
         {
@@ -730,9 +733,9 @@ int main(int argc, char** argv)
             //for (int pkti = 0; pkti < 10; ++pkti)
             {
                 bytevector data(SRT_LIVE_MAX_PLSIZE);
-                const int res = src->Read(transmit_chunk_size, data, out_stats);
+                const int res = psrc->Read(transmit_chunk_size, data, out_stats);
 
-                if (res == SRT_ERROR && src->uri.type() == UriParser::SRT)
+                if (res == SRT_ERROR && psrc->uri.type() == UriParser::SRT)
                 {
                     if (srt_getlasterror(NULL) == SRT_EASYNCRCV)
                         break;
@@ -749,10 +752,7 @@ int main(int argc, char** argv)
 
                 receivedBytes += data.size();
 
-                if (!tar.get() || !tar->IsOpen()) {
-                    lostBytes += data.size();
-                }
-                else if (!tar->Write(data.data(), data.size(), out_stats)) {
+                if (ptar->Write(data.data(), data.size(), out_stats)) {
                     lostBytes += data.size();
                 }
                 else
