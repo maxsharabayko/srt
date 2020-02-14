@@ -528,13 +528,13 @@ int establish(unique_ptr<Source> &src, unique_ptr<Target> &tar, const LiveTransm
                         {
                             const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
                             // Disable OUT event polling when connected
-                            if (srt_epoll_update_usock(pollid,
+                            /*if (srt_epoll_update_usock(pollid,
                                 tar->GetSRTSocket(), &events))
                             {
                                 cerr << "Failed to add SRT destination to poll, "
                                     << tar->GetSRTSocket() << endl;
                                 return 1;
-                            }
+                            }*/
                         }
 
 #ifndef _WIN32
@@ -721,14 +721,10 @@ int main(int argc, char** argv)
             if (srt_epoll_wait(pollid,
                 &srtrwfds[0], &srtrfdslen, &srtrwfds[2], &srtwfdslen,
                 100,
-                &sysrfds[0], &sysrfdslen, 0, 0) >= 0)
+                &sysrfds[0], &sysrfdslen, 0, 0) < 0)
             {
-                break;
+                continue;
             }
-        }
-
-        while (!int_state && !timer_state)
-        {
 
             // read a few chunks at a time in attempt to deplete
             // read buffers as much as possible on each read event
