@@ -714,7 +714,7 @@ int main(int argc, char** argv)
         
         while (!int_state && !timer_state)
         {
-            int srtrfdslen = 2;
+            /*int srtrfdslen = 2;
             int srtwfdslen = 2;
             SRTSOCKET srtrwfds[4] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK , SRT_INVALID_SOCK , SRT_INVALID_SOCK };
             int sysrfdslen = 2;
@@ -725,7 +725,7 @@ int main(int argc, char** argv)
                 &sysrfds[0], &sysrfdslen, 0, 0) < 0)
             {
                 continue;
-            }
+            }*/
         
             // read a few chunks at a time in attempt to deplete
             // read buffers as much as possible on each read event
@@ -748,7 +748,7 @@ int main(int argc, char** argv)
 
                 if (res == 0 || data.empty())
                 {
-                    break;
+                    continue;
                 }
 
                 receivedBytes += data.size();
