@@ -715,7 +715,7 @@ int main(int argc, char** argv)
         {
             int srtrfdslen = 2;
             int srtwfdslen = 2;
-            SRTSOCKET srtrwfds[4] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK , SRT_INVALID_SOCK , SRT_INVALID_SOCK };
+            SRTSOCKET srtrwfds[4] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK , SRT_INVALID_SOCK , SRT_INVALID_SOCK };
             int sysrfdslen = 2;
             SYSSOCKET sysrfds[2];
             if (srt_epoll_wait(pollid,
@@ -725,6 +725,10 @@ int main(int argc, char** argv)
             {
                 continue;
             }
+        }
+
+        while (!int_state && !timer_state)
+        {
 
             // read a few chunks at a time in attempt to deplete
             // read buffers as much as possible on each read event
