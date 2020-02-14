@@ -703,50 +703,36 @@ int main(int argc, char** argv)
                 // read buffers as much as possible on each read event
                 // note that this implies live streams and does not
                 // work for cached/file sources
-                std::list<std::shared_ptr<bytevector>> dataqueue;
-                if (src.get() && (srtrfdslen || sysrfdslen))
+                for (int pkti = 0; pkti < 10; ++pkti)
                 {
-                    while (dataqueue.size() < 10)
+                    bytevector data(SRT_LIVE_MAX_PLSIZE);
+                    const int res = src->Read(transmit_chunk_size, data, out_stats);
+
+                    if (res == SRT_ERROR && src->uri.type() == UriParser::SRT)
                     {
-                        std::shared_ptr<bytevector> pdata(
-                            new bytevector(transmit_chunk_size));
-
-                        const int res = src->Read(transmit_chunk_size, *pdata, out_stats);
-
-                        if (res == SRT_ERROR && src->uri.type() == UriParser::SRT)
-                        {
-                            if (srt_getlasterror(NULL) == SRT_EASYNCRCV)
-                                break;
+                        if (srt_getlasterror(NULL) == SRT_EASYNCRCV)
+                            break;
 
                             throw std::runtime_error(
                                 string("error: recvmsg: ") + string(srt_getlasterror_str())
-                            );
-                        }
-
-                        if (res == 0 || pdata->empty())
-                        {
-                            break;
-                        }
-
-                        dataqueue.push_back(pdata);
-                        receivedBytes += (*pdata).size();
+                        );
                     }
-                }
 
-                // if no target, let received data fall to the floor
-                while (!dataqueue.empty())
-                {
-                    std::shared_ptr<bytevector> pdata = dataqueue.front();
+                    if (res == 0 || data.empty())
+                    {
+                        break;
+                    }
+
+                    receivedBytes += data.size();
+
                     if (!tar.get() || !tar->IsOpen()) {
-                        lostBytes += (*pdata).size();
+                        lostBytes += data.size();
                     }
-                    else if (!tar->Write(pdata->data(), pdata->size(), out_stats)) {
-                        lostBytes += (*pdata).size();
+                    else if (!tar->Write(data.data(), data.size(), out_stats)) {
+                        lostBytes += data.size();
                     }
                     else
-                        wroteBytes += (*pdata).size();
-
-                    dataqueue.pop_front();
+                        wroteBytes += data.size();
                 }
 
                 if (!cfg.quiet && (lastReportedtLostBytes != lostBytes))
