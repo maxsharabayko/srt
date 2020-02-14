@@ -721,9 +721,9 @@ int main(int argc, char** argv)
             if (srt_epoll_wait(pollid,
                 &srtrwfds[0], &srtrfdslen, &srtrwfds[2], &srtwfdslen,
                 100,
-                &sysrfds[0], &sysrfdslen, 0, 0) < 0)
+                &sysrfds[0], &sysrfdslen, 0, 0) >= 0)
             {
-                continue;
+                break;
             }
         }
 
