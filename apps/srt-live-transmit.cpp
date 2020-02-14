@@ -714,7 +714,7 @@ int main(int argc, char** argv)
         
         while (!int_state && !timer_state)
         {
-            /*int srtrfdslen = 2;
+            int srtrfdslen = 2;
             int srtwfdslen = 2;
             SRTSOCKET srtrwfds[4] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK , SRT_INVALID_SOCK , SRT_INVALID_SOCK };
             int sysrfdslen = 2;
@@ -725,13 +725,13 @@ int main(int argc, char** argv)
                 &sysrfds[0], &sysrfdslen, 0, 0) < 0)
             {
                 continue;
-            }*/
+            }
         
             // read a few chunks at a time in attempt to deplete
             // read buffers as much as possible on each read event
             // note that this implies live streams and does not
             // work for cached/file sources
-            //for (int pkti = 0; pkti < 10; ++pkti)
+            for (; ; )
             {
                 bytevector data(SRT_LIVE_MAX_PLSIZE);
                 const int res = psrc->Read(transmit_chunk_size, data, out_stats);
@@ -741,14 +741,14 @@ int main(int argc, char** argv)
                     if (srt_getlasterror(NULL) == SRT_EASYNCRCV)
                         break;
 
-                        throw std::runtime_error(
-                            string("error: recvmsg: ") + string(srt_getlasterror_str())
+                    throw std::runtime_error(
+                        string("error: recvmsg: ") + string(srt_getlasterror_str())
                     );
                 }
 
                 if (res == 0 || data.empty())
                 {
-                    continue;
+                    break;
                 }
 
                 receivedBytes += data.size();
