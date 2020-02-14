@@ -299,6 +299,271 @@ int parse_args(LiveTransmitConfig &cfg, int argc, char** argv)
 }
 
 
+int establish(unique_ptr<Source> &src, unique_ptr<Target> &tar, const LiveTransmitConfig &cfg, const int pollid)
+{
+    bool srcConnected = false;
+    bool tarConnected = false;
+    while (!int_state && !timer_state && !src && !tar)
+    {
+        if (!src.get())
+        {
+            src = Source::Create(cfg.source);
+            if (!src.get())
+            {
+                cerr << "Unsupported source type" << endl;
+                return 1;
+            }
+            int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
+            switch (src->uri.type())
+            {
+            case UriParser::SRT:
+                if (srt_epoll_add_usock(pollid,
+                    src->GetSRTSocket(), &events))
+                {
+                    cerr << "Failed to add SRT source to poll, "
+                        << src->GetSRTSocket() << endl;
+                    return 1;
+                }
+                break;
+            case UriParser::UDP:
+                if (srt_epoll_add_ssock(pollid,
+                    src->GetSysSocket(), &events))
+                {
+                    cerr << "Failed to add UDP source to poll, "
+                        << src->GetSysSocket() << endl;
+                    return 1;
+                }
+                break;
+            case UriParser::FILE:
+                if (srt_epoll_add_ssock(pollid,
+                    src->GetSysSocket(), &events))
+                {
+                    cerr << "Failed to add FILE source to poll, "
+                        << src->GetSysSocket() << endl;
+                    return 1;
+                }
+                break;
+            default:
+                break;
+            }
+
+            //receivedBytes = 0;
+        }
+
+        if (!tar.get())
+        {
+            tar = Target::Create(cfg.target);
+            if (!tar.get())
+            {
+                cerr << "Unsupported target type" << endl;
+                return 1;
+            }
+
+            // IN because we care for state transitions only
+            // OUT - to check the connection state changes
+            int events = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
+            switch (tar->uri.type())
+            {
+            case UriParser::SRT:
+                if (srt_epoll_add_usock(pollid,
+                    tar->GetSRTSocket(), &events))
+                {
+                    cerr << "Failed to add SRT destination to poll, "
+                        << tar->GetSRTSocket() << endl;
+                    return 1;
+                }
+                break;
+            default:
+                break;
+            }
+
+            //wroteBytes = 0;
+            //lostBytes = 0;
+            //lastReportedtLostBytes = 0;
+        }
+
+        int srtrfdslen = 2;
+        int srtwfdslen = 2;
+        SRTSOCKET srtrwfds[4] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK , SRT_INVALID_SOCK , SRT_INVALID_SOCK };
+        int sysrfdslen = 2;
+        SYSSOCKET sysrfds[2];
+        if (srt_epoll_wait(pollid,
+            &srtrwfds[0], &srtrfdslen, &srtrwfds[2], &srtwfdslen,
+            100,
+            &sysrfds[0], &sysrfdslen, 0, 0) >= 0)
+        {
+            bool doabort = false;
+            for (size_t i = 0; i < sizeof(srtrwfds) / sizeof(SRTSOCKET); i++)
+            {
+                SRTSOCKET s = srtrwfds[i];
+                if (s == SRT_INVALID_SOCK)
+                    continue;
+
+                bool issource = false;
+                if (src && src->GetSRTSocket() == s)
+                {
+                    issource = true;
+                }
+                else if (tar && tar->GetSRTSocket() != s)
+                {
+                    continue;
+                }
+
+                const char* dirstring = (issource) ? "source" : "target";
+
+                SRT_SOCKSTATUS status = srt_getsockstate(s);
+                switch (status)
+                {
+                case SRTS_LISTENING:
+                {
+                    const bool res = (issource) ?
+                        src->AcceptNewClient() : tar->AcceptNewClient();
+                    if (!res)
+                    {
+                        cerr << "Failed to accept SRT connection"
+                            << endl;
+                        doabort = true;
+                        break;
+                    }
+
+                    srt_epoll_remove_usock(pollid, s);
+
+                    SRTSOCKET ns = (issource) ?
+                        src->GetSRTSocket() : tar->GetSRTSocket();
+                    int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
+                    if (srt_epoll_add_usock(pollid, ns, &events))
+                    {
+                        cerr << "Failed to add SRT client to poll, "
+                            << ns << endl;
+                        doabort = true;
+                    }
+                    else
+                    {
+                        if (!cfg.quiet)
+                        {
+                            cerr << "Accepted SRT "
+                                << dirstring
+                                << " connection"
+                                << endl;
+                        }
+#ifndef _WIN32
+                        if (cfg.timeout_mode == 1 && cfg.timeout > 0)
+                        {
+                            if (!cfg.quiet)
+                                cerr << "TIMEOUT: cancel\n";
+                            alarm(0);
+                        }
+#endif
+                        if (issource)
+                            srcConnected = true;
+                        else
+                            tarConnected = true;
+                    }
+                }
+                break;
+                case SRTS_BROKEN:
+                case SRTS_NONEXIST:
+                case SRTS_CLOSED:
+                {
+                    if (issource)
+                    {
+                        if (srcConnected)
+                        {
+                            if (!cfg.quiet)
+                            {
+                                cerr << "SRT source disconnected"
+                                    << endl;
+                            }
+                            srcConnected = false;
+                        }
+                    }
+                    else if (tarConnected)
+                    {
+                        if (!cfg.quiet)
+                            cerr << "SRT target disconnected" << endl;
+                        tarConnected = false;
+                    }
+
+                    if (!cfg.auto_reconnect)
+                    {
+                        doabort = true;
+                    }
+                    else
+                    {
+                        // force re-connection
+                        srt_epoll_remove_usock(pollid, s);
+                        if (issource)
+                            src.reset();
+                        else
+                            tar.reset();
+
+#ifndef _WIN32
+                        if (cfg.timeout_mode == 1 && cfg.timeout > 0)
+                        {
+                            if (!cfg.quiet)
+                                cerr << "TIMEOUT: will interrupt after " << cfg.timeout << "s\n";
+                            alarm(cfg.timeout);
+                        }
+#endif
+                    }
+                }
+                break;
+                case SRTS_CONNECTED:
+                {
+                    if (issource)
+                    {
+                        if (!srcConnected)
+                        {
+                            if (!cfg.quiet)
+                                cerr << "SRT source connected" << endl;
+                            srcConnected = true;
+                        }
+                    }
+                    else if (!tarConnected)
+                    {
+                        if (!cfg.quiet)
+                            cerr << "SRT target connected" << endl;
+                        tarConnected = true;
+                        if (tar->uri.type() == UriParser::SRT)
+                        {
+                            const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
+                            // Disable OUT event polling when connected
+                            if (srt_epoll_update_usock(pollid,
+                                tar->GetSRTSocket(), &events))
+                            {
+                                cerr << "Failed to add SRT destination to poll, "
+                                    << tar->GetSRTSocket() << endl;
+                                return 1;
+                            }
+                        }
+
+#ifndef _WIN32
+                        if (cfg.timeout_mode == 1 && cfg.timeout > 0)
+                        {
+                            if (!cfg.quiet)
+                                cerr << "TIMEOUT: cancel\n";
+                            alarm(0);
+                        }
+#endif
+                    }
+                }
+
+                default:
+                {
+                    // No-Op
+                }
+                break;
+                }
+            }
+
+            if (doabort)
+            {
+                break;
+            }
+        }
+    }
+}
+
 
 int main(int argc, char** argv)
 {
@@ -441,85 +706,10 @@ int main(int argc, char** argv)
 
     try {
         // Now loop until broken
+        establish(src, tar, cfg, pollid);
+        
         while (!int_state && !timer_state)
         {
-            if (!src.get())
-            {
-                src = Source::Create(cfg.source);
-                if (!src.get())
-                {
-                    cerr << "Unsupported source type" << endl;
-                    return 1;
-                }
-                int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-                switch (src->uri.type())
-                {
-                case UriParser::SRT:
-                    if (srt_epoll_add_usock(pollid,
-                        src->GetSRTSocket(), &events))
-                    {
-                        cerr << "Failed to add SRT source to poll, "
-                            << src->GetSRTSocket() << endl;
-                        return 1;
-                    }
-                    break;
-                case UriParser::UDP:
-                    if (srt_epoll_add_ssock(pollid,
-                        src->GetSysSocket(), &events))
-                    {
-                        cerr << "Failed to add UDP source to poll, "
-                            << src->GetSysSocket() << endl;
-                        return 1;
-                    }
-                    break;
-                case UriParser::FILE:
-                    if (srt_epoll_add_ssock(pollid,
-                        src->GetSysSocket(), &events))
-                    {
-                        cerr << "Failed to add FILE source to poll, "
-                            << src->GetSysSocket() << endl;
-                        return 1;
-                    }
-                    break;
-                default:
-                    break;
-                }
-
-                receivedBytes = 0;
-            }
-
-            if (!tar.get())
-            {
-                tar = Target::Create(cfg.target);
-                if (!tar.get())
-                {
-                    cerr << "Unsupported target type" << endl;
-                    return 1;
-                }
-
-                // IN because we care for state transitions only
-                // OUT - to check the connection state changes
-                int events = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
-                switch(tar->uri.type())
-                {
-                case UriParser::SRT:
-                    if (srt_epoll_add_usock(pollid,
-                        tar->GetSRTSocket(), &events))
-                    {
-                        cerr << "Failed to add SRT destination to poll, "
-                            << tar->GetSRTSocket() << endl;
-                        return 1;
-                    }
-                    break;
-                default:
-                    break;
-                }
-
-                wroteBytes = 0;
-                lostBytes = 0;
-                lastReportedtLostBytes = 0;
-            }
-
             int srtrfdslen = 2;
             int srtwfdslen = 2;
             SRTSOCKET srtrwfds[4] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK , SRT_INVALID_SOCK , SRT_INVALID_SOCK };
@@ -528,225 +718,58 @@ int main(int argc, char** argv)
             if (srt_epoll_wait(pollid,
                 &srtrwfds[0], &srtrfdslen, &srtrwfds[2], &srtwfdslen,
                 100,
-                &sysrfds[0], &sysrfdslen, 0, 0) >= 0)
+                &sysrfds[0], &sysrfdslen, 0, 0) < 0)
             {
-                bool doabort = false;
-                for (size_t i = 0; i < sizeof(srtrwfds) / sizeof(SRTSOCKET); i++)
+                continue;
+            }
+
+            // read a few chunks at a time in attempt to deplete
+            // read buffers as much as possible on each read event
+            // note that this implies live streams and does not
+            // work for cached/file sources
+            //for (int pkti = 0; pkti < 10; ++pkti)
+            {
+                bytevector data(SRT_LIVE_MAX_PLSIZE);
+                const int res = src->Read(transmit_chunk_size, data, out_stats);
+
+                if (res == SRT_ERROR && src->uri.type() == UriParser::SRT)
                 {
-                    SRTSOCKET s = srtrwfds[i];
-                    if (s == SRT_INVALID_SOCK)
-                        continue;
-
-                    bool issource = false;
-                    if (src && src->GetSRTSocket() == s)
-                    {
-                        issource = true;
-                    }
-                    else if (tar && tar->GetSRTSocket() != s)
-                    {
-                        continue;
-                    }
-
-                    const char * dirstring = (issource) ? "source" : "target";
-
-                    SRT_SOCKSTATUS status = srt_getsockstate(s);
-                    switch (status)
-                    {
-                    case SRTS_LISTENING:
-                    {
-                        const bool res = (issource) ?
-                            src->AcceptNewClient() : tar->AcceptNewClient();
-                        if (!res)
-                        {
-                            cerr << "Failed to accept SRT connection"
-                                << endl;
-                            doabort = true;
-                            break;
-                        }
-
-                        srt_epoll_remove_usock(pollid, s);
-
-                        SRTSOCKET ns = (issource) ?
-                            src->GetSRTSocket() : tar->GetSRTSocket();
-                        int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-                        if (srt_epoll_add_usock(pollid, ns, &events))
-                        {
-                            cerr << "Failed to add SRT client to poll, "
-                                << ns << endl;
-                            doabort = true;
-                        }
-                        else
-                        {
-                            if (!cfg.quiet)
-                            {
-                                cerr << "Accepted SRT "
-                                    << dirstring
-                                    <<  " connection"
-                                    << endl;
-                            }
-#ifndef _WIN32
-                            if (cfg.timeout_mode == 1 && cfg.timeout > 0)
-                            {
-                                if (!cfg.quiet)
-                                    cerr << "TIMEOUT: cancel\n";
-                                alarm(0);
-                            }
-#endif
-                            if (issource)
-                                srcConnected = true;
-                            else
-                                tarConnected = true;
-                        }
-                    }
-                    break;
-                    case SRTS_BROKEN:
-                    case SRTS_NONEXIST:
-                    case SRTS_CLOSED:
-                    {
-                        if (issource)
-                        {
-                            if (srcConnected)
-                            {
-                                if (!cfg.quiet)
-                                {
-                                    cerr << "SRT source disconnected"
-                                        << endl;
-                                }
-                                srcConnected = false;
-                            }
-                        }
-                        else if (tarConnected)
-                        {
-                            if (!cfg.quiet)
-                                cerr << "SRT target disconnected" << endl;
-                            tarConnected = false;
-                        }
-
-                        if(!cfg.auto_reconnect)
-                        {
-                            doabort = true;
-                        }
-                        else
-                        {
-                            // force re-connection
-                            srt_epoll_remove_usock(pollid, s);
-                            if (issource)
-                                src.reset();
-                            else
-                                tar.reset();
-
-#ifndef _WIN32
-                            if (cfg.timeout_mode == 1 && cfg.timeout > 0)
-                            {
-                                if (!cfg.quiet)
-                                    cerr << "TIMEOUT: will interrupt after " << cfg.timeout << "s\n";
-                                alarm(cfg.timeout);
-                            }
-#endif
-                        }
-                    }
-                    break;
-                    case SRTS_CONNECTED:
-                    {
-                        if (issource)
-                        {
-                            if (!srcConnected)
-                            {
-                                if (!cfg.quiet)
-                                    cerr << "SRT source connected" << endl;
-                                srcConnected = true;
-                            }
-                        }
-                        else if (!tarConnected)
-                        {
-                            if (!cfg.quiet)
-                                cerr << "SRT target connected" << endl;
-                            tarConnected = true;
-                            if (tar->uri.type() == UriParser::SRT)
-                            {
-                                const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-                                // Disable OUT event polling when connected
-                                if (srt_epoll_update_usock(pollid,
-                                    tar->GetSRTSocket(), &events))
-                                {
-                                    cerr << "Failed to add SRT destination to poll, "
-                                        << tar->GetSRTSocket() << endl;
-                                    return 1;
-                                }
-                            }
-
-#ifndef _WIN32
-                            if (cfg.timeout_mode == 1 && cfg.timeout > 0)
-                            {
-                                if (!cfg.quiet)
-                                    cerr << "TIMEOUT: cancel\n";
-                                alarm(0);
-                            }
-#endif
-                        }
-                    }
-
-                    default:
-                    {
-                        // No-Op
-                    }
-                    break;
-                    }
-                }
-
-                if (doabort)
-                {
-                    break;
-                }
-
-                // read a few chunks at a time in attempt to deplete
-                // read buffers as much as possible on each read event
-                // note that this implies live streams and does not
-                // work for cached/file sources
-                for (int pkti = 0; pkti < 10; ++pkti)
-                {
-                    bytevector data(SRT_LIVE_MAX_PLSIZE);
-                    const int res = src->Read(transmit_chunk_size, data, out_stats);
-
-                    if (res == SRT_ERROR && src->uri.type() == UriParser::SRT)
-                    {
-                        if (srt_getlasterror(NULL) == SRT_EASYNCRCV)
-                            break;
-
-                            throw std::runtime_error(
-                                string("error: recvmsg: ") + string(srt_getlasterror_str())
-                        );
-                    }
-
-                    if (res == 0 || data.empty())
-                    {
+                    if (srt_getlasterror(NULL) == SRT_EASYNCRCV)
                         break;
-                    }
 
-                    receivedBytes += data.size();
-
-                    if (!tar.get() || !tar->IsOpen()) {
-                        lostBytes += data.size();
-                    }
-                    else if (!tar->Write(data.data(), data.size(), out_stats)) {
-                        lostBytes += data.size();
-                    }
-                    else
-                        wroteBytes += data.size();
+                        throw std::runtime_error(
+                            string("error: recvmsg: ") + string(srt_getlasterror_str())
+                    );
                 }
 
-                if (!cfg.quiet && (lastReportedtLostBytes != lostBytes))
+                if (res == 0 || data.empty())
                 {
-                    std::time_t now(std::time(nullptr));
-                    if (std::difftime(now, writeErrorLogTimer) >= 5.0)
-                    {
-                        cerr << lostBytes << " bytes lost, "
-                            << wroteBytes << " bytes sent, "
-                            << receivedBytes << " bytes received"
-                            << endl;
-                        writeErrorLogTimer = now;
-                        lastReportedtLostBytes = lostBytes;
-                    }
+                    break;
+                }
+
+                receivedBytes += data.size();
+
+                if (!tar.get() || !tar->IsOpen()) {
+                    lostBytes += data.size();
+                }
+                else if (!tar->Write(data.data(), data.size(), out_stats)) {
+                    lostBytes += data.size();
+                }
+                else
+                    wroteBytes += data.size();
+            }
+
+            if (!cfg.quiet && (lastReportedtLostBytes != lostBytes))
+            {
+                std::time_t now(std::time(nullptr));
+                if (std::difftime(now, writeErrorLogTimer) >= 5.0)
+                {
+                    cerr << lostBytes << " bytes lost, "
+                        << wroteBytes << " bytes sent, "
+                        << receivedBytes << " bytes received"
+                        << endl;
+                    writeErrorLogTimer = now;
+                    lastReportedtLostBytes = lostBytes;
                 }
             }
         }
