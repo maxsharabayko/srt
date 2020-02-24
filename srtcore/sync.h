@@ -551,6 +551,34 @@ private:
 };
 
 
+class CTimer
+{
+public:
+    CTimer();
+    ~CTimer();
+
+public:
+    /// sleep_until causes the current thread to block until
+    /// a specific time is reached.
+    /// Sleep can be interrupted by calling interrupt()
+    ///
+    /// @return true  if the specified time was reached
+    ///         false should never happen
+    bool sleep_until(steady_clock::time_point tp);
+
+
+    /// Resets target wait time and interrupts all sleeps
+    void interrupt();
+
+    void notify_one();
+
+    void notify_all();
+
+private:
+    CEvent m_event;
+    steady_clock::time_point m_tsSchedTime;
+};
+
 
 /// Print steady clock timepoint in a human readable way.
 /// days HH:MM::SS.us [STD]
