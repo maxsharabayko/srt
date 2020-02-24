@@ -446,3 +446,155 @@ int srt::sync::SyncEvent::wait_for_monotonic(pthread_cond_t* cond, pthread_mutex
     return wait_for(cond, mutex, rel_time);
 }
 #endif
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// CEvent class
+//
+////////////////////////////////////////////////////////////////////////////////
+
+srt::sync::CEvent::CEvent()
+{
+    m_cond.init();
+}
+
+
+srt::sync::CEvent::~CEvent()
+{
+    m_cond.destroy();
+}
+
+
+bool srt::sync::CEvent::wait_until(const TimePoint<steady_clock>& tp)
+{
+    UniqueLock lock(m_lock);
+    return m_cond.wait_until(lock, tp);
+}
+
+void srt::sync::CEvent::notify_one()
+{
+    return m_cond.notify_one();
+}
+
+void srt::sync::CEvent::notify_all()
+{
+    return m_cond.notify_all();
+}
+
+bool srt::sync::CEvent::wait_for(const Duration<steady_clock>& rel_time)
+{
+    UniqueLock lock(m_lock);
+    return m_cond.wait_for(lock, rel_time);
+}
+
+bool srt::sync::CEvent::wait_for(UniqueLock& lock, const Duration<steady_clock>& rel_time)
+{
+    return m_cond.wait_for(lock, rel_time);
+}
+
+void srt::sync::CEvent::wait()
+{
+    UniqueLock lock(m_lock);
+    return wait(lock);
+}
+
+void srt::sync::CEvent::wait(UniqueLock& lock)
+{
+    return m_cond.wait(lock);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Timer
+//
+////////////////////////////////////////////////////////////////////////////////
+
+srt::sync::Timer::Timer()
+{
+}
+
+
+srt::sync::Timer::~Timer()
+{
+}
+
+
+bool srt::sync::Timer::sleep_until(TimePoint<steady_clock> tp)
+{
+    // The class member m_sched_time can be used to interrupt the sleep.
+    // Refer to Timer::interrupt().
+    enterCS(m_event.mutex());
+    m_tsSchedTime = tp;
+    leaveCS(m_event.mutex());
+
+#if USE_BUSY_WAITING
+#if defined(_WIN32)
+    const steady_clock::duration td_threshold = milliseconds_from(10);   // 10 ms on Windows: bad accuracy of timers
+#else
+    const steady_clock::duration td_threshold = milliseconds_from(1);    // 1 ms on non-Windows platforms
+#endif
+#endif // USE_BUSY_WAITING
+
+    TimePoint<steady_clock> cur_tp = steady_clock::now();
+    
+    while (cur_tp < m_tsSchedTime)
+    {
+#if USE_BUSY_WAITING
+        steady_clock::duration td_wait = m_tsSchedTime - cur_tp;
+        if (td_wait <= 2 * td_threshold)
+            break;
+
+        m_event.wait_for(td_wait);
+#else
+        m_event.wait_until(m_tsSchedTime);
+#endif // USE_BUSY_WAITING
+
+        cur_tp = steady_clock::now();
+    }
+
+#if USE_BUSY_WAITING
+    while (cur_tp < m_tsSchedTime)
+    {
+#ifdef IA32
+        __asm__ volatile ("pause; rep; nop; nop; nop; nop; nop;");
+#elif IA64
+        __asm__ volatile ("nop 0; nop 0; nop 0; nop 0; nop 0;");
+#elif AMD64
+        __asm__ volatile ("nop; nop; nop; nop; nop;");
+#elif defined(_WIN32) && !defined(__MINGW__)
+        __nop();
+        __nop();
+        __nop();
+        __nop();
+        __nop();
+#endif
+
+        cur_tp = steady_clock::now();
+    }
+#endif // USE_BUSY_WAITING
+
+    return cur_tp >= m_tsSchedTime;
+}
+
+
+void srt::sync::Timer::interrupt()
+{
+    UniqueLock lck(m_event.mutex());
+    m_tsSchedTime = steady_clock::now();
+    m_event.notify_all();
+}
+
+
+void srt::sync::Timer::notify_one()
+{
+    m_event.notify_one();
+}
+
+void srt::sync::Timer::notify_all()
+{
+    m_event.notify_all();
+}
+
+
