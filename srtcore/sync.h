@@ -558,12 +558,12 @@ private:
 };
 
 
-class Timer
+class CTimer
 {
 public:
-    Timer();
+    CTimer();
 
-    ~Timer();
+    ~CTimer();
 
 public:
 
@@ -646,5 +646,8 @@ inline std::string FormatDuration(const steady_clock::duration& dur)
 
 }; // namespace sync
 }; // namespace srt
+
+
+extern srt::sync::CEvent g_Sync;
 
 #endif // __SRT_SYNC_H__

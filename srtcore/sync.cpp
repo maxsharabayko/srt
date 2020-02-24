@@ -505,23 +505,26 @@ void srt::sync::CEvent::wait(UniqueLock& lock)
 }
 
 
+srt::sync::CEvent g_Sync;
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Timer
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-srt::sync::Timer::Timer()
+srt::sync::CTimer::CTimer()
 {
 }
 
 
-srt::sync::Timer::~Timer()
+srt::sync::CTimer::~CTimer()
 {
 }
 
 
-bool srt::sync::Timer::sleep_until(TimePoint<steady_clock> tp)
+bool srt::sync::CTimer::sleep_until(TimePoint<steady_clock> tp)
 {
     // The class member m_sched_time can be used to interrupt the sleep.
     // Refer to Timer::interrupt().
@@ -579,7 +582,7 @@ bool srt::sync::Timer::sleep_until(TimePoint<steady_clock> tp)
 }
 
 
-void srt::sync::Timer::interrupt()
+void srt::sync::CTimer::interrupt()
 {
     UniqueLock lck(m_event.mutex());
     m_tsSchedTime = steady_clock::now();
@@ -587,12 +590,12 @@ void srt::sync::Timer::interrupt()
 }
 
 
-void srt::sync::Timer::notify_one()
+void srt::sync::CTimer::notify_one()
 {
     m_event.notify_one();
 }
 
-void srt::sync::Timer::notify_all()
+void srt::sync::CTimer::notify_all()
 {
     m_event.notify_all();
 }

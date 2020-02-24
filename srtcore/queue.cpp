@@ -589,7 +589,7 @@ void *CSndQueue::worker(void *param)
         THREAD_PAUSED();
         if (currtime < next_time)
         {
-            self->m_pTimer->sleepto(next_time);
+            self->m_pTimer->sleep_until(next_time);
 
 #if defined(HAI_DEBUG_SNDQ_HIGHRATE)
             self->m_WorkerStats.lSleepTo++;
@@ -1244,7 +1244,7 @@ EReadStatus CRcvQueue::worker_RetrieveUnit(int32_t& w_id, CUnit*& w_unit, sockad
 #if !USE_BUSY_WAITING
     // This might be not really necessary, and probably
     // not good for extensive bidirectional communication.
-    m_pTimer->tick();
+    m_pTimer->notify_one();
 #endif
 
     // check waiting list, if new socket, insert it to the list
