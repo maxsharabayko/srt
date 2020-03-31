@@ -1,0 +1,1 @@
+1. swig -python srtcore/srt.i

@@ -685,6 +685,28 @@ if (srt_libspec_static)
 	endif()
 endif()
 
+if (1)
+	add_library(pysrt SHARED srtcore/srt_wrap.c)
+	# python3-config --cflags
+	target_include_directories(pysrt PUBLIC "/Library/Frameworks/Python.framework/Versions/3.8/include/python3.8")
+	target_link_libraries(pysrt PRIVATE ${TARGET_srt}_static)
+	target_link_libraries(pysrt PRIVATE "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/config-3.8-darwin/libpython3.8.a")
+	#target_link_libraries(pysrt PRIVATE "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8")
+	#target_link_libraries(pysrt PRIVATE "python3.8")
+	# shared libraries need PIC
+	if (ENABLE_ENCRYPTION)
+		target_link_libraries(pysrt PRIVATE ${SSL_LIBRARIES})
+	endif()
+	if (MICROSOFT)
+		target_link_libraries(pysrt PRIVATE ws2_32.lib)
+		set_target_properties(pysrt PROPERTIES LINK_FLAGS "/DELAYLOAD:libeay32.dll")
+	elseif (MINGW)
+		target_link_libraries(pysrt PRIVATE wsock32.lib ws2_32.lib)
+	elseif (APPLE)
+		set_property(TARGET pysrt PROPERTY MACOSX_RPATH ON)
+	endif()
+endif()
+
 target_include_directories(srt_virtual PRIVATE  ${SSL_INCLUDE_DIRS})
 
 if (MICROSOFT)

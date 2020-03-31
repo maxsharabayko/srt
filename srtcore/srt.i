@@ -28,10 +28,10 @@ You can now reference the SrtSharp lib in your .Net Core projects.  Ensure the s
    #include "srt.h"
 %}
 
-%include <arrays_csharp.i>
+//%include <arrays_csharp.i>
 
 //push anything with an argument name 'buf' back to being an array (e.g. csharp defaults this type to string, which is not ideal here)
-%apply unsigned char INOUT[]  { char* buf}
+//%apply unsigned char INOUT[]  { char* buf}
 
 /// 
 /// C# related configration section, customizing binding for this language  
@@ -39,36 +39,34 @@ You can now reference the SrtSharp lib in your .Net Core projects.  Ensure the s
 
 // add top-level code to module file, which allows C# bindings of specific objects to be injected for easier use in C# 
 
-%pragma(csharp) moduleimports=%{ 
-using System;
-using System.Runtime.InteropServices;
+//%pragma(csharp) moduleimports=%{ 
+//using System;
+//using System.Runtime.InteropServices;
 
 // sockaddr_in layout in C# - for easier creation of socket object from C# code
-[StructLayout(LayoutKind.Sequential)]
-public struct sockaddr_in
-{
-   public short sin_family;
-   public ushort sin_port;
-   public uint sin_addr;
-   public long sin_zero;
-};
-%}
+//[StructLayout(LayoutKind.Sequential)]
+//public struct sockaddr_in
+//{
+//   public short sin_family;
+//   public ushort sin_port;
+//   public uint sin_addr;
+//   public long sin_zero;
+//};
+//%}
 
 /// Rebind objects from the default mappings for types and objects that are optimized for C#
 
 //enums in C# are int by default, this override pushes this enum to the require uint format
-%typemap(csbase) SRT_EPOLL_OPT "uint"
+//%typemap(csbase) SRT_EPOLL_OPT "uint"
 
 //the SRT_ERRNO enum references itself another enum - we must import this other enum into the class file for resolution
-%typemap(csimports) SRT_ERRNO %{
+//%typemap(csimports) SRT_ERRNO %{
+//    using static CodeMajor;
+//    using static CodeMinor;
+// %}
 
-   using static CodeMajor;
-   using static CodeMinor;
-
-%}
-
-SWIG_CSBODY_PROXY(public, public, SWIGTYPE)
-SWIG_CSBODY_TYPEWRAPPER(public, public, public, SWIGTYPE)
+//SWIG_CSBODY_PROXY(public, public, SWIGTYPE)
+//SWIG_CSBODY_TYPEWRAPPER(public, public, public, SWIGTYPE)
 
 ///
 /// General interface definition of wrapper - pull in some constants and methods.
@@ -86,4 +84,5 @@ SRTSOCKET srt_socket (int af, int type, int protocol);
 int srt_connect (SRTSOCKET u, const struct sockaddr* name, int namelen);
 int srt_recvmsg (SRTSOCKET u, char* buf, int len);
 */
+#define _SWIG
 %include "srt.h";
