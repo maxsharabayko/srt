@@ -429,6 +429,9 @@ def srt_connect_debug(u, name, namelen, forced_isn):
 def srt_connect_bind(u, source, target, len):
     return _srt.srt_connect_bind(u, source, target, len)
 
+def srt_connect2(u, host, port):
+    return _srt.srt_connect2(u, host, port)
+
 def srt_rendezvous(u, local_name, local_namelen, remote_name, remote_namelen):
     return _srt.srt_rendezvous(u, local_name, local_namelen, remote_name, remote_namelen)
 

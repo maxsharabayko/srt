@@ -63,6 +63,36 @@ int srt_connect_bind(SRTSOCKET u,
     return CUDT::connect(u, source, target, target_len);
 }
 
+int srt_connect2(SRTSOCKET u, const char* host, int port)
+{
+    sockaddr_in sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+
+    cerr << "HOST provided: " << host << "\n";
+    std::string name(host);
+    if (name != "")
+    {
+        if (inet_pton(AF_INET, name.c_str(), &sa.sin_addr) == 1)
+        {
+            return srt_connect(u, (const sockaddr*) &sa, sizeof sa);
+        }
+
+        // XXX RACY!!! Use getaddrinfo() instead. Check portability.
+        // Windows/Linux declare it.
+        // See:
+        //  http://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancedInternet3b.html
+        hostent* he = gethostbyname(name.c_str());
+        if ( !he || he->h_addrtype != AF_INET )
+            throw invalid_argument("CreateAddrInet: host not found: " + name);
+
+        sa.sin_addr = *(in_addr*)he->h_addr_list[0];
+    }
+    // SRTSOCKET u, const struct sockaddr* name, int namelen
+    return srt_connect(u, (const sockaddr*) &sa, sizeof sa);
+}
+
 SRT_SOCKGROUPDATA srt_prepare_endpoint(const struct sockaddr* src, const struct sockaddr* adr, int namelen)
 {
     SRT_SOCKGROUPDATA data;

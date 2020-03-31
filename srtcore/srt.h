@@ -758,6 +758,7 @@ SRT_API       int srt_connect      (SRTSOCKET u, const struct sockaddr* name, in
 SRT_API       int srt_connect_debug(SRTSOCKET u, const struct sockaddr* name, int namelen, int forced_isn);
 SRT_API       int srt_connect_bind (SRTSOCKET u, const struct sockaddr* source,
                                     const struct sockaddr* target, int len);
+SRT_API       int srt_connect2     (SRTSOCKET u, const char* host, int port);
 SRT_API       int srt_rendezvous   (SRTSOCKET u, const struct sockaddr* local_name, int local_namelen,
                                     const struct sockaddr* remote_name, int remote_namelen);
 
