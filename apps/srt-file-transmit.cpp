@@ -394,7 +394,7 @@ bool DoUpload(UriParser& ut, string path, string filename,
             size_t shift = 0;
             while (n > 0)
             {
-                int st = tar->Write(buf.data() + shift, n, out_stats);
+                int st = tar->Write(buf.data() + shift, n, 0, out_stats);
                 Verb() << "Upload: " << n << " --> " << st
                     << (!shift ? string() : "+" + Sprint(shift));
                 if (st == SRT_ERROR)
@@ -591,7 +591,8 @@ bool DoDownload(UriParser& us, string directory, string filename,
                 cerr << "Writing output to [" << directory << "]" << endl;
             }
 
-            int n = src->Read(cfg.chunk_size, buf, out_stats);
+            uint64_t src_time = 0;
+            int n = src->Read(cfg.chunk_size, buf, src_time, out_stats);
             if (n == SRT_ERROR)
             {
                 cerr << "Download: SRT error: " << srt_getlasterror_str() << endl;

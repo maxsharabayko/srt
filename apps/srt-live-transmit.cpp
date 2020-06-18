@@ -708,7 +708,7 @@ int main(int argc, char** argv)
                 // read buffers as much as possible on each read event
                 // note that this implies live streams and does not
                 // work for cached/file sources
-                std::list<std::shared_ptr<bytevector>> dataqueue;
+                std::list<std::pair<std::shared_ptr<bytevector>, uint64_t>> dataqueue;
                 if (src.get() && src->IsOpen() && (srtrfdslen || sysrfdslen))
                 {
                     while (dataqueue.size() < 10)
@@ -716,7 +716,8 @@ int main(int argc, char** argv)
                         std::shared_ptr<bytevector> pdata(
                             new bytevector(transmit_chunk_size));
 
-                        const int res = src->Read(transmit_chunk_size, *pdata, out_stats);
+                        uint64_t src_time = 0;
+                        const int res = src->Read(transmit_chunk_size, *pdata, src_time, out_stats);
 
                         if (res == SRT_ERROR && src->uri.type() == UriParser::SRT)
                         {
@@ -733,7 +734,7 @@ int main(int argc, char** argv)
                             break;
                         }
 
-                        dataqueue.push_back(pdata);
+                        dataqueue.push_back(std::make_pair(pdata, src_time));
                         receivedBytes += (*pdata).size();
                     }
                 }
@@ -741,11 +742,13 @@ int main(int argc, char** argv)
                 // if no target, let received data fall to the floor
                 while (!dataqueue.empty())
                 {
-                    std::shared_ptr<bytevector> pdata = dataqueue.front();
+                    std::pair<std::shared_ptr<bytevector>, uint64_t> item = dataqueue.front();
+                    const bytevector* pdata = item.first.get();
+
                     if (!tar.get() || !tar->IsOpen()) {
-                        lostBytes += (*pdata).size();
+                        lostBytes += pdata->size();
                     }
-                    else if (!tar->Write(pdata->data(), pdata->size(), out_stats)) {
+                    else if (!tar->Write(pdata->data(), pdata->size(), item.second, out_stats)) {
                         lostBytes += (*pdata).size();
                     }
                     else

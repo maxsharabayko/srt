@@ -54,8 +54,9 @@ public:
             throw std::runtime_error(path + ": Can't open file for reading");
     }
 
-    int Read(size_t chunk, bytevector& data, ostream & ignored SRT_ATR_UNUSED = cout) override
+    int Read(size_t chunk, bytevector& data, uint64_t& src_time, ostream & ignored SRT_ATR_UNUSED = cout) override
     {
+        src_time = 0;
         if (data.size() < chunk)
             data.resize(chunk);
 
@@ -83,7 +84,7 @@ public:
 
     FileTarget(const string& path): ofile(path, ios::out | ios::trunc | ios::binary) {}
 
-    int Write(const char* data, size_t size, ostream & ignored SRT_ATR_UNUSED = cout) override
+    int Write(const char* data, size_t size, uint64_t src_time SRT_ATR_UNUSED, ostream & ignored SRT_ATR_UNUSED = cout) override
     {
         ofile.write(data, size);
         return !(ofile.bad()) ? (int) size : 0;
@@ -501,20 +502,23 @@ SrtSource::SrtSource(string host, int port, const map<string,string>& par)
     hostport_copy = os.str();
 }
 
-int SrtSource::Read(size_t chunk, bytevector& data, ostream &out_stats)
+int SrtSource::Read(size_t chunk, bytevector& data, uint64_t& src_time, ostream& out_stats)
 {
+    src_time = 0;
     static unsigned long counter = 1;
 
     if (data.size() < chunk)
         data.resize(chunk);
 
-    const int stat = srt_recvmsg(m_sock, data.data(), (int) chunk);
+    SRT_MSGCTRL ctrl;
+    const int stat = srt_recvmsg2(m_sock, data.data(), (int) chunk, &ctrl);
     if (stat <= 0)
     {
         data.clear();
         return stat;
     }
 
+    src_time = ctrl.srctime;
     chunk = size_t(stat);
     if (chunk < data.size())
         data.resize(chunk);
@@ -556,11 +560,13 @@ int SrtTarget::ConfigurePre(SRTSOCKET sock)
     return 0;
 }
 
-int SrtTarget::Write(const char* data, size_t size, ostream &out_stats)
+int SrtTarget::Write(const char* data, size_t size, uint64_t src_time, ostream &out_stats)
 {
     static unsigned long counter = 1;
 
-    int stat = srt_sendmsg2(m_sock, data, (int) size, nullptr);
+    SRT_MSGCTRL ctrl = srt_msgctrl_default;
+    ctrl.srctime = src_time;
+    int stat = srt_sendmsg2(m_sock, data, (int) size, &ctrl);
     if (stat == SRT_ERROR)
     {
         return stat;
@@ -686,8 +692,9 @@ public:
 #endif
     }
 
-    int Read(size_t chunk, bytevector& data, ostream & ignored SRT_ATR_UNUSED = cout) override
+    int Read(size_t chunk, bytevector& data, uint64_t& src_time, ostream & ignored SRT_ATR_UNUSED = cout) override
     {
+        src_time = 0;
         if (data.size() < chunk)
             data.resize(chunk);
 
@@ -728,7 +735,7 @@ public:
         cout.flush();
     }
 
-    int Write(const char* data, size_t len, ostream & ignored SRT_ATR_UNUSED = cout) override
+    int Write(const char* data, size_t len, uint64_t src_time SRT_ATR_UNUSED, ostream & ignored SRT_ATR_UNUSED = cout) override
     {
         cout.write(data, len);
         return (int) len;
@@ -960,8 +967,9 @@ public:
         eof = false;
     }
 
-    int Read(size_t chunk, bytevector& data, ostream & ignored SRT_ATR_UNUSED = cout) override
+    int Read(size_t chunk, bytevector& data, uint64_t& src_time, ostream & ignored SRT_ATR_UNUSED = cout) override
     {
+        src_time = 0;
         if (data.size() < chunk)
             data.resize(chunk);
 
@@ -1009,7 +1017,7 @@ public:
 
     }
 
-    int Write(const char* data, size_t len, ostream & ignored SRT_ATR_UNUSED = cout) override
+    int Write(const char* data, size_t len, uint64_t src_time SRT_ATR_UNUSED, ostream & ignored SRT_ATR_UNUSED = cout) override
     {
         int stat = sendto(m_sock, data, (int) len, 0, (sockaddr*)&sadr, sizeof sadr);
         if ( stat == -1 )
