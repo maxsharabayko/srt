@@ -195,11 +195,11 @@ void CSndBuffer::addBuffer(const char* data, int len, SRT_MSGCTRL& w_mctrl)
     }
 
     const steady_clock::time_point time = steady_clock::now();
-    if (w_srctime == 0)
-    {
-        HLOGC(dlog.Debug, log << CONID() << "addBuffer: DEFAULT SRCTIME - overriding with current time.");
-        w_srctime = count_microseconds(time.time_since_epoch());
-    }
+    // if (w_srctime != 0)
+    // {
+    //     HLOGC(dlog.Debug, log << CONID() << "addBuffer: DEFAULT SRCTIME - overriding with current time.");
+    //     w_srctime = count_microseconds(time.time_since_epoch());
+    // }
     int32_t inorder = w_mctrl.inorder ? MSGNO_PACKET_INORDER::mask : 0;
 
     HLOGC(dlog.Debug,
@@ -444,11 +444,16 @@ int CSndBuffer::readData(CPacket& w_packet, steady_clock::time_point& w_srctime,
     }
     w_packet.m_iMsgNo = m_pCurrBlock->m_iMsgNoBitset;
 
-    // TODO: FR #930. Use source time if it is provided.
-    w_srctime = m_pCurrBlock->m_tsOriginTime;
-    /* *srctime =
-       m_pCurrBlock->m_ullSourceTime_us ? m_pCurrBlock->m_ullSourceTime_us :
-       m_pCurrBlock->m_tsOriginTime;*/
+    if (m_pCurrBlock->m_ullSourceTime_us)
+    {
+        const steady_clock::duration since_epoch = m_pCurrBlock->m_tsOriginTime.time_since_epoch();
+        const steady_clock::duration delta = microseconds_from(m_pCurrBlock->m_ullSourceTime_us) - since_epoch;
+        w_srctime = m_pCurrBlock->m_tsOriginTime + delta;
+    }
+    else
+    {
+        w_srctime = m_pCurrBlock->m_tsOriginTime;
+    }
 
     m_pCurrBlock = m_pCurrBlock->m_pNext;
 
