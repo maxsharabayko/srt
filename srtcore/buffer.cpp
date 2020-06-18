@@ -574,10 +574,16 @@ int CSndBuffer::readData(const int offset, CPacket& w_packet, steady_clock::time
     w_packet.m_iMsgNo = p->m_iMsgNoBitset;
 
     // TODO: FR #930. Use source time if it is provided.
-    w_srctime = p->m_tsOriginTime;
-    /*w_srctime =
-       p->m_ullSourceTime_us ? p->m_ullSourceTime_us :
-       p->m_tsOriginTime;*/
+    if (m_pCurrBlock->m_ullSourceTime_us)
+    {
+        const steady_clock::duration since_epoch = m_pCurrBlock->m_tsOriginTime.time_since_epoch();
+        const steady_clock::duration delta = microseconds_from(m_pCurrBlock->m_ullSourceTime_us) - since_epoch;
+        w_srctime = m_pCurrBlock->m_tsOriginTime + delta;
+    }
+    else
+    {
+        w_srctime = m_pCurrBlock->m_tsOriginTime;
+    }
 
     HLOGC(dlog.Debug,
           log << CONID() << "CSndBuffer: getting packet %" << p->m_iSeqNo << " as per %" << w_packet.m_iSeqNo
