@@ -3971,7 +3971,7 @@ void CUDT::startConnect(const sockaddr_any& serv_addr, int32_t forced_isn)
     }
 
     m_ConnReq.m_iMSS            = m_iMSS;
-    m_ConnReq.m_iFlightFlagSize = (m_iRcvBufSize < m_iFlightFlagSize) ? m_iRcvBufSize : m_iFlightFlagSize;
+    m_ConnReq.m_iFlightFlagSize = min(m_iRcvBufSize, m_iFlightFlagSize);
     m_ConnReq.m_iID             = m_SocketID;
     CIPAddress::ntop(serv_addr, (m_ConnReq.m_piPeerIP));
 
