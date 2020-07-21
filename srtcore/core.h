@@ -69,6 +69,7 @@ modified by
 #include "handshake.h"
 #include "congctl.h"
 #include "packetfilter.h"
+#include "jitter_tracer.h"
 #include "utilities.h"
 #include "logger_defs.h"
 
@@ -115,7 +116,7 @@ enum AckDataItem
 };
 const size_t ACKD_FIELD_SIZE = sizeof(int32_t);
 
-static const size_t SRT_SOCKOPT_NPOST = 12;
+static const size_t SRT_SOCKOPT_NPOST = 13;
 extern const SRT_SOCKOPT srt_post_opt_list [];
 
 enum GroupDataItem
@@ -832,6 +833,7 @@ private:
     std::string m_OPT_PktFilterConfigString;
     SRT_ARQLevel m_PktFilterRexmitLevel;
     std::string m_sPeerPktFilterConfigString;
+    std::ofstream m_fDriftLog;
 
     // Attached tool function
     void EmitSignal(ETransmissionEvent tev, EventVariant var);
@@ -963,6 +965,7 @@ private: // Receiving related data
 
     CACKWindow<1024> m_ACKWindow;                //< ACK history window
     CPktTimeWindow<16, 64> m_RcvTimeWindow;      //< Packet arrival time window
+    srt::CJitterTracer m_JitterTracer;           //< RFC3550 packet jitter tracer
 
     int32_t m_iRcvLastAck;                       //< Last sent ACK
 #ifdef ENABLE_LOGGING
@@ -1160,6 +1163,7 @@ private: // Trace
         int rcvFilterSupply;
         int rcvFilterLoss;
 
+        uint64_t ullJitter;                 // Packet inter-arrival jitter (microseconds)
         int64_t sndDuration;                // real time for sending
         time_point sndDurationCounter;         // timers to record the sending Duration
     } m_stats;
