@@ -426,7 +426,8 @@ public:
             output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
             output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,RCVLATENCYms,";
             // Filter stats
-            output << "pktSndFilterExtra,pktRcvFilterExtra,pktRcvFilterSupply,pktRcvFilterLoss";
+            output << "pktSndFilterExtra,pktRcvFilterExtra,pktRcvFilterSupply,pktRcvFilterLoss,";
+            output << "usRcvIATJitter,usRcvTsbpdJitter,usSndJitter,usDrift";
             output << endl;
             first_line_printed = true;
         }
@@ -485,7 +486,11 @@ public:
         output << mon.pktSndFilterExtra << ",";
         output << mon.pktRcvFilterExtra << ",";
         output << mon.pktRcvFilterSupply << ",";
-        output << mon.pktRcvFilterLoss; //<< ",";
+        output << mon.pktRcvFilterLoss << ",";
+        output << mon.usInterArrivalJitter << ",";
+        output << mon.usDeliveryJitter << ",";
+        output << mon.usSendingJitter << ",";
+        output << mon.usDrift;
         output << endl;
         return output.str();
     }
@@ -514,6 +519,10 @@ public:
         output << "RATE     SENDING: " << setw(11) << mon.mbpsSendRate       << "  RECEIVING:  " << setw(11) << mon.mbpsRecvRate         << endl;
         output << "BELATED RECEIVED: " << setw(11) << mon.pktRcvBelated      << "  AVG TIME:   " << setw(11) << mon.pktRcvAvgBelatedTime << endl;
         output << "REORDER DISTANCE: " << setw(11) << mon.pktReorderDistance << endl;
+        output << "IAT jitter (us):  " << setw(11) << mon.usInterArrivalJitter << endl;
+        output << "TSBPD jitter (us):" << setw(11) << mon.usDeliveryJitter << endl;
+        output << "Send jitter (us): " << setw(11) << mon.usSendingJitter << endl;
+        output << "Drift (us):       " << setw(11) << mon.usDrift << endl;
         output << "WINDOW      FLOW: " << setw(11) << mon.pktFlowWindow      << "  CONGESTION: " << setw(11) << mon.pktCongestionWindow  << "  FLIGHT: " << setw(11) << mon.pktFlightSize << endl;
         output << "LINK         RTT: " << setw(9)  << mon.msRTT            << "ms  BANDWIDTH:  " << setw(7)  << mon.mbpsBandwidth    << "Mb/s " << endl;
         output << "BUFFERLEFT:  SND: " << setw(11) << mon.byteAvailSndBuf    << "  RCV:        " << setw(11) << mon.byteAvailRcvBuf      << endl;

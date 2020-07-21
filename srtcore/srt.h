@@ -218,6 +218,7 @@ typedef enum SRT_SOCKOPT {
    SRTO_PEERVERSION,         // Peer SRT Version (from SRT Handshake)
    SRTO_CONNTIMEO = 36,      // Connect timeout in msec. Caller default: 3000, rendezvous (x 10)
    SRTO_DRIFTTRACER = 37,    // Enable or disable drift tracer
+   SRTO_DRIFTLOG = 38,       // Enable of disable drift logging (debug option)
    // (some space left)
    SRTO_SNDKMSTATE = 40,     // (GET) the current state of the encryption at the peer side
    SRTO_RCVKMSTATE,          // (GET) the current state of the encryption at the agent side
@@ -409,6 +410,12 @@ struct CBytePerfMon
    int64_t  pktRecvUnique;              // number of packets to be received by the application
    uint64_t byteSentUnique;             // number of data bytes, sent by the application
    uint64_t byteRecvUnique;             // number of data bytes to be received by the application
+
+   uint64_t usInterSendingJitter;       // RFC3550 inter jitter jitter of data packets
+   uint64_t usInterArrivalJitter;       // RFC3550 inter arrival jitter of data packets
+   uint64_t usDeliveryJitter;           // RFC3550 inter delivery jitter of data packets
+   uint64_t usSendingJitter;            // RFC3550 inter sending jitter of data packets (excluding probing packets)
+   int64_t usDrift;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

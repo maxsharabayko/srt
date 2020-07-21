@@ -509,6 +509,7 @@ public:
    time_point getTsbPdTimeBase(uint32_t timestamp_us);
 
    int64_t getDrift() const { return m_DriftTracer.drift(); }
+   int64_t getOverdrift() const { return m_DriftTracer.overdrift(); }
 
 public:
 

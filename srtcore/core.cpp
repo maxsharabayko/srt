@@ -342,6 +342,7 @@ extern const SRT_SOCKOPT srt_post_opt_list [SRT_SOCKOPT_NPOST] = {
     SRTO_SNDDROPDELAY,
     SRTO_CONNTIMEO,
     SRTO_DRIFTTRACER,
+    SRTO_DRIFTLOG,
     SRTO_LOSSMAXTTL
 };
 
@@ -692,6 +693,38 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void* optval, int optlen)
 
     case SRTO_DRIFTTRACER:
         m_bDriftTracer = cast_optval<bool>(optval, optlen);
+        break;
+
+    case SRTO_DRIFTLOG:
+        if (cast_optval<bool>(optval, optlen))
+        {
+            if (m_fDriftLog.is_open())
+            {
+                LOGC(aclog.Error, log << "Drift log is already open");
+            }
+            else
+            {
+                const std::string strDriftlog = "driftlog_sid" + to_string(m_SocketID) + ".csv";
+                m_fDriftLog.open(strDriftlog, std::ofstream::out);
+                if (m_fDriftLog.is_open())
+                {
+                    m_fDriftLog << "usTimestamp" << ",";
+                    m_fDriftLog << "usPktTimestamp" << ",";
+                    m_fDriftLog << "usOldTSBPDTime" << ",";
+                    m_fDriftLog << "usNewTSBPDTime" << ",";
+                    m_fDriftLog << "usDriftSample" << ",";
+                    m_fDriftLog << "usDrift" << ",";
+                    m_fDriftLog << "usOverdrift" << ",";
+                    m_fDriftLog << "usInstantRTT" << ",";
+                    m_fDriftLog << "usSmoothedRTT" << ",";
+                    m_fDriftLog << "usRTTVar" << endl;
+                }
+                else
+                {
+                    LOGC(aclog.Error, log << "Failed to open drift log " << strDriftlog.c_str());
+                }
+            }
+        }
         break;
 
     case SRTO_LOSSMAXTTL:
@@ -1442,6 +1475,26 @@ void CUDT::clearData()
     m_iAckSeqNo         = 0;
     m_tsLastAckTime     = steady_clock::now();
 
+    // const std::string strDriftlog = "driftlog_sid" + CONID() + ".csv";
+    // m_fDriftLog.open(strDriftlog, std::ofstream::out);
+    // if (m_fDriftLog.is_open())
+    // {
+    //     m_fDriftLog << "usTimestamp" << ",";
+    //     m_fDriftLog << "usPktTimestamp" << ",";
+    //     m_fDriftLog << "usOldTSBPDTime" << ",";
+    //     m_fDriftLog << "usNewTSBPDTime" << ",";
+    //     m_fDriftLog << "usDriftSample" << ",";
+    //     m_fDriftLog << "usDrift" << ",";
+    //     m_fDriftLog << "usOverdrift" << ",";
+    //     m_fDriftLog << "usInstantRTT" << ",";
+    //     m_fDriftLog << "usAvgRTT" << ",";
+    //     m_fDriftLog << "usRTTVar" << endl;
+    // }
+    // else
+    // {
+    //     LOGC(mglog.Error, log << "Failed to open drift log " << strDriftlog.c_str());
+    // }
+
     // trace information
     {
         ScopedLock stat_lock(m_StatsLock);
@@ -1490,6 +1543,7 @@ void CUDT::clearData()
         m_stats.m_rcvBytesUndecryptTotal = 0;
         m_stats.traceRcvBytesUndecrypt   = 0;
 
+        m_stats.ullJitter = 0;
         m_stats.sndDuration = m_stats.m_sndDurationTotal = 0;
     }
 
@@ -6914,6 +6968,8 @@ int CUDT::receiveMessage(char* data, int len, SRT_MSGCTRL& w_mctrl, int by_excep
             HLOGC(arlog.Debug, log << CONID() << "CURRENT BANDWIDTH: " << bw << "Mbps (" << m_iBandwidth << " buffers per second)");
 #endif
         }
+
+        m_JitterTracer.onDataPktDelivery(srt::sync::steady_clock::time_point() + microseconds_from(w_mctrl.srctime));
         return res;
     }
 
@@ -7038,6 +7094,8 @@ int CUDT::receiveMessage(char* data, int len, SRT_MSGCTRL& w_mctrl, int by_excep
             return APIError(MJ_AGAIN, MN_XMTIMEOUT, 0);
         throw CUDTException(MJ_AGAIN, MN_XMTIMEOUT, 0);
     }
+
+    m_JitterTracer.onDataPktDelivery(srt::sync::steady_clock::time_point() + microseconds_from(w_mctrl.srctime));
 
     return res;
 }
@@ -7380,6 +7438,10 @@ void CUDT::bstats(CBytePerfMon *perf, bool clear, bool instantaneous)
     perf->msSndTsbPdDelay = m_bPeerTsbPd ? m_iPeerTsbPdDelay_ms : 0;
     perf->msRcvTsbPdDelay = isOPT_TsbPd() ? m_iTsbPdDelay_ms : 0;
     perf->byteMSS         = m_iMSS;
+    perf->usInterArrivalJitter = m_JitterTracer.jitter();
+    perf->usDeliveryJitter = m_JitterTracer.deliveryJitter();
+    perf->usSendingJitter = m_JitterTracer.sendingJitter();
+    perf->usDrift = m_pRcvBuffer->getDrift();
 
     perf->mbpsMaxBW = m_llMaxBW > 0 ? Bps2Mbps(m_llMaxBW) : m_CongCtl.ready() ? Bps2Mbps(m_CongCtl->sndBandwidth()) : 0;
 
@@ -8480,18 +8542,36 @@ void CUDT::processCtrl(const CPacket &ctrlpkt)
         // inaccurate. Additionally it won't lock if TSBPD mode is off, and
         // won't update anything. Note that if you set TSBPD mode and use
         // srt_recvfile (which doesn't make any sense), you'll have a deadlock.
-        if (m_bDriftTracer)
+        if (m_bDriftTracer || m_fDriftLog.is_open())
         {
+            const time_point oldtsbpdtime = m_pRcvBuffer->getTsbPdTimeBase(ctrlpkt.getMsgTimeStamp());
             steady_clock::duration udrift(0);
             steady_clock::time_point newtimebase;
-            const bool drift_updated ATR_UNUSED = m_pRcvBuffer->addRcvTsbPdDriftSample(ctrlpkt.getMsgTimeStamp(), m_RecvLock,
-                    (udrift), (newtimebase));
+            const bool drift_updated ATR_UNUSED = m_bDriftTracer
+                ? m_pRcvBuffer->addRcvTsbPdDriftSample(ctrlpkt.getMsgTimeStamp(), m_RecvLock, (udrift), (newtimebase))
+                : false;
 #if ENABLE_EXPERIMENTAL_BONDING
             if (drift_updated && m_parent->m_IncludedGroup)
             {
                 m_parent->m_IncludedGroup->synchronizeDrift(this, udrift, newtimebase);
             }
 #endif
+
+            if (m_fDriftLog.is_open())
+            {
+                const time_point newtsbpdtime = m_pRcvBuffer->getTsbPdTimeBase(ctrlpkt.getMsgTimeStamp());
+                m_fDriftLog << count_microseconds(steady_clock::now() - m_stats.tsStartTime) << ",";
+                m_fDriftLog << ctrlpkt.getMsgTimeStamp() << ",";
+                m_fDriftLog << count_microseconds(oldtsbpdtime - m_stats.tsStartTime) << ",";
+                m_fDriftLog << count_microseconds(newtsbpdtime - m_stats.tsStartTime) << ",";
+                m_fDriftLog << count_microseconds(udrift) << ",";
+                m_fDriftLog << m_pRcvBuffer->getDrift() << ",";
+                m_fDriftLog << m_pRcvBuffer->getOverdrift() << ",";
+                m_fDriftLog << rtt << ",";
+                m_fDriftLog << m_iRTT << ",";
+                m_fDriftLog << m_iRTTVar << endl;
+            }
+
         }
 
         // update last ACK that has been received by the sender
@@ -9078,6 +9158,14 @@ std::pair<int, steady_clock::time_point> CUDT::packData(CPacket& w_packet)
                 if ((w_packet.m_iSeqNo & PUMASK_SEQNO_PROBE) == 0)
                     probe = true;
 
+                // This jitter estimation only makes sense in live mode
+                // and on non-probing DATA packets. Every 17th packet is likely to be sent
+                // with reduced sending interval.
+                if (m_bPeerTsbPd && ((w_packet.m_iSeqNo & PUMASK_SEQNO_PROBE) != 1))
+                {
+                    m_JitterTracer.onDataPktSent(origintime);
+                }
+
                 new_packet_packed = true;
             }
             else
@@ -9439,6 +9527,14 @@ int CUDT::processData(CUnit* in_unit)
     // We expect the 16th and 17th packet to be sent regularly,
     // otherwise measurement must be rejected.
     m_RcvTimeWindow.probeArrival(packet, unordered || retransmitted);
+
+    // The 17th packet is a probing packet that arrives with reduced IAT
+    if (!retransmitted && ((packet.m_iSeqNo & PUMASK_SEQNO_PROBE) != 1))
+    {
+        const uint32_t timestamp = packet.getMsgTimeStamp();
+        const time_point tsbpdTime = m_pRcvBuffer->getTsbPdTimeBase(timestamp);
+        m_JitterTracer.onDataPktArrival(packet, tsbpdTime);
+    }
 
     enterCS(m_StatsLock);
     m_stats.traceBytesRecv += pktsz;

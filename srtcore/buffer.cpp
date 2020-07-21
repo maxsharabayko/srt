@@ -2010,13 +2010,11 @@ bool CRcvBuffer::addRcvTsbPdDriftSample(uint32_t                  timestamp_us,
         printDriftOffset(m_DriftTracer.overdrift(), m_DriftTracer.drift());
 #endif /* SRT_DEBUG_TSBPD_DRIFT */
 
-#if ENABLE_HEAVY_LOGGING
         const steady_clock::time_point oldbase = m_tsTsbPdTimeBase;
-#endif
         steady_clock::duration overdrift = microseconds_from(m_DriftTracer.overdrift());
         m_tsTsbPdTimeBase += overdrift;
 
-        HLOGC(brlog.Debug,
+        LOGC(brlog.Debug,
               log << "DRIFT=" << FormatDuration(iDrift) << " AVG=" << (m_DriftTracer.drift() / 1000.0)
                   << "ms, TB: " << FormatTime(oldbase) << " EXCESS: " << FormatDuration(overdrift)
                   << " UPDATED TO: " << FormatTime(m_tsTsbPdTimeBase));
