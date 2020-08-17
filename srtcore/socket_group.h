@@ -756,7 +756,9 @@ public:
 
 	bool applyGroupTime(time_point& w_start_time, time_point& w_peer_start_time)
 	{
+#if ENABLE_LOGGING
 		using srt_logging::mglog;
+#endif
 		using srt::sync::is_zero;
 
 		if (is_zero(m_tsStartTime))
