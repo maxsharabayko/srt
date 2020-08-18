@@ -1123,5 +1123,40 @@ private: // for epoll
     void removeEPollID(const int eid);
 };
 
+// Socket option value casting functions
+template <typename T>
+inline T cast_optval(const void* optval)
+{
+    return *reinterpret_cast<const T*>(optval);
+}
+
+template <typename T>
+inline T cast_optval(const void* optval, int optlen)
+{
+    if (optlen > 0 && optlen != sizeof(T))
+        throw CUDTException(MJ_NOTSUP, MN_INVAL, 0);
+
+    return cast_optval<T>(optval);
+}
+
+// This function is to make it possible for both C and C++
+// API to accept both bool and int types for boolean options.
+// (it's not that C couldn't use <stdbool.h>, it's that people
+// often forget to use correct type).
+template <>
+inline bool cast_optval(const void* optval, int optlen)
+{
+    if (optlen == sizeof(bool))
+    {
+        return *reinterpret_cast<const bool*>(optval);
+    }
+
+    if (optlen == sizeof(int))
+    {
+        // 0!= is a windows warning-killer int-to-bool conversion
+        return 0 != *reinterpret_cast<const int*>(optval);
+    }
+    return false;
+}
 
 #endif

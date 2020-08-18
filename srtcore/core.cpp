@@ -366,41 +366,6 @@ CUDT::~CUDT()
     delete m_pRNode;
 }
 
-template <typename T>
-T cast_optval(const void* optval)
-{
-    return *reinterpret_cast<const T*>(optval);
-}
-
-template <typename T>
-T cast_optval(const void* optval, int optlen)
-{
-    if (optlen > 0 && optlen != sizeof(T))
-        throw CUDTException(MJ_NOTSUP, MN_INVAL, 0);
-
-    return cast_optval<T>(optval);
-}
-
-// This function is to make it possible for both C and C++
-// API to accept both bool and int types for boolean options.
-// (it's not that C couldn't use <stdbool.h>, it's that people
-// often forget to use correct type).
-template <>
-bool cast_optval(const void* optval, int optlen)
-{
-    if (optlen == sizeof(bool))
-    {
-        return *reinterpret_cast<const bool*>(optval);
-    }
-
-    if (optlen == sizeof(int))
-    {
-        // 0!= is a windows warning-killer int-to-bool conversion
-        return 0 != *reinterpret_cast<const int*>(optval);
-    }
-    return false;
-}
-
 extern const SRT_SOCKOPT srt_post_opt_list [SRT_SOCKOPT_NPOST] = {
     SRTO_SNDSYN,
     SRTO_RCVSYN,

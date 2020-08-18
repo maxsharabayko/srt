@@ -32,16 +32,8 @@ void CUDTGroup::debugGroup()
 #endif
 
 
-// The following section contains declarations of functions and variables, defined in core.cpp.
-// Casting operations are defined in core.cpp. Adding declarations only.
-template <typename T>
-T cast_optval(const void* optval);
-
-template <typename T>
-T cast_optval(const void* optval, int optlen);
-
+// The SRT_DEF_VERSION is defined in core.cpp.
 extern const int32_t SRT_DEF_VERSION;
-// End of declarations section
 
 // [[using locked(this->m_GroupLock)]];
 bool CUDTGroup::getBufferTimeBase(CUDT* forthesakeof, steady_clock::time_point& w_tb, bool& w_wp, steady_clock::duration& w_dr)
