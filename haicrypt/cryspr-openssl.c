@@ -50,6 +50,17 @@ int crysprOpenSSL_AES_SetKey(
             return(-1);
         }
     }
+
+    printf("kstr[%lu]: 0x", kstr_len * 8);
+    for (size_t i = 0; i < kstr_len; ++i)
+        printf("%02X", kstr[i]);
+    printf("\n");
+    printf("AES %s KEY[%lu]: 0x", bEncrypt ? "ENC" : "DEC", sizeof(aes_key->rd_key));
+    for (size_t i = 0; i < 16; ++i)
+        printf("%02X", aes_key->rd_key[i]);
+
+    printf("... rounds=%d\n", aes_key->rounds);
+
     return(0);
 }
 

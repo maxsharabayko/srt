@@ -194,7 +194,7 @@ int crysprFallback_AES_UnwrapKey(CRYSPR_cb *cryspr_cb,
 		return -1;
 	A = B;
 	t =  6 * (inlen >> 3);
-	memcpy(A, in, 8);
+	memcpy(A, in, 8); // IV ?
 	memcpy(out, in + 8, inlen);
 	for (j = 0; j < 6; j++)
 	{
@@ -559,9 +559,35 @@ static int crysprFallback_MsDecrypt(CRYSPR_cb *cryspr_cb, hcrypt_Ctx *ctx,
 				 */
 				hcrypt_SetCtrIV((unsigned char *)&pki, ctx->salt, iv);
 
+				printf("PKI: %d (0x%02X%02X%02X%02X)\n", pki, ((uint8_t*)&pki)[0], ((uint8_t*)&pki)[1], ((uint8_t*)&pki)[2], ((uint8_t*)&pki)[3]);
+				printf("Salt: 0x");
+				for (int i = 0; i < HAICRYPT_SALT_SZ; ++i)
+					printf("%02X", ctx->salt[i]);
+				printf("\n");
+
+				printf("IV: 0x");
+				for (int i = 0; i < CRYSPR_AESBLKSZ; ++i)
+					printf("%02X", iv[i]);
+				printf("\n");
+
+				printf("AES KEY[%lu]: 0x", sizeof(aes_key->rd_key));
+				for (size_t i = 0; i < sizeof(aes_key->rd_key); ++i)
+					printf("%02X", aes_key->rd_key[i]);
+
+				printf(" rounds=%d\n", aes_key->rounds);
+
 				cryspr_cb->cryspr->aes_ctr_cipher(false, aes_key, iv, in_data[0].payload, in_data[0].len,
 						out_txt);
 				out_len = in_data[0].len;
+
+				printf("DATA ENC: 0x");
+				for (int i = 0; i < 16; ++i)
+					printf("%02X", in_data[0].payload[i]);
+				printf("\n");
+				printf("DATA DEC: 0x");
+				for (int i = 0; i < 16; ++i)
+					printf("%02X", out_txt[i]);
+				printf("\n");
 #else  /*CRYSPR_HAS_AESCTR*/
 				/* Get current key (odd|even) from context */
 				CRYSPR_AESCTX *aes_key = &cryspr_cb->aes_sek[hcryptCtx_GetKeyIndex(ctx)];
