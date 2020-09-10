@@ -404,12 +404,17 @@ struct CBytePerfMon
    int64_t  pktRecvUniqueTotal;         // total number of packets to be received by the application
    uint64_t byteSentUniqueTotal;        // total number of data bytes, sent by the application
    uint64_t byteRecvUniqueTotal;        // total number of data bytes to be received by the application
+   uint32_t msAvgResponseTimeTotal;
+   uint32_t msMaxResponseTimeTotal;
 
    // Local
    int64_t  pktSentUnique;              // number of data packets sent by the application
    int64_t  pktRecvUnique;              // number of packets to be received by the application
    uint64_t byteSentUnique;             // number of data bytes, sent by the application
    uint64_t byteRecvUnique;             // number of data bytes to be received by the application
+
+   uint32_t msAvgResponseTime;
+   uint32_t msMaxResponseTime;
 
    uint64_t usInterSendingJitter;       // RFC3550 inter jitter jitter of data packets
    uint64_t usInterArrivalJitter;       // RFC3550 inter arrival jitter of data packets
