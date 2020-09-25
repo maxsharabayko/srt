@@ -78,6 +78,9 @@ TEST_F(TestSocketOptions, LossMaxTTL)
     const int loss_max_ttl = 5;
     ASSERT_EQ(srt_setsockopt(m_listen_sock, 0, SRTO_LOSSMAXTTL, &loss_max_ttl, sizeof loss_max_ttl), SRT_SUCCESS);
 
+    const linger ling {1, 10};
+    ASSERT_EQ(srt_setsockopt(m_listen_sock, 0, SRTO_LINGER, &ling, sizeof ling), SRT_SUCCESS);
+
     // Specify address
     sockaddr_in sa;
     memset(&sa, 0, sizeof sa);
@@ -108,6 +111,17 @@ TEST_F(TestSocketOptions, LossMaxTTL)
     ASSERT_EQ(srt_getsockopt(accepted_sock, 0, SRTO_LOSSMAXTTL, &opt_val, &opt_len), SRT_SUCCESS);
     EXPECT_EQ(opt_val, loss_max_ttl) << "Wrong SRTO_LOSSMAXTTL value on the accepted socket";
     EXPECT_EQ(opt_len, sizeof opt_len) << "Wrong SRTO_LOSSMAXTTL value length on the accepted socket";
+
+    linger ling_read;
+    int ling_size = sizeof ling_read;
+    ASSERT_EQ(srt_getsockopt(accepted_sock, 0, SRTO_LINGER, &ling_read, &ling_size), SRT_SUCCESS);
+    EXPECT_EQ(ling_read.l_onoff, ling.l_onoff);
+    EXPECT_EQ(ling_read.l_linger, ling.l_linger);
+
+    ling_size = sizeof ling_read;
+    ASSERT_EQ(srt_getsockopt(m_listen_sock, 0, SRTO_LINGER, &ling_read, &ling_size), SRT_SUCCESS);
+    EXPECT_EQ(ling_read.l_onoff, ling.l_onoff);
+    EXPECT_EQ(ling_read.l_linger, ling.l_linger);
 
     SRT_TRACEBSTATS stats;
     EXPECT_EQ(srt_bstats(accepted_sock, &stats, 0), SRT_SUCCESS);
