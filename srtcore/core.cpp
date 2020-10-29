@@ -706,8 +706,9 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void* optval, int optlen)
             }
             else
             {
-                const std::string strDriftlog = "driftlog_sid" + std::to_string(m_SocketID) + ".csv";
-                m_fDriftLog.open(strDriftlog, std::ofstream::out);
+                char filename[33 + 128]; // 33 chars for socket ID
+                sprintf(filename, "driftlog_sid%d.csv", m_SocketID);
+                m_fDriftLog.open(filename, std::ofstream::out);
                 if (m_fDriftLog.is_open())
                 {
                     m_fDriftLog << "usTimestamp" << ",";
@@ -723,7 +724,7 @@ void CUDT::setOpt(SRT_SOCKOPT optName, const void* optval, int optlen)
                 }
                 else
                 {
-                    LOGC(aclog.Error, log << "Failed to open drift log " << strDriftlog.c_str());
+                    LOGC(aclog.Error, log << "Failed to open drift log " << filename);
                 }
             }
         }
