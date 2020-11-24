@@ -1,8 +1,19 @@
 # SRT API Functions
 
+<table>
+    <tr><th>Function</th><th>Description</th></tr>
+    <tr><td colspan=2><b>Library Initialization</b></td></tr>
+  <tr><td><a href="#srt_startup"><b>srt_startup</b></a></td><td>Called at the start of an application that uses the SRT library</td></tr>
+    <tr><td><a href="#srt_cleanup"><b>srt_cleanup</b></a></td><td>Cleans up global SRT resources before exiting an application</td></tr>
+  <tr><td colspan=2><b>Socket Creation</b></td></tr>
+    <tr><td><a href="#srt_startup"><b>srt_startup</b></a></td><td>Called at the start of an application that uses the SRT library</td></tr>
+    <tr><td><a href="#srt_cleanup"><b>srt_cleanup</b></a></td><td>Cleans up global SRT resources before exiting an application</td></tr>
+</table>
+
+
 | Function                                          | Description                                                                                                    |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Library Initialization** | |
+| **Library Initialization** ||
 | [**srt_startup**](#srt_startup)                   | Called at the start of an application that uses the SRT library                                                |
 | [**srt_cleanup**](#srt_cleanup)                   | Cleans up global SRT resources before exiting an application                                                   |
 | **Create socket** | |
