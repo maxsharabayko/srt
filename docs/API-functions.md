@@ -1,28 +1,15 @@
 # SRT API Functions
 
-- [**Library Initialization**](#Library-Initialization)
-- [**Creating and configuring sockets**](#Creating-and-configuring-sockets)
-- [**Connecting**](#Connecting)
-- [**Socket group management**](#Socket-group-management)
-- [**Options and properties**](#Options-and-properties)
-- [**Helper data types for transmission**](#Helper-data-types-for-transmission)
-- [**Transmission**](#Transmission)
-- [**Diagnostics**](#Diagnostics)
-- [**Performance tracking**](#Performance-tracking)
-- [**Asynchronous operations (epoll)**](#Asynchronous-operations-epoll)
-- [**Logging control**](#Logging-control)
-- [**Time Access**](#time-access)
-
-## List of Functions & Structures
-
 | Function                                          | Description                                                                                                    |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [**Library Initialization**](#Library-Initialization) | |
+| [**srt_startup**](#srt_startup)                   | Called at the start of an application that uses the SRT library                                                |
+| [**srt_cleanup**](#srt_cleanup)                   | Cleans up global SRT resources before exiting an application                                                   |
 | **Connection Functions** | |
 | [**srt_accept_bond**](#srt_accept_bond)           | Accepts a connection pending on any sockets passed in the `listeners` array of `nlisteners` size               |
 | [**srt_accept**](#srt_accept)                     | Accepts a connection; creates/returns a new socket or group ID.                                                |
 | [**srt_bind_acquire**](#srt_bind_acquire)         | Acquires a given UDP socket instead of creating one                                                            |
 | [**srt_bind**](#srt_bind)                         | Binds a socket to a local address and port                                                                     |
-| [**srt_cleanup**](#srt_cleanup)                   | Cleans up global SRT resources before exiting an application                                                   |
 | [**srt_close**](#srt_close)                       | Closes the socket or group and frees all used resources.                                                       |
 | [**srt_connect_bind**](#srt_connect_bind)         | Same as `srt_bind` then `srt_connect` if called with socket `u`                                                |
 | [**srt_connect_callback**](#srt_connect_callback) | Installs/executes a callback hook on socket/group `u` after connection resolution/failure                      |
@@ -46,7 +33,6 @@
 | [**srt_socket**](#srt_socket)                     | Deprecated                                                                                                     |
 | [**SRT_SOCKGROUPCONFIG**](#SRT_SOCKGROUPCONFIG)   | Structure used to define entry points for connections for `srt_connect_group`                                  |
 | [**SRT_SOCKGROUPDATA**](#SRT_SOCKGROUPDATA)       | Most important structure for group member status                                                               |
-| [**srt_startup**](#srt_startup)                   | Called at the start of an application that uses the SRT library                                                |
 
 
 
