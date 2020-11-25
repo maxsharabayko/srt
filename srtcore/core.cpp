@@ -7513,6 +7513,9 @@ void CUDT::bstats(CBytePerfMon *perf, bool clear, bool instantaneous)
         perf->msRcvBuf   = 0;
     }
 
+    // Update max response time.
+    m_stats.tdMaxResponseTime.Update(currtime - m_tsLastRspTime);
+    
     perf->msAvgResponseTimeTotal = count_milliseconds(m_stats.tdAverageResponseTime.total);
     perf->msMaxResponseTimeTotal = count_milliseconds(m_stats.tdMaxResponseTime.total);
     perf->msAvgResponseTime = count_milliseconds(m_stats.tdAverageResponseTime.local);
