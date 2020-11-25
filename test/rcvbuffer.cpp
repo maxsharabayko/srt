@@ -1,12 +1,13 @@
 #include "rcvbuffer.h"
 #include "logging.h"
 
+using namespace srt::sync;
 using namespace srt_logging;
 namespace srt_logging
 {
-    extern Logger mglog;
+    extern Logger brlog;
 }
-#define rbuflog mglog
+#define rbuflog brlog
 
 //
 // TODO: Use enum class if C++11 is available.
@@ -61,13 +62,11 @@ CRcvBuffer2::CRcvBuffer2(int initSeqNo, size_t size, CUnitQueue* unitqueue)
     m_pUnit = new CUnit *[m_size];
     for (size_t i = 0; i < m_size; ++i)
         m_pUnit[i] = NULL;
-
-    pthread_mutex_init(&m_BytesCountLock, NULL);
 }
 
 CRcvBuffer2::~CRcvBuffer2()
 {
-    for (int i = 0; i < m_size; ++i)
+    for (size_t i = 0; i < m_size; ++i)
     {
         if (m_pUnit[i] != NULL)
         {
@@ -76,8 +75,6 @@ CRcvBuffer2::~CRcvBuffer2()
     }
 
     delete[] m_pUnit;
-
-    pthread_mutex_destroy(&m_BytesCountLock);
 }
 
 int CRcvBuffer2::insert(CUnit *unit)
@@ -335,7 +332,7 @@ void CRcvBuffer2::countBytes(int pkts, int bytes, bool acked)
      *  acked (bytes>0, acked=true),
      *  removed (bytes<0, acked=n/a)
      */
-    CGuard cg(m_BytesCountLock);
+    ScopedLock lock(m_BytesCountLock);
 
     if (!acked) // adding new pkt in RcvBuffer
     {
@@ -488,7 +485,6 @@ void CRcvBuffer2::updateFirstReadableOutOfOrder()
     // First check if there are packets to the right.
     const int lastPos = (m_iLastAckPos + m_iMaxPos - 1) % m_size;
 
-    int pos = m_iStartPos;
     int posFirst = -1;
     int posLast  = -1;
     int msgNo    = -1;

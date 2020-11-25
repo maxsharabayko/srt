@@ -237,7 +237,7 @@ TEST_F(TestRcvBuffer2Read, MsgPartialAck)
 
     res = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(res, msg_bytelen);
-    for (int i = 0; i < msg_pkts; ++i)
+    for (size_t i = 0; i < msg_pkts; ++i)
     {
         EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + i));
     }
@@ -263,7 +263,7 @@ TEST_F(TestRcvBuffer2Read, MsgNotAckOutOfOrder)
     std::array<char, 2 * msg_bytelen> buff;
     int res = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(res, msg_bytelen);
-    for (int i = 0; i < msg_pkts; ++i)
+    for (size_t i = 0; i < msg_pkts; ++i)
     {
         EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + i));
     }
@@ -287,7 +287,7 @@ TEST_F(TestRcvBuffer2Read, MsgNotAckOutOfOrderGap)
     std::array<char, 2 * msg_bytelen> buff;
     int res = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(res, msg_bytelen);
-    for (int i = 0; i < msg_pkts; ++i)
+    for (size_t i = 0; i < msg_pkts; ++i)
     {
         EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + 1 + i));
     }
@@ -313,7 +313,7 @@ TEST_F(TestRcvBuffer2Read, MsgNotAckOutOfOrderAfterInOrder)
     std::array<char, 2 * msg_bytelen> buff;
     int res = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(res, msg_bytelen);
-    for (int i = 0; i < msg_pkts; ++i)
+    for (size_t i = 0; i < msg_pkts; ++i)
     {
         EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + msg_pkts + i));
     }
@@ -322,7 +322,7 @@ TEST_F(TestRcvBuffer2Read, MsgNotAckOutOfOrderAfterInOrder)
     EXPECT_TRUE(m_rcv_buffer->canRead());
     res = m_rcv_buffer->readMessage(buff.data(), buff.size());
     EXPECT_EQ(res, msg_bytelen);
-    for (int i = 0; i < msg_pkts; ++i)
+    for (size_t i = 0; i < msg_pkts; ++i)
     {
         EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + 2 * msg_pkts + 1 + i));
     }

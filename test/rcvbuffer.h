@@ -1,7 +1,7 @@
 #pragma once
 #include "common.h"
 #include "queue.h"
-
+#include "sync.h"
 
 //
 // TODO: Use enum class if C++11 is available.
@@ -238,7 +238,7 @@ private:    // TSBPD member variables
 
 private:    // Statistics
 
-    pthread_mutex_t m_BytesCountLock;    // used to protect counters operations
+    srt::sync::Mutex m_BytesCountLock;   // used to protect counters operations
     int m_iBytesCount;                   // Number of payload bytes in the buffer
     int m_iAckedPktsCount;               // Number of acknowledged pkts in the buffer
     int m_iAckedBytesCount;              // Number of acknowledged payload bytes in the buffer

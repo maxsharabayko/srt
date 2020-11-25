@@ -10,7 +10,9 @@
 TEST(CRcvBuffer2, Create)
 {
     const int buffer_size = 65536;
-    CRcvBuffer2 rcv_buffer(0, buffer_size);
+    CUnitQueue unit_queue;
+    unit_queue.init(buffer_size, 1500, AF_INET);
+    CRcvBuffer2 rcv_buffer(0, buffer_size, &unit_queue);
 
     EXPECT_EQ(rcv_buffer.getAvailBufSize(), buffer_size - 1);   // logic
 }
@@ -23,7 +25,7 @@ TEST(CRcvBuffer2, FullBuffer)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1234;
-    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts);
+    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue);
 
     const size_t payload_size = 1456;
     // Add a number of units (packets) to the buffer
@@ -80,7 +82,7 @@ TEST(CRcvBuffer2, HandleSeqGap)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1234;
-    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts);
+    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue);
 
     const size_t payload_size = 1456;
     // Add a number of units (packets) to the buffer
@@ -109,7 +111,7 @@ TEST(CRcvBuffer2, OneMessageInSeveralPackets)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1000;
-    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts);
+    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue);
 
     const size_t payload_size = 1456;
     const int message_len_in_pkts = 4;
@@ -162,7 +164,7 @@ TEST(CRcvBuffer2, MessageOutOfOrder)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1000;
-    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts);
+    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue);
 
     const size_t payload_size = 1456;
     const int message_len_in_pkts = 4;
@@ -213,7 +215,7 @@ TEST(CRcvBuffer2, GetFirstValidPacket)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1234;
-    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts);
+    CRcvBuffer2 rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue);
 
     const size_t payload_size = 1456;
     // Add a number of units (packets) to the buffer
