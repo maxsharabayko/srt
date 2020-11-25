@@ -2,11 +2,10 @@
 
 ### **Library Initialization**
   
-| *Function / Structure*                            | *Description*                                                                                                  |
+| <img width=290px height=1px/> *Function / Structure*     | <img width=720px height=1px/> *Description*                                                                                            |
 |:------------------------------------------------- |:-------------------------------------------------------------------------------------------------------------- |
 | [srt_startup](#srt_startup)                       | Called at the start of an application that uses the SRT library                                                |
 | [srt_cleanup](#srt_cleanup)                       | Cleans up global SRT resources before exiting an application                                                   |
-| ![](/docs/images/1x290.png)                       | ![](/docs/images/1x720.png)                                                                                    |
 
 
 ### **Creating and Configuring Sockets**
@@ -20,7 +19,7 @@
 | [srt_getsockstate](#srt_getsockstate)             | Gets the current status of the socket.                                                                         |
 | [srt_getsndbuffer](#srt_getsndbuffer)             | Retrieves information about the sender buffer.                                                                 |
 | [srt_close](#srt_close)                           | Closes the socket or group and frees all used resources.                                                       |
-| ![](/docs/images/1x290.png)                       | ![](/docs/images/1x720.png)                                                                                    |
+| <img width=290px/> | <img width=720px/> | 
 
 
 ### **Connecting**
