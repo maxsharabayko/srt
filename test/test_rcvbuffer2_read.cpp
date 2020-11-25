@@ -292,7 +292,7 @@ TEST_F(TestRcvBuffer2Read, MsgNotAckOutOfOrderGap)
         EXPECT_TRUE(verifyPayload(buff.data() + i * m_payload_sz, m_payload_sz, m_init_seqno + 1 + i));
     }
 
-    // 3. Further read is not possible
+    // 3. Further read is not possible, but those packets can be acknowledged.
     EXPECT_TRUE(m_rcv_buffer->canAck());
     EXPECT_FALSE(m_rcv_buffer->canRead());
 }
