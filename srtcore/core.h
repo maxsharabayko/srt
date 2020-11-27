@@ -649,6 +649,8 @@ private:
     /// Close the opened UDT entity.
 
     bool closeInternal();
+    void updateBrokenConnection();
+    void completeBrokenConnectionDependencies(int errorcode);
 
     /// Request UDT to send out a data block "data" with size of "len".
     /// @param data [in] The address of the application data to be sent.
@@ -1032,8 +1034,9 @@ private: // Receiving related data
     bool m_bGroupTsbPd;                          // TSBPD should be used for GROUP RECEIVER instead.
 
     srt::sync::CThread m_RcvTsbPdThread;         // Rcv TsbPD Thread handle
-    srt::sync::Condition m_RcvTsbPdCond;         // TSBPD signals if reading is ready
+    srt::sync::Condition m_RcvTsbPdCond;         // TSBPD signals if reading is ready. Use together with m_RecvLock.
     bool m_bTsbPdAckWakeup;                      // Signal TsbPd thread on Ack sent
+    srt::sync::Mutex m_RcvTsbPdStartupLock;      // Protects TSBPD thread creating and joining
 
     CallbackHolder<srt_listen_callback_fn> m_cbAcceptHook;
     CallbackHolder<srt_connect_callback_fn> m_cbConnectHook;
@@ -1064,11 +1067,10 @@ private: // synchronization: mutexes and conditions
     // Protects access to m_iSndCurrSeqNo, m_iSndLastAck
     srt::sync::Mutex m_RecvAckLock;              // Protects the state changes while processing incomming ACK (SRT_EPOLL_OUT)
 
-    srt::sync::Condition m_RecvDataCond;         // used to block "recv" when there is no data
-    srt::sync::Mutex m_RecvDataLock;             // lock associated to m_RecvDataCond
+    srt::sync::Condition m_RecvDataCond;         // used to block "srt_recv*" when there is no data. Use together with m_RecvLock
+    srt::sync::Mutex m_RecvLock;                 // used to synchronize "srt_recv*" call, protects TSBPD drift updates (CRcvBuffer::isRcvDataReady())
 
     srt::sync::Mutex m_SendLock;                 // used to synchronize "send" call
-    srt::sync::Mutex m_RecvLock;                 // used to synchronize "recv" call, protects TSBPD drift updates (CRcvBuffer::isRcvDataReady())
     srt::sync::Mutex m_RcvLossLock;              // Protects the receiver loss list (access: CRcvQueue::worker, CUDT::tsbpd)
     srt::sync::Mutex m_StatsLock;                // used to synchronize access to trace statistics
 
@@ -1094,6 +1096,15 @@ private: // Common connection Congestion Control setup
 
 private: // Generation and processing of packets
     void sendCtrl(UDTMessageType pkttype, const int32_t* lparam = NULL, void* rparam = NULL, int size = 0);
+
+    /// Forms and sends ACK packet
+    /// @note Assumes @ctrlpkt already has a timestamp.
+    ///
+    /// @param ctrlpkt  A control packet structure to fill. It must have a timestemp already set.
+    /// @param size     Sends lite ACK if size is SEND_LITE_ACK, Full ACK otherwise
+    ///
+    /// @returns the nmber of packets sent.
+    int  sendCtrlAck(CPacket& ctrlpkt, int size);
 
     void processCtrl(const CPacket& ctrlpkt);
     void sendLossReport(const std::vector< std::pair<int32_t, int32_t> >& losslist);
