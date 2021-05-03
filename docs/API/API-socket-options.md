@@ -7,31 +7,32 @@ to the system `setsockopt/getsockopt` functions.
 - [Getting and Setting Options](#getting-and-setting-options)
 - [List of Options](#list-of-options)
 
-## Types Used in Socket Options
+## Types Used in Socket Options <a name="sockopt_types"></a>
 
 Possible types of socket options are:
 
-- `int32_t` - This type can usually be treated as an `int` equivalent since it 
-does not change size on 64-bit systems. For clarity, options use this fixed size 
-integer. In some cases the value is expressed using an enumeration type (see below).
+- `int32_t` - a 32-bit integer. On most systems similar to `int`.
+In some cases the value is expressed using an enumeration type
+(see [Enumeration types...](#enumeration_types) section below).
 
-- `int64_t` - Some options need the parameter specified as 64-bit integer.
+- `int64_t` - a 64-bit integer.
 
-- `bool` - Requires the use of a boolean type (`<stdbool.h>` for C, or built-in
+- `bool` - a Boolean type (`<stdbool.h>` for C, or built-in
 for C++). When *setting* an option, passing the value through an `int` type is
-also properly recognized. When *getting* an option, however, you should use the
-`bool` type, although you can risk passing a variable of `int` type initialized
-with 0 and then checking if the resulting value is equal to 0 (just don't compare
-the result with 1).
+also properly recognized. When *getting* an option, however, the`bool` type
+should be used. It is also possible to pass a variable of `int` type initialized
+with 0 and then comparing the resulting value with 0 (just don't compare
+the result with 1 or `true`).
 
-- `string` - When *setting* an option, pass the character array pointer as value
-and the string length as length. When *getting*, pass an array of sufficient size
-(as specified in the size variable). Every option with this type that can be
-read should specify the maximum length of that array.
+- `string` - a C string. When *setting* an option, a `const char*` character array pointer
+is expected to be passed in `optval` and the array length in `optlen` **without the terminating NULL character**.
+When *getting*, an array is expected to be passed in `optval` with a
+sufficient size **with an extra space for the terminating NULL character** provided in `optlen`.
+The return value of `optlen` does not count the terminating NULL character.
 
 - `linger` - Linger structure. Used exclusively with `SRTO_LINGER`.
 
-### Enumeration Types Used in Options
+### Enumeration Types Used in Options <a name="enumeration_types"></a>
 
 #### `SRT_TRANSTYPE`
 
@@ -197,7 +198,7 @@ The following table lists SRT API socket options in alphabetical order. Option d
 | Option Name                                            | Since | Restrict | Type      | Units   | Default           | Range    | Dir |Entity |
 | :----------------------------------------------------- | :---: | :------: | :-------: | :-----: | :---------------: | :------: |:---:|:-----:|
 | [`SRTO_BINDTODEVICE`](#SRTO_BINDTODEVICE)              | 1.4.2 | pre-bind | `string`  |         |                   |          | RW  | GSD+  |
-| [`SRTO_CONGESTION`](#SRTO_CONGESTION)                  | 1.3.0 | pre      | `string`  |         | "live"            | *        | W   | S     |
+| [`SRTO_CONGESTION`](#SRTO_CONGESTION)                  | 1.3.0 | pre      | `string`  |         | "live"            | \*       | W   | S     |
 | [`SRTO_CONNTIMEO`](#SRTO_CONNTIMEO)                    | 1.1.2 | pre      | `int32_t` | ms      | 3000              | 0..      | W   | GSD+  |
 | [`SRTO_DRIFTTRACER`](#SRTO_DRIFTTRACER)                | 1.4.2 | post     | `bool`    |         | true              |          | RW  | GSD   |
 | [`SRTO_ENFORCEDENCRYPTION`](#SRTO_ENFORCEDENCRYPTION)  | 1.3.2 | pre      | `bool`    |         | true              |          | W   | GSD   |
@@ -211,49 +212,49 @@ The following table lists SRT API socket options in alphabetical order. Option d
 | [`SRTO_IPTTL`](#SRTO_IPTTL)                            | 1.0.5 | pre-bind | `int32_t` | hops    | (system)          | 1..255   | RW  | GSD   |
 | [`SRTO_IPV6ONLY`](#SRTO_IPV6ONLY)                      | 1.4.0 | pre-bind | `int32_t` |         | (system)          | -1..1    | RW  | GSD   |
 | [`SRTO_ISN`](#SRTO_ISN)                                | 1.3.0 |          | `int32_t` |         |                   |          | R   | S     |
-| [`SRTO_KMPREANNOUNCE`](#SRTO_KMPREANNOUNCE)            | 1.3.2 | pre      | `int32_t` | pkts    | 0: 2<sup>12</sup> | 0.. *    | RW  | GSD   |
+| [`SRTO_KMPREANNOUNCE`](#SRTO_KMPREANNOUNCE)            | 1.3.2 | pre      | `int32_t` | pkts    | 0: 2<sup>12</sup> | 0.. \*   | RW  | GSD   |
 | [`SRTO_KMREFRESHRATE`](#SRTO_KMREFRESHRATE)            | 1.3.2 | pre      | `int32_t` | pkts    | 0: 2<sup>24</sup> | 0..      | RW  | GSD   |
 | [`SRTO_KMSTATE`](#SRTO_KMSTATE)                        | 1.0.2 |          | `int32_t` | enum    |                   |          | R   | S     |
-| [`SRTO_LATENCY`](#SRTO_LATENCY)                        | 1.0.2 | pre      | `int32_t` | ms      | 120 *             | 0..      | RW  | GSD   |
+| [`SRTO_LATENCY`](#SRTO_LATENCY)                        | 1.0.2 | pre      | `int32_t` | ms      | 120 \*            | 0..      | RW  | GSD   |
 | [`SRTO_LINGER`](#SRTO_LINGER)                          |       | post     | `linger`  | s       | on, 180           | 0..      | RW  | GSD   |
-| [`SRTO_LOSSMAXTTL`](#SRTO_LOSSMAXTTL)                  | 1.2.0 | pre      | `int32_t` | packets | 0                 | 0..      | RW  | GSD+  |
+| [`SRTO_LOSSMAXTTL`](#SRTO_LOSSMAXTTL)                  | 1.2.0 | post     | `int32_t` | packets | 0                 | 0..      | RW  | GSD+  |
 | [`SRTO_MAXBW`](#SRTO_MAXBW)                            |       | post     | `int64_t` | B/s     | -1                | -1..     | RW  | GSD   |
 | [`SRTO_MESSAGEAPI`](#SRTO_MESSAGEAPI)                  | 1.3.0 | pre      | `bool`    |         | true              |          | W   | GSD   |
 | [`SRTO_MININPUTBW`](#SRTO_MININPUTBW)                  | 1.4.3 | post     | `int64_t` | B/s     | 0                 | 0..      | RW  | GSD   |
-| [`SRTO_MINVERSION`](#SRTO_MINVERSION)                  | 1.3.0 | pre      | `int32_t` | version | 0x010000          | *        | RW  | GSD   |
-| [`SRTO_MSS`](#SRTO_MSS)                                |       | pre      | `int32_t` | bytes   | 1500              | 76..     | RW  | GSD   |
-| [`SRTO_NAKREPORT`](#SRTO_NAKREPORT)                    | 1.1.0 | pre      | `bool`    |         |  *                |          | RW  | GSD+  |
+| [`SRTO_MINVERSION`](#SRTO_MINVERSION)                  | 1.3.0 | pre      | `int32_t` | version | 0x010000          | \*       | RW  | GSD   |
+| [`SRTO_MSS`](#SRTO_MSS)                                |       | pre-bind | `int32_t` | bytes   | 1500              | 76..     | RW  | GSD   |
+| [`SRTO_NAKREPORT`](#SRTO_NAKREPORT)                    | 1.1.0 | pre      | `bool`    |         |  \*               |          | RW  | GSD+  |
 | [`SRTO_OHEADBW`](#SRTO_OHEADBW)                        | 1.0.5 | post     | `int32_t` | %       | 25                | 5..100   | RW  | GSD   |
 | [`SRTO_PACKETFILTER`](#SRTO_PACKETFILTER)              | 1.4.0 | pre      | `string`  |         | ""                | [512]    | RW  | GSD   |
 | [`SRTO_PASSPHRASE`](#SRTO_PASSPHRASE)                  | 0.0.0 | pre      | `string`  |         | ""                | [10..79] | W   | GSD   |
-| [`SRTO_PAYLOADSIZE`](#SRTO_PAYLOADSIZE)                | 1.3.0 | pre      | `int32_t` | bytes   | \*                | \*       | W   | GSD   |
-| [`SRTO_PBKEYLEN`](#SRTO_PBKEYLEN)                      | 0.0.0 | pre      | `int32_t` | bytes   | 0                 | *        | RW  | GSD   |
+| [`SRTO_PAYLOADSIZE`](#SRTO_PAYLOADSIZE)                | 1.3.0 | pre      | `int32_t` | bytes   | \*                | 0.. \*   | W   | GSD   |
+| [`SRTO_PBKEYLEN`](#SRTO_PBKEYLEN)                      | 0.0.0 | pre      | `int32_t` | bytes   | 0                 | \*       | RW  | GSD   |
 | [`SRTO_PEERIDLETIMEO`](#SRTO_PEERIDLETIMEO)            | 1.3.3 | pre      | `int32_t` | ms      | 5000              | 0..      | RW  | GSD+  |
 | [`SRTO_PEERLATENCY`](#SRTO_PEERLATENCY)                | 1.3.0 | pre      | `int32_t` | ms      | 0                 | 0..      | RW  | GSD   |
 | [`SRTO_PEERVERSION`](#SRTO_PEERVERSION)                | 1.1.0 |          | `int32_t` | *       |                   |          | R   | GS    |
-| [`SRTO_RCVBUF`](#SRTO_RCVBUF)                          |       | pre-bind | `int32_t` | bytes   | 8192 payloads     | *        | RW  | GSD+  |
+| [`SRTO_RCVBUF`](#SRTO_RCVBUF)                          |       | pre-bind | `int32_t` | bytes   | 8192 payloads     | \*       | RW  | GSD+  |
 | [`SRTO_RCVDATA`](#SRTO_RCVDATA)                        |       |          | `int32_t` | pkts    |                   |          | R   | S     |
 | [`SRTO_RCVKMSTATE`](#SRTO_RCVKMSTATE)                  | 1.2.0 |          | `int32_t` | enum    |                   |          | R   | S     |
-| [`SRTO_RCVLATENCY`](#SRTO_RCVLATENCY)                  | 1.3.0 | pre      | `int32_t` | msec    | *                 | 0..      | RW  | GSD   |
+| [`SRTO_RCVLATENCY`](#SRTO_RCVLATENCY)                  | 1.3.0 | pre      | `int32_t` | msec    | \*                | 0..      | RW  | GSD   |
 | [`SRTO_RCVSYN`](#SRTO_RCVSYN)                          |       | post     | `bool`    |         | true              |          | RW  | GSI   |
 | [`SRTO_RCVTIMEO`](#SRTO_RCVTIMEO)                      |       | post     | `int32_t` | ms      | -1                | -1, 0..  | RW  | GSI   |
 | [`SRTO_RENDEZVOUS`](#SRTO_RENDEZVOUS)                  |       | pre      | `bool`    |         | false             |          | RW  | S     |
 | [`SRTO_RETRANSMITALGO`](#SRTO_RETRANSMITALGO)          | 1.4.2 | pre      | `int32_t` |         | 0                 | [0, 1]   | RW  | GSD   |
 | [`SRTO_REUSEADDR`](#SRTO_REUSEADDR)                    |       | pre-bind | `bool`    |         | true              |          | RW  | GSD   |
 | [`SRTO_SENDER`](#SRTO_SENDER)                          | 1.0.4 | pre      | `bool`    |         | false             |          | W   | S     |
-| [`SRTO_SNDBUF`](#SRTO_SNDBUF)                          |       | pre-bind | `int32_t` | bytes   | 8192 payloads     | *        | RW  | GSD+  |
+| [`SRTO_SNDBUF`](#SRTO_SNDBUF)                          |       | pre-bind | `int32_t` | bytes   | 8192 payloads     | \*       | RW  | GSD+  |
 | [`SRTO_SNDDATA`](#SRTO_SNDDATA)                        |       |          | `int32_t` | pkts    |                   |          | R   | S     |
-| [`SRTO_SNDDROPDELAY`](#SRTO_SNDDROPDELAY)              | 1.3.2 | post     | `int32_t` | ms      | *                 | -1..     | W   | GSD+  |
+| [`SRTO_SNDDROPDELAY`](#SRTO_SNDDROPDELAY)              | 1.3.2 | post     | `int32_t` | ms      | \*                | -1..     | W   | GSD+  |
 | [`SRTO_SNDKMSTATE`](#SRTO_SNDKMSTATE)                  | 1.2.0 |          | `int32_t` | enum    |                   |          | R   | S     |
 | [`SRTO_SNDSYN`](#SRTO_SNDSYN)                          |       | post     | `bool`    |         | true              |          | RW  | GSI   |
 | [`SRTO_SNDTIMEO`](#SRTO_SNDTIMEO)                      |       | post     | `int32_t` | ms      | -1                | -1..     | RW  | GSI   |
 | [`SRTO_STATE`](#SRTO_STATE)                            |       |          | `int32_t` | enum    |                   |          | R   | S     |
 | [`SRTO_STREAMID`](#SRTO_STREAMID)                      | 1.3.0 | pre      | `string`  |         | ""                | [512]    | RW  | GSD   |
-| [`SRTO_TLPKTDROP`](#SRTO_TLPKTDROP)                    | 1.0.6 | pre      | `bool`    |         | *                 |          | RW  | GSD   |
-| [`SRTO_TRANSTYPE`](#SRTO_TRANSTYPE)                    | 1.3.0 | pre      | `int32_t` | enum    |`SRTT_LIVE`        | *        | W   | S     |
-| [`SRTO_TSBPDMODE`](#SRTO_TSBPDMODE)                    | 0.0.0 | pre      | `bool`    |         | *                 |          | W   | S     |
-| [`SRTO_UDP_RCVBUF`](#SRTO_UDP_RCVBUF)                  |       | pre-bind | `int32_t` | bytes   | 8192 payloads     | *        | RW  | GSD+  |
-| [`SRTO_UDP_SNDBUF`](#SRTO_UDP_SNDBUF)                  |       | pre-bind | `int32_t` | bytes   | 65536             | *        | RW  | GSD+  |
+| [`SRTO_TLPKTDROP`](#SRTO_TLPKTDROP)                    | 1.0.6 | pre      | `bool`    |         | \*                |          | RW  | GSD   |
+| [`SRTO_TRANSTYPE`](#SRTO_TRANSTYPE)                    | 1.3.0 | pre      | `int32_t` | enum    |`SRTT_LIVE`        | \*       | W   | S     |
+| [`SRTO_TSBPDMODE`](#SRTO_TSBPDMODE)                    | 0.0.0 | pre      | `bool`    |         | \*                |          | W   | S     |
+| [`SRTO_UDP_RCVBUF`](#SRTO_UDP_RCVBUF)                  |       | pre-bind | `int32_t` | bytes   | 8192 payloads     | \*       | RW  | GSD+  |
+| [`SRTO_UDP_SNDBUF`](#SRTO_UDP_SNDBUF)                  |       | pre-bind | `int32_t` | bytes   | 65536             | \*       | RW  | GSD+  |
 | [`SRTO_VERSION`](#SRTO_VERSION)                        | 1.1.0 |          | `int32_t` |         |                   |          | R   | S     |
 
 ### Option Descriptions
@@ -733,7 +734,7 @@ Linger time on close (see [SO\_LINGER](http://man7.org/linux/man-pages/man7/sock
 
 | OptName              | Since | Restrict | Type       |  Units  | Default  | Range  | Dir | Entity |
 | -------------------- | ----- | -------- | ---------- | ------- | -------- | ------ | --- | ------ |
-| `SRTO_LOSSMAXTTL`    | 1.2.0 | pre      | `int32_t`  | packets | 0        | 0..    | RW  | GSD+   |
+| `SRTO_LOSSMAXTTL`    | 1.2.0 | post     | `int32_t`  | packets | 0        | 0..    | RW  | GSD+   |
 
 The value up to which the *Reorder Tolerance* may grow. The *Reorder Tolerance*
 is the number of packets that must follow the experienced "gap" in sequence numbers
@@ -833,7 +834,7 @@ The default value is 0x010000 (SRT v1.0.0).
 
 | OptName              | Since | Restrict | Type       |  Units  | Default  | Range  | Dir | Entity |
 | -------------------- | ----- | -------- | ---------- | ------- | -------- | ------ | --- | ------ |
-| `SRTO_MSS`           |       | pre      | `int32_t`  | bytes   | 1500     | 76..   | RW  | GSD    |
+| `SRTO_MSS`           |       | pre-bind | `int32_t`  | bytes   | 1500     | 76..   | RW  | GSD    |
 
 Maximum Segment Size. Used for buffer allocation and rate calculation using
 packet counter assuming fully filled packets. Each party can set its own MSS
@@ -996,7 +997,7 @@ encrypted connection, they have to simply set the same passphrase.
 
 | OptName              | Since | Restrict | Type       |  Units  | Default  | Range  | Dir | Entity |
 | -------------------- | ----- | -------- | ---------- | ------- | -------- | ------ | --- | ------ |
-| `SRTO_PAYLOADSIZE`   | 1.3.0 | pre      | `int32_t`  | bytes   | \*       | \*     | W   | GSD    |
+| `SRTO_PAYLOADSIZE`   | 1.3.0 | pre      | `int32_t`  | bytes   | \*       | 0.. \* | W   | GSD    |
 
 Sets the maximum declared size of a single call to sending function in Live
 mode. When set to 0, there's no limit for a single sending call.
