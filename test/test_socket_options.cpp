@@ -662,35 +662,79 @@ TEST_F(TestSocketOptions, TLPktDropInherits)
 
 TEST_F(TestSocketOptions, Latency)
 {
-    const int latency_a    = 140;
-    const int latency_b    = 100;
-    const int latency_dflt = 120;
-
-    int optval;
-    int optlen = (int)(sizeof optval);
-    EXPECT_EQ(srt_setsockopt(m_listen_sock, 0, SRTO_RCVLATENCY,  &latency_a, sizeof latency_a), SRT_SUCCESS);
-    EXPECT_EQ(srt_setsockopt(m_listen_sock, 0, SRTO_PEERLATENCY, &latency_b, sizeof latency_b), SRT_SUCCESS);
-
-    EXPECT_EQ(srt_getsockopt(m_listen_sock, 0, SRTO_RCVLATENCY, &optval, &optlen), SRT_SUCCESS);
-    EXPECT_EQ(optval, latency_a);
-    EXPECT_EQ(srt_getsockopt(m_listen_sock, 0, SRTO_PEERLATENCY, &optval, &optlen), SRT_SUCCESS);
-    EXPECT_EQ(optval, latency_b);
+    // Here -1 will be treated as "use the default value" (do not set anything).
+    const int latencies[] = { 0, 60, 120, 200 };
 
     StartListener();
-    const SRTSOCKET accepted_sock = EstablishConnection();
 
-    // Check caller socket
-    EXPECT_EQ(srt_getsockopt(m_caller_sock, 0, SRTO_RCVLATENCY, &optval, &optlen), SRT_SUCCESS);
-    EXPECT_EQ(optval, latency_dflt);
-    EXPECT_EQ(srt_getsockopt(m_caller_sock, 0, SRTO_PEERLATENCY, &optval, &optlen), SRT_SUCCESS);
-    EXPECT_EQ(optval, latency_a);
+    for (int caller_late_rcv : latencies)
+    {
+        for (int caller_late_peer : latencies)
+        {
+            for (int listener_late_rcv : latencies)
+            {
+                for (int listener_late_peer : latencies)
+                {
+                    int optval;
+                    int optlen = (int)(sizeof optval);
+                    EXPECT_EQ(srt_setsockopt(m_listen_sock, 0, SRTO_RCVLATENCY, &listener_late_rcv, sizeof listener_late_rcv), SRT_SUCCESS);
+                    EXPECT_EQ(srt_setsockopt(m_listen_sock, 0, SRTO_PEERLATENCY, &listener_late_peer, sizeof listener_late_peer), SRT_SUCCESS);
 
-    EXPECT_EQ(srt_getsockopt(accepted_sock, 0, SRTO_RCVLATENCY, &optval, &optlen), SRT_SUCCESS);
-    EXPECT_EQ(optval, latency_a);
-    EXPECT_EQ(srt_getsockopt(accepted_sock, 0, SRTO_PEERLATENCY, &optval, &optlen), SRT_SUCCESS);
-    EXPECT_EQ(optval, latency_dflt);
+                    EXPECT_EQ(srt_getsockopt(m_listen_sock, 0, SRTO_RCVLATENCY, &optval, &optlen), SRT_SUCCESS);
+                    EXPECT_EQ(optval, listener_late_rcv);
+                    EXPECT_EQ(srt_getsockopt(m_listen_sock, 0, SRTO_PEERLATENCY, &optval, &optlen), SRT_SUCCESS);
+                    EXPECT_EQ(optval, listener_late_peer);
 
-    ASSERT_NE(srt_close(accepted_sock), SRT_ERROR);
+                    EXPECT_EQ(srt_setsockopt(m_caller_sock, 0, SRTO_RCVLATENCY, &caller_late_rcv, sizeof listener_late_rcv), SRT_SUCCESS);
+                    EXPECT_EQ(srt_setsockopt(m_caller_sock, 0, SRTO_PEERLATENCY, &caller_late_peer, sizeof listener_late_peer), SRT_SUCCESS);
+
+                    EXPECT_EQ(srt_getsockopt(m_caller_sock, 0, SRTO_RCVLATENCY, &optval, &optlen), SRT_SUCCESS);
+                    EXPECT_EQ(optval, caller_late_rcv);
+                    EXPECT_EQ(srt_getsockopt(m_caller_sock, 0, SRTO_PEERLATENCY, &optval, &optlen), SRT_SUCCESS);
+                    EXPECT_EQ(optval, caller_late_peer);
+
+                    //StartListener();
+                    const SRTSOCKET accepted_sock = EstablishConnection();
+
+                    cerr << caller_late_rcv << " " << caller_late_peer << " " << listener_late_rcv << " " << listener_late_peer << " ";
+
+                    // Check caller socket
+                    EXPECT_EQ(srt_getsockopt(m_caller_sock, 0, SRTO_RCVLATENCY, &optval, &optlen), SRT_SUCCESS);
+                    cerr << optval << " ";
+                    //EXPECT_EQ(optval, latency_dflt);
+                    EXPECT_EQ(srt_getsockopt(m_caller_sock, 0, SRTO_PEERLATENCY, &optval, &optlen), SRT_SUCCESS);
+                    cerr << optval << " ";
+                    //EXPECT_EQ(optval, latency_a);
+
+                    EXPECT_EQ(srt_getsockopt(accepted_sock, 0, SRTO_RCVLATENCY, &optval, &optlen), SRT_SUCCESS);
+                    cerr << optval << " ";
+                    //EXPECT_EQ(optval, latency_a);
+                    EXPECT_EQ(srt_getsockopt(accepted_sock, 0, SRTO_PEERLATENCY, &optval, &optlen), SRT_SUCCESS);
+                    cerr << optval << endl;
+                    //EXPECT_EQ(optval, latency_dflt);
+
+                    ASSERT_NE(srt_close(accepted_sock), SRT_ERROR);
+
+                    //srt_close(m_listen_sock);
+
+                    //this_thread::sleep_for(1s); // To have listener actually cloe
+
+                    const int yes = 1;
+                    m_caller_sock = srt_create_socket();
+                    ASSERT_NE(m_caller_sock, SRT_INVALID_SOCK);
+                    ASSERT_EQ(srt_setsockopt(m_caller_sock, 0, SRTO_RCVSYN, &yes, sizeof yes), SRT_SUCCESS); // for async connect
+                    ASSERT_EQ(srt_setsockopt(m_caller_sock, 0, SRTO_SNDSYN, &yes, sizeof yes), SRT_SUCCESS); // for async connect
+
+                    //m_listen_sock = srt_create_socket();
+                    //ASSERT_NE(m_listen_sock, SRT_INVALID_SOCK);
+                    //ASSERT_EQ(srt_setsockopt(m_listen_sock, 0, SRTO_RCVSYN, &yes, sizeof yes), SRT_SUCCESS); // for async connect
+                    //ASSERT_EQ(srt_setsockopt(m_listen_sock, 0, SRTO_SNDSYN, &yes, sizeof yes), SRT_SUCCESS); // for async connect
+                }
+            }
+        }
+    }
+
+    
 }
 
 /// A regression test for issue #735, fixed by PR #843.
