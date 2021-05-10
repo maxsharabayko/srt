@@ -239,7 +239,7 @@ int main(int argc, char** argv)
             continue;
 
         if (!mc.grpdata)
-            printf("Group status: [%zi] members > %zi, can't handle.\n", mc.grpdata_size, N);
+            printf("Group status: [%z] members > %z, can't handle.\n", mc.grpdata_size, N);
         else
         {
             printf(" ++ Group status [%zi]: ", mc.grpdata_size);
