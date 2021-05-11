@@ -10,9 +10,9 @@ addons:
         - libssl-dev
         - build-essential
     sonarcloud:
-        organization: "haivision"
+        organization: "maxlovic"
         token:
-            secure: "wJZC0kyyjuf4SZyonZ6p/5Ga9asEqSnKWF9NpRbu6S6ceERO7vbebuSJF5qX3A6ivPuw0TTk5WASOdnvIyfA28FU/D0MWRdH8K7T3w77wdE9EgAEYTUXzdrbzJY18+9pxjljHwWXWALPSGf3MClg4irWrdk1e6uHK+68R39+ZvBGBFpWeeZy/+at9+xwhtAGKBlSHe8zc+3wPxuYdvviLVJ25qbpNmnzkUR0X89G+UBl90raCPSN32EHFdImHZ5DxfEQQJgZFRjzQUY4EW/iYwaMel7jufAq0ClgV4psKujl9Lz8cPqx3WgqRfJyiIthOMTsac7G4zAw8LK2CI0VsssBp0JalLXaumi6vG7o6c3rIwKckzSKccq3pHa7h45praIVVn9s3nq+Q/JGA11FMkKQxdQtmwgFsLhbi6ZxabgsUi5KtWoWY2z6MgpJuROuAjNxZi9XJzUoJs7zSTUtRRW7V8Q2lRiOnknYh25N6TCA5bpyy1EZmRdJErm071YNI9P01gbFz5137FWJFiJzro9TGF0KoHSGiCIdUt3WlMzwr/i/wFLxFBQOZQ2rjTXvhs4hxONxMZV3gzxA1NdLaf9i5Mh6jxVMV+ujaRSV7JmPGzxqiAlpT9cJUhTCYuar9diLLeDrpe7RawEZR8V1xVDQ7yT8ruDNQ78VbSn/sC0="
+            secure: "b6wNG5SyPMsa9ErmolD1SGoa8WWz4CVS1j89pktXEl30UBBvY1HbPXaBdN1ky5/ksmVA/HkqM9R82PFW+suxZucuVHpar/LPPwgT8hC97Whk2Q6zB+wmr99scQJRBLvgwmkpuXpEeiuwIhR8VByzYa+MP2sp2p9FN4hlkXucmXhH00FowCRi1UjA7wH8+LU0I3sLBItz8wBQNB4Dp7flyPjfQ9SEmWWELRNl9Oj7uWUnykzVwZ92xtGQUt+TqVJ55uo91YFcwq15EnARYQtEcx2yrkBYPG7NHka1iYQ6d7gFi2k8VE2J/7eFNItI+A5EmJ092c8RLGdQ95FA1HsiVGYzfcgrLdkLCRDni7A9Z8eBVKOtE3iH9Py4rBDC/UhuuouIRsiy03xq8/CB3/lH3WHmzTVTOclvKzETCjuz7mWxCgpxPX46QxmP/K4TPdA9aDbTOo8c1Yx5WT4H8aYqNB/wSp9Dqd7JZ3++0R+nkuGKUhSoAt1o+GK3vjsMKqKOdejKd1Em2KS9q5N2SIYhdpNGGBju7SDYQUe+Camhi1KL+PKboUNh+tv8FnXq6yTuljRbc1hX5YDVQK+HeD64Fb7iCazwpU8htlB1QlpLkg5r+k7e2TMmUpKTe9qyJP+1dbot4K6VFiFU1/JYxpR1iovFtnlueP2aFaeaWeXOUM0="
     homebrew:
         update: false
         packages:
