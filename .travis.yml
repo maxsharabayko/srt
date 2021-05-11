@@ -81,9 +81,6 @@ script:
       fi
     - echo "TRAVIS_REPO_SLUG=$TRAVIS_REPO_SLUG"
     - echo "TRAVIS_PULL_REQUEST=$TRAVIS_PULL_REQUEST"
-    - if [[ "$TRAVIS_REPO_SLUG" != "Haivision/srt" || "$TRAVIS_PULL_REQUEST" -gt 0 ]]; then
-        export RUN_SONARCUBE=0;
-      fi
     - echo "RUN_SONARCUBE=$RUN_SONARCUBE"
     - if (( "$RUN_SONARCUBE" )); then
         build-wrapper-linux-x86-64 --out-dir bw-output make;
