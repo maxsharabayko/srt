@@ -524,7 +524,7 @@ void srt::CUDT::getOpt(SRT_SOCKOPT optName, void *optval, int &optlen)
         else
         {
             enterCS(m_RecvLock);
-            if (m_pRcvBuffer && m_pRcvBuffer->isRcvDataReady())
+            if (m_pRcvBuffer && isRcvBufferReady())
                 event |= SRT_EPOLL_IN;
             leaveCS(m_RecvLock);
             if (m_pSndBuffer && (m_config.iSndBufSize > m_pSndBuffer->getCurrBufSize()))
@@ -5161,7 +5161,7 @@ void * srt::CUDT::tsbpd(void* param)
     self->m_bTsbPdAckWakeup = true;
     while (!self->m_bClosing)
     {
-        steady_clock::time_point tsbpd_time;
+        steady_clock::time_point tsNextDelivery; // Next packet delivery time
         bool                     rxready = false;
 #if ENABLE_EXPERIMENTAL_BONDING
         bool shall_update_group = false;
@@ -5173,7 +5173,8 @@ void * srt::CUDT::tsbpd(void* param)
         self->m_pRcvBuffer->updRcvAvgDataSize(tnow);
         const srt::CRcvBufferNew::PacketInfo info = self->m_pRcvBuffer->getFirstValidPacketInfo();
 
-        const bool is_time_to_deliver = (tnow >= info.tsbpd_time);
+        const bool is_time_to_deliver = !is_zero(info.tsbpd_time) && (tnow >= info.tsbpd_time);
+        tsNextDelivery = info.tsbpd_time;
 
         if (!self->m_bTLPktDrop)
         {
@@ -5209,7 +5210,7 @@ void * srt::CUDT::tsbpd(void* param)
 
 #if ENABLE_LOGGING
                 const int64_t timediff_us = count_microseconds(tnow - info.tsbpd_time);
-				// TODO: seq_gap_len is not the actual number of packets dropped.
+                // TODO: seq_gap_len is not the actual number of packets dropped.
 #if ENABLE_HEAVY_LOGGING
                 HLOGC(tslog.Debug,
                     log << self->CONID() << "tsbpd: DROPSEQ: up to seqno %" << CSeqNo::decseq(info.seqno) << " ("
@@ -5221,7 +5222,7 @@ void * srt::CUDT::tsbpd(void* param)
                     << (timediff_us % 1000) << " ms");
 #endif
 
-                tsbpd_time = steady_clock::time_point(); // Ready to read, nothing to wait for.
+                tsNextDelivery = steady_clock::time_point(); // Ready to read, nothing to wait for.
             }
         }
         leaveCS(self->m_RcvBufferLock);
@@ -5286,12 +5287,12 @@ void * srt::CUDT::tsbpd(void* param)
             }
 #endif
             CGlobEvent::triggerEvent();
-            tsbpd_time = steady_clock::time_point(); // Ready to read, nothing to wait for.
+            tsNextDelivery = steady_clock::time_point(); // Ready to read, nothing to wait for.
         }
 
-        if (!is_zero(tsbpd_time))
+        if (!is_zero(tsNextDelivery))
         {
-            IF_HEAVY_LOGGING(const steady_clock::duration timediff = tsbpd_time - tnow);
+            IF_HEAVY_LOGGING(const steady_clock::duration timediff = tsNextDelivery - tnow);
             /*
              * Buffer at head of queue is not ready to play.
              * Schedule wakeup when it will be.
@@ -5299,9 +5300,9 @@ void * srt::CUDT::tsbpd(void* param)
             self->m_bTsbPdAckWakeup = false;
             HLOGC(tslog.Debug,
                 log << self->CONID() << "tsbpd: FUTURE PACKET seq=" << info.seqno
-                << " T=" << FormatTime(tsbpd_time) << " - waiting " << count_milliseconds(timediff) << "ms");
+                << " T=" << FormatTime(tsNextDelivery) << " - waiting " << count_milliseconds(timediff) << "ms");
             THREAD_PAUSED();
-            tsbpd_cc.wait_until(tsbpd_time);
+            tsbpd_cc.wait_until(tsNextDelivery);
             THREAD_RESUMED();
         }
         else
@@ -6222,7 +6223,7 @@ int srt::CUDT::receiveBuffer(char *data, int len)
 
     UniqueLock recvguard(m_RecvLock);
 
-    if ((m_bBroken || m_bClosing) && !m_pRcvBuffer->isRcvDataReady())
+    if ((m_bBroken || m_bClosing) && !isRcvBufferReady())
     {
         if (m_bShutdown)
         {
@@ -6254,7 +6255,7 @@ int srt::CUDT::receiveBuffer(char *data, int len)
 
     CSync rcond  (m_RecvDataCond, recvguard);
     CSync tscond (m_RcvTsbPdCond, recvguard);
-    if (!m_pRcvBuffer->isRcvDataReady())
+    if (!isRcvBufferReady())
     {
         if (!m_config.bSynRecving)
         {
@@ -6266,7 +6267,7 @@ int srt::CUDT::receiveBuffer(char *data, int len)
             if (m_config.iRcvTimeOut < 0)
             {
                 THREAD_PAUSED();
-                while (stillConnected() && !m_pRcvBuffer->isRcvDataReady())
+                while (stillConnected() && !isRcvBufferReady())
                 {
                     // Do not block forever, check connection status each 1 sec.
                     rcond.wait_for(seconds_from(1));
@@ -6278,7 +6279,7 @@ int srt::CUDT::receiveBuffer(char *data, int len)
                 const steady_clock::time_point exptime =
                     steady_clock::now() + milliseconds_from(m_config.iRcvTimeOut);
                 THREAD_PAUSED();
-                while (stillConnected() && !m_pRcvBuffer->isRcvDataReady())
+                while (stillConnected() && !isRcvBufferReady())
                 {
                     if (!rcond.wait_until(exptime)) // NOT means "not received a signal"
                         break; // timeout
@@ -6292,7 +6293,7 @@ int srt::CUDT::receiveBuffer(char *data, int len)
     if (!m_bConnected)
         throw CUDTException(MJ_CONNECTION, MN_NOCONN, 0);
 
-    if ((m_bBroken || m_bClosing) && !m_pRcvBuffer->isRcvDataReady())
+    if ((m_bBroken || m_bClosing) && !isRcvBufferReady())
     {
         // See at the beginning
         if (!m_config.bMessageAPI && m_bShutdown)
@@ -6326,7 +6327,7 @@ int srt::CUDT::receiveBuffer(char *data, int len)
         HLOGP(tslog.Debug, "NOT pinging TSBPD - not set");
     }
 
-    if (!m_pRcvBuffer->isRcvDataReady())
+    if (!isRcvBufferReady())
     {
         // read is not available any more
         s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_IN, false);
@@ -6861,7 +6862,7 @@ int srt::CUDT::receiveMessage(char* data, int len, SRT_MSGCTRL& w_mctrl, int by_
             HLOGP(tslog.Debug, "NOT pinging TSBPD - not set");
         }
 
-        if (!m_pRcvBuffer->isRcvDataReady())
+        if (!isRcvBufferReady())
         {
             // read is not available any more
             s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_IN, false);
@@ -7008,7 +7009,7 @@ int srt::CUDT::receiveMessage(char* data, int len, SRT_MSGCTRL& w_mctrl, int by_
 
             HLOGC(tslog.Debug,
                   log << CONID() << "receiveMessage: lock-waiting loop exited: stillConntected=" << stillConnected()
-                      << " timeout=" << timeout << " data-ready=" << m_pRcvBuffer->isRcvDataReady());
+                      << " timeout=" << timeout << " data-ready=" << isRcvBufferReady());
         }
 
         /* XXX DEBUG STUFF - enable when required
@@ -7044,7 +7045,7 @@ int srt::CUDT::receiveMessage(char* data, int len, SRT_MSGCTRL& w_mctrl, int by_
         }
     } while ((res == 0) && !timeout);
 
-    if (!m_pRcvBuffer->isRcvDataReady())
+    if (!isRcvBufferReady())
     {
         // Falling here means usually that res == 0 && timeout == true.
         // res == 0 would repeat the above loop, unless there was also a timeout.
@@ -7205,7 +7206,7 @@ int64_t srt::CUDT::recvfile(fstream &ofs, int64_t &offset, int64_t size, int blo
 {
     if (!m_bConnected || !m_CongCtl.ready())
         throw CUDTException(MJ_CONNECTION, MN_NOCONN, 0);
-    else if ((m_bBroken || m_bClosing) && !m_pRcvBuffer->isRcvDataReady())
+    else if ((m_bBroken || m_bClosing) && !isRcvBufferReady())
     {
         if (!m_config.bMessageAPI && m_bShutdown)
             return 0;
@@ -7287,14 +7288,14 @@ int64_t srt::CUDT::recvfile(fstream &ofs, int64_t &offset, int64_t size, int blo
             CSync rcond (m_RecvDataCond, recvguard);
 
             THREAD_PAUSED();
-            while (stillConnected() && !m_pRcvBuffer->isRcvDataReady())
+            while (stillConnected() && !isRcvBufferReady())
                 rcond.wait();
             THREAD_RESUMED();
         }
 
         if (!m_bConnected)
             throw CUDTException(MJ_CONNECTION, MN_NOCONN, 0);
-        else if ((m_bBroken || m_bClosing) && !m_pRcvBuffer->isRcvDataReady())
+        else if ((m_bBroken || m_bClosing) && !isRcvBufferReady())
         {
             if (!m_config.bMessageAPI && m_bShutdown)
                 return 0;
@@ -7318,7 +7319,7 @@ int64_t srt::CUDT::recvfile(fstream &ofs, int64_t &offset, int64_t size, int blo
         }
     }
 
-    if (!m_pRcvBuffer->isRcvDataReady())
+    if (!isRcvBufferReady())
     {
         // read is not available any more
         s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_IN, false);
@@ -9535,7 +9536,7 @@ void srt::CUDT::processClose()
 
     if (m_bTsbPd)
     {
-        HLOGP(smlog.Debug, "processClose: lock-and-signal TSBPD");
+        LOGP(smlog.Debug, "processClose: lock-and-signal TSBPD");
         CSync::lock_signal(m_RcvTsbPdCond, m_RecvLock);
     }
 
@@ -9652,7 +9653,7 @@ int srt::CUDT::processData(CUnit* in_unit)
         if (m_bClosing) // Check again to protect join() in CUDT::releaseSync()
             return -1;
 
-        HLOGP(qrlog.Debug, "Spawning Socket TSBPD thread");
+        LOGP(qrlog.Debug, "Spawning Socket TSBPD thread");
 #if ENABLE_HEAVY_LOGGING
         std::ostringstream tns1, tns2;
         // Take the last 2 ciphers from the socket ID.
@@ -11368,7 +11369,7 @@ void srt::CUDT::addEPoll(const int eid)
         return;
 
     enterCS(m_RecvLock);
-    if (m_pRcvBuffer->isRcvDataReady())
+    if (isRcvBufferReady())
     {
         s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_IN, true);
     }
