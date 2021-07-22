@@ -120,7 +120,6 @@ TEST(CRcvBufferNew, OneMessageInSeveralPackets)
     {
         CUnit* unit = unit_queue.getNextAvailUnit();
         EXPECT_NE(unit, nullptr);
-        unit->m_iFlag = CUnit::GOOD;
         CPacket& packet = unit->m_Packet;
         packet.setLength(payload_size);
         packet.m_iSeqNo = initial_seqno + i;
@@ -169,7 +168,6 @@ TEST(CRcvBufferNew, MessageOutOfOrder)
     {
         CUnit* unit = unit_queue.getNextAvailUnit();
         EXPECT_NE(unit, nullptr);
-        unit->m_iFlag = CUnit::GOOD;
         CPacket& packet = unit->m_Packet;
         packet.setLength(payload_size);
         packet.m_iSeqNo = initial_seqno + message_len_in_pkts + i;

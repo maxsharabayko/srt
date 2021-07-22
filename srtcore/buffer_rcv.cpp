@@ -16,6 +16,22 @@ using namespace std;
 
 namespace srt {
 
+namespace {
+    struct ScopedLog
+    {
+        ScopedLog() {};
+
+        ~ScopedLog()
+        {
+            LOGC(rbuflog.Warn, log << ss.str());
+        }
+
+        stringstream ss;
+    };
+
+#define IF_RCVBUF_DEBUG(instr) (void)0
+}
+
 
 /*
  *   RcvBufferNew (circular buffer):
@@ -77,11 +93,20 @@ int CRcvBufferNew::insert(CUnit* unit)
     const int32_t seqno  = unit->m_Packet.getSeqNo();
     const int     offset = CSeqNo::seqoff(m_iStartSeqNo, seqno);
 
-    if (offset < 0)
-        return -2;
+    IF_RCVBUF_DEBUG(ScopedLog scoped_log);
+    IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::insert: seqno " << seqno << " m_iStartSeqNo " << m_iStartSeqNo << " offset " << offset);
 
-    if (offset >= (int) capacity())
+    if (offset < 0)
+    {
+        IF_RCVBUF_DEBUG(scoped_log.ss << " returns -2");
+        return -2;
+    }
+
+    if (offset >= (int)capacity())
+    {
+        IF_RCVBUF_DEBUG(scoped_log.ss << " returns -3");
         return -3;
+    }
 
     // If >= 2, then probably there is a long gap, and buffer needs to be reset.
     SRT_ASSERT((m_iStartPos + offset) / m_szSize < 2);
@@ -93,7 +118,10 @@ int CRcvBufferNew::insert(CUnit* unit)
     // Packet already exists
     SRT_ASSERT(pos >= 0 && pos < m_szSize);
     if (m_entries[pos].status != EntryState_Empty)
+    {
+        IF_RCVBUF_DEBUG(scoped_log.ss << " returns -1");
         return -1;
+    }
     SRT_ASSERT(m_entries[pos].pUnit == NULL);
 
     m_pUnitQueue->makeUnitGood(unit);
@@ -110,6 +138,7 @@ int CRcvBufferNew::insert(CUnit* unit)
     }
 
     updateNonreadPos();
+    IF_RCVBUF_DEBUG(scoped_log.ss << " returns 0 (OK)");
     return 0;
 }
 
@@ -119,10 +148,16 @@ void CRcvBufferNew::dropUpTo(int32_t seqno)
     // first unacknowledged packet is missing.
     SRT_ASSERT(m_iStartPos == m_iFirstNonreadPos);
 
+    IF_RCVBUF_DEBUG(ScopedLog scoped_log);
+    IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::dropUpTo: seqno " << seqno << " m_iStartSeqNo " << m_iStartSeqNo);
+
     int len = CSeqNo::seqoff(m_iStartSeqNo, seqno);
     SRT_ASSERT(len > 0);
     if (len <= 0)
+    {
+        IF_RCVBUF_DEBUG(scoped_log.ss << ". Nothing to drop.");
         return;
+    }
 
     /*LOGC(rbuflog.Warn, log << "CRcvBufferNew.dropUpTo(): seqno=" << seqno << ", pkts=" << len
         << ". Buffer start " << m_iStartSeqNo << ".");*/
@@ -162,6 +197,8 @@ void CRcvBufferNew::dropUpTo(int32_t seqno)
 
 void CRcvBufferNew::dropMessage(int32_t seqnolo, int32_t seqnohi, int32_t msgno)
 {
+    IF_RCVBUF_DEBUG(ScopedLog scoped_log);
+    IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::dropMessage: seqnolo " << seqnolo << " seqnohi " << seqnohi << " m_iStartSeqNo " << m_iStartSeqNo);
     // TODO: count bytes as removed?
     const int end_pos = incPos(m_iStartPos, m_iMaxPosInc);
     if (msgno != 0)
@@ -216,6 +253,9 @@ int CRcvBufferNew::readMessage(char* data, size_t len, SRT_MSGCTRL* msgctrl)
         LOGC(rbuflog.Warn, log << "CRcvBufferNew.readMessage(): nothing to read. Ignored isRcvDataReady() result?");
         return -1;
     }
+
+    IF_RCVBUF_DEBUG(ScopedLog scoped_log);
+    IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::readMessage. m_iStartSeqNo " << m_iStartSeqNo);
 
     const int readPos = canReadInOrder ? m_iStartPos : m_iFirstReadableOutOfOrder;
 
@@ -289,8 +329,13 @@ int CRcvBufferNew::readMessage(char* data, size_t len, SRT_MSGCTRL* msgctrl)
         updateFirstReadableOutOfOrder();
 
     releaseNextFillerEntries();
-    m_iFirstNonreadPos = m_iStartPos;
-    updateNonreadPos();
+
+    if (!canReadInOrder)
+    {
+        // This heavily impacts performance!
+        m_iFirstNonreadPos = m_iStartPos;
+        updateNonreadPos();
+    }
 
     return (dst - data);
 }
@@ -327,7 +372,11 @@ int CRcvBufferNew::readBufferTo(int len, int iFirstUnackSeqNo, copy_to_dst_f fun
         return 0;
 
     int p = m_iStartPos;
-    const int iNumAvail = CSeqNo::seqlen(m_iStartSeqNo, iFirstUnackSeqNo);
+    const int iNumAvail = CSeqNo::seqlen(m_iStartSeqNo, iFirstUnackSeqNo) - 1;
+    if (iNumAvail > m_iMaxPosInc)
+    {
+        LOGC(rbuflog.Error, log << "readBufferTo: IPE: iNumAvail " << iNumAvail << " iMaxPosInc " << m_iMaxPosInc);
+    }
 
     SRT_ASSERT(iNumAvail <= m_iMaxPosInc);
     const int end_pos = incPos(m_iStartPos, iNumAvail);
@@ -341,7 +390,7 @@ int CRcvBufferNew::readBufferTo(int len, int iFirstUnackSeqNo, copy_to_dst_f fun
         if (!m_entries[p].pUnit)
         {
             p = incPos(p);
-            LOGC(rbuflog.Error, log << "readBufferToFile: IPE: NULL unit found in file transmission");
+            LOGC(rbuflog.Error, log << "readBufferTo: IPE: NULL unit found in file transmission");
             continue;
         }
 
