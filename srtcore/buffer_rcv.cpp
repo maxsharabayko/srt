@@ -30,6 +30,23 @@ namespace {
     };
 
 #define IF_RCVBUF_DEBUG(instr) (void)0
+
+    // Check if iFirstNonreadPos is in range [iStartPos, (iStartPos + iMaxPosInc) % iSize].
+    // The right edge is included because we expect iFirstNonreadPos to be
+    // right after the last valid packet position if all packets are available.
+    bool isInRange(int iStartPos, int iMaxPosInc, int iSize, int iFirstNonreadPos)
+    {
+        if (iFirstNonreadPos == iStartPos)
+            return true;
+
+        const int iLastPos = (iStartPos + iMaxPosInc) % iSize;
+        const bool isOverrun = iLastPos < iStartPos;
+
+        if (isOverrun)
+            return iFirstNonreadPos > iStartPos || iFirstNonreadPos <= iLastPos;
+
+        return iFirstNonreadPos > iStartPos && iFirstNonreadPos <= iLastPos;
+    }
 }
 
 
@@ -37,15 +54,14 @@ namespace {
  *   RcvBufferNew (circular buffer):
  *
  *   |<------------------- m_iSize ----------------------------->|
- *   |       |<--- acked pkts -->|<--- m_iMaxPosInc --->|           |
- *   |       |                   |                   |           |
+ *   |       |<----------- m_iMaxPosInc ------------>|           |
+ *   |       |                                       |           |
  *   +---+---+---+---+---+---+---+---+---+---+---+---+---+   +---+
  *   | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 0 |...| 0 | m_pUnit[]
  *   +---+---+---+---+---+---+---+---+---+---+---+---+---+   +---+
- *             |                 | |               |
- *             |                   |               \__last pkt received
- *             |                   \___ m_iLastAckPos: last ack sent
- *             \___ m_iStartPos: first message to read
+ *             |                                   |
+ *             |                                   |__last pkt received
+ *             |___ m_iStartPos: first message to read
  *
  *   m_pUnit[i]->m_iFlag: 0:free, 1:good, 2:passack, 3:dropped
  *
@@ -258,6 +274,8 @@ int CRcvBufferNew::readMessage(char* data, size_t len, SRT_MSGCTRL* msgctrl)
     IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::readMessage. m_iStartSeqNo " << m_iStartSeqNo);
 
     const int readPos = canReadInOrder ? m_iStartPos : m_iFirstReadableOutOfOrder;
+    // Remember if we actually read out of order packet.
+    const bool readingOutOfOrderPacket = !canReadInOrder || m_iStartPos == m_iFirstReadableOutOfOrder;
 
     size_t remain = len;
     char* dst = data;
@@ -301,10 +319,9 @@ int CRcvBufferNew::readMessage(char* data, size_t len, SRT_MSGCTRL* msgctrl)
             msgctrl->srctime = count_microseconds(getPktTsbPdTime(packet.getMsgTimeStamp()).time_since_epoch());
         }
 
+        releaseUnitInPos(i);
         if (updateStartPos)
         {
-            releaseUnitInPos(i);
-            
             m_iStartPos = incPos(i);
             --m_iMaxPosInc;
             SRT_ASSERT(m_iMaxPosInc >= 0);
@@ -312,8 +329,8 @@ int CRcvBufferNew::readMessage(char* data, size_t len, SRT_MSGCTRL* msgctrl)
         }
         else
         {
+            // If out of order, only mark it read.
             m_entries[i].status = EntryState_Read;
-            //m_pUnit[i]->m_iFlag = CUnit::PASSACK;
         }
 
         if (pbLast)
@@ -325,16 +342,15 @@ int CRcvBufferNew::readMessage(char* data, size_t len, SRT_MSGCTRL* msgctrl)
     }
 
     countBytes(-pkts_read, -bytes_read);
-    if (!updateStartPos)
+    if (!m_tsbpd.isEnabled() && readingOutOfOrderPacket)
         updateFirstReadableOutOfOrder();
 
     releaseNextFillerEntries();
 
-    if (!canReadInOrder)
+    if (!isInRange(m_iStartPos, m_iMaxPosInc, m_szSize, m_iFirstNonreadPos))
     {
-        // This heavily impacts performance!
         m_iFirstNonreadPos = m_iStartPos;
-        updateNonreadPos();
+        //updateNonreadPos();
     }
 
     return (dst - data);
@@ -518,7 +534,7 @@ CRcvBufferNew::PacketInfo CRcvBufferNew::getFirstValidPacketInfo() const
         return info;
     }
 
-    return PacketInfo();
+    return { -1, false, time_point() };
 }
 
 std::pair<int, int> CRcvBufferNew::getAvailablePacketsRange() const
@@ -565,18 +581,17 @@ void CRcvBufferNew::countBytes(int pkts, int bytes)
 void CRcvBufferNew::releaseUnitInPos(int pos)
 {
     CUnit* tmp = m_entries[pos].pUnit;
-    SRT_ASSERT(tmp != NULL);
-    m_entries[pos] = Entry();
-    m_pUnitQueue->makeUnitFree(tmp);
+    m_entries[pos] = Entry(); // pUnit = NULL; status = Empty
+    if (tmp != NULL)
+        m_pUnitQueue->makeUnitFree(tmp);
 }
 
 void CRcvBufferNew::releaseNextFillerEntries()
 {
     int pos = m_iStartPos;
-    while (m_entries[pos].pUnit
-        && (m_entries[pos].status == EntryState_Read || m_entries[pos].status == EntryState_Drop))
+    while (m_entries[pos].status == EntryState_Read || m_entries[pos].status == EntryState_Drop)
     {
-        m_iStartSeqNo = CSeqNo::incseq(m_entries[pos].pUnit->m_Packet.getSeqNo());
+        m_iStartSeqNo = CSeqNo::incseq(m_iStartSeqNo);
         releaseUnitInPos(pos);
         pos = incPos(pos);
         m_iStartPos = pos;

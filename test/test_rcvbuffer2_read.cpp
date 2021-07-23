@@ -160,7 +160,6 @@ TEST_F(TestRcvBuffer2Read, OnePacket)
 
     EXPECT_FALSE(m_rcv_buffer->isRcvDataReady());
     EXPECT_EQ(m_rcv_buffer->readMessage(buff.data(), buff.size()), -1);
-    EXPECT_EQ(read_len, msg_bytelen);
 }
 
 /// One packet is added to the buffer. Is allowed to be read on TSBPD condition.
@@ -297,7 +296,7 @@ TEST_F(TestRcvBuffer2Read, LongMessage)
     EXPECT_FALSE(m_rcv_buffer->isRcvDataReady());
 }
 
-// One message (4 packets) are added to the buffer. Can be read out of order.
+// One message (4 packets) is added to the buffer. Can be read out of order.
 // Reading should be possible even before the missing packet arrives.
 // After a missing packet arrived and read, memory units of the previously read message are freed.
 TEST_F(TestRcvBuffer2Read, MsgOutOfOrderAdd)
@@ -336,9 +335,8 @@ TEST_F(TestRcvBuffer2Read, MsgOutOfOrderAdd)
     EXPECT_EQ(m_unit_queue->size(), m_unit_queue->capacity());
 }
 
-// One message (4 packets) are added to the buffer. Can be read out of order.
+// One message (4 packets) is added to the buffer. Can be read out of order.
 // Reading should be possible even before the missing packet is dropped.
-// After a missing packet is dropped, memory units of the previously read message are freed.
 TEST_F(TestRcvBuffer2Read, MsgOutOfOrderDrop)
 {
     const size_t msg_pkts = 4;
@@ -363,7 +361,8 @@ TEST_F(TestRcvBuffer2Read, MsgOutOfOrderDrop)
     EXPECT_EQ(addMessage(msg_pkts, msg_seqno, true), -1);
 
     const auto pkt_info = m_rcv_buffer->getFirstValidPacketInfo();
-    EXPECT_EQ(pkt_info.seqno, msg_seqno);
+    EXPECT_EQ(pkt_info.seqno, -1); // Nothing to read
+    EXPECT_TRUE(srt::sync::is_zero(pkt_info.tsbpd_time));
 
     // Drop missing packet
     m_rcv_buffer->dropUpTo(msg_seqno);

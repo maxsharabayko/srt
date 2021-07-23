@@ -18,6 +18,62 @@ TEST(CRcvBufferNew, Create)
     EXPECT_EQ(rcv_buffer.getAvailSize(init_seqno), buffer_size - 1);   // logic
 }
 
+// This is move into CRcVBuffer. To delete from here.
+//bool isInRange(int iStartPos, int iMaxPosInc, int iSize, int iFirstNonreadPos)
+//{
+//    if (iFirstNonreadPos == iStartPos)
+//        return true;
+//
+//    const int iLastPos = (iStartPos + iMaxPosInc) % iSize;
+//    const bool isOverrun = iLastPos < iStartPos;
+//
+//    if (isOverrun)
+//        return iFirstNonreadPos > iStartPos || iFirstNonreadPos <= iLastPos;
+//
+//    return iFirstNonreadPos > iStartPos && iFirstNonreadPos <= iLastPos;
+//}
+//
+//
+//TEST(CRcvBufferNew, IsPosInRange)
+//{
+//    struct TestCase
+//    {
+//        int iFirstNonRead;
+//        int iStartPos;
+//        int iMaxPosInc;
+//        int iSize;
+//        bool bRes;
+//    };
+//
+//    std::array<TestCase, 16> matrix = {
+//        TestCase{0, 2, 14, 16, 1},
+//        TestCase{1, 2, 14, 16, 0},
+//        TestCase{2, 2, 14, 16, 1},
+//        TestCase{15, 2, 14, 16, 1},
+//
+//        TestCase{0, 1, 6, 12, 0},
+//        TestCase{1, 1, 6, 12, 1},
+//        TestCase{4, 1, 6, 12, 1},
+//        TestCase{7, 1, 6, 12, 1},
+//        TestCase{8, 1, 6, 12, 0},
+//
+//        TestCase{1, 8, 6, 12, 1},
+//        TestCase{2, 8, 6, 12, 1},
+//        TestCase{3, 8, 6, 12, 0},
+//        TestCase{7, 8, 6, 12, 0},
+//        TestCase{8, 8, 6, 12, 1},
+//        TestCase{11, 8, 6, 12, 1},
+//        TestCase{15, 1, 14, 16, 1}
+//    };
+//
+//    for (const auto& test : matrix)
+//    {
+//        const bool res = isInRange(test.iStartPos, test.iMaxPosInc, test.iSize, test.iFirstNonRead);
+//        EXPECT_EQ(res, test.bRes) << "Case iStartPos=" << test.iStartPos << " iFirstNonRead=" << test.iFirstNonRead;
+//    }
+//}
+
+
 TEST(CRcvBufferNew, FullBuffer)
 {
     const int buffer_size_pkts = 16;
@@ -66,9 +122,9 @@ TEST(CRcvBufferNew, FullBuffer)
     std::array<char, 2 * payload_size> buff;
     for (int i = 0; i < buffer_size_pkts - 1; ++i)
     {
-        EXPECT_TRUE(rcv_buffer.isRcvDataReady());
-    	const int res = rcv_buffer.readMessage(buff.data(), buff.size());
-    	EXPECT_EQ(res, payload_size);
+        EXPECT_TRUE(rcv_buffer.isRcvDataReady()) << "Iteration " << i;
+        const int res = rcv_buffer.readMessage(buff.data(), buff.size());
+        EXPECT_EQ(res, payload_size);
     }
 }
 

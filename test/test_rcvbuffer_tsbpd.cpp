@@ -86,7 +86,6 @@ TEST_F(TestRcvBufferTSBPD, UnackPreceedsMissing)
     const size_t pld_size = 1456;
     CUnit* unit = m_unit_queue->getNextAvailUnit();
     EXPECT_NE(unit, nullptr);
-    unit->m_iFlag = CUnit::GOOD;
     CPacket& pkt = unit->m_Packet;
     pkt.setLength(pld_size);
     pkt.m_iSeqNo = seqno;
@@ -126,8 +125,6 @@ TEST_F(TestRcvBufferTSBPD, ReadMessage)
     const size_t payload_size = 1456;
     CUnit* unit = m_unit_queue->getNextAvailUnit();
     EXPECT_NE(unit, nullptr);
-    unit->m_iFlag = CUnit::GOOD;
-
     std::array<char, payload_size> src_buffer;
     std::iota(src_buffer.begin(), src_buffer.end(), (char)0);
 
