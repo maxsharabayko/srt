@@ -28,6 +28,7 @@
 TEST(Transmission, FileUpload)
 {
     srt_startup();
+    srt_setloglevel(LOG_DEBUG);
 
     // Generate the source file
     // We need a file that will contain more data
