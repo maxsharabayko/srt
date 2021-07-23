@@ -436,6 +436,11 @@ int CRcvBufferNew::readBufferTo(int len, int iFirstUnackSeqNo, copy_to_dst_f fun
             releaseUnitInPos(p);
             p = incPos(p);
             m_iNotch = 0;
+
+            m_iStartPos = p;
+            --m_iMaxPosInc;
+            SRT_ASSERT(m_iMaxPosInc >= 0);
+            m_iStartSeqNo = CSeqNo::incseq(m_iStartSeqNo);
         }
         else
             m_iNotch += rs;
@@ -447,11 +452,13 @@ int CRcvBufferNew::readBufferTo(int len, int iFirstUnackSeqNo, copy_to_dst_f fun
     countBytes(-1, -(len - rs));
 
     // Update positions
-    m_iStartSeqNo = p;
     // Set nonread position to the starting position before updating,
     // because start position was increased, and preceeding packets are invalid. 
-    m_iFirstNonreadPos = m_iStartPos;
-    updateNonreadPos();
+    if (!isInRange(m_iStartPos, m_iMaxPosInc, m_szSize, m_iFirstNonreadPos))
+    {
+        m_iFirstNonreadPos = m_iStartPos;
+        //updateNonreadPos();
+    }
 
     return len - rs;
 }
