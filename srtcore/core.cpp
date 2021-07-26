@@ -5604,7 +5604,7 @@ bool srt::CUDT::prepareConnectionObjects(const CHandShake &hs, HandshakeSide hsd
         m_pSndBuffer = new CSndBuffer(32, m_iMaxSRTPayloadSize);
 #if ENABLE_NEW_RCVBUFFER
         SRT_ASSERT(m_iISN != -1);
-        m_pRcvBuffer = new srt::CRcvBufferNew(m_iISN, m_config.iRcvBufSize, &(m_pRcvQueue->m_UnitQueue), m_bPeerRexmitFlag);
+        m_pRcvBuffer = new srt::CRcvBufferNew(m_iISN, m_config.iRcvBufSize, &(m_pRcvQueue->m_UnitQueue), m_bPeerRexmitFlag, m_config.bMessageAPI);
 #else
         m_pRcvBuffer = new CRcvBuffer(&(m_pRcvQueue->m_UnitQueue), m_config.iRcvBufSize);
 #endif
@@ -6309,11 +6309,7 @@ int srt::CUDT::receiveBuffer(char *data, int len)
     }
 
     enterCS(m_RcvBufferLock);
-#if ENABLE_NEW_RCVBUFFER
-    const int res = m_pRcvBuffer->readBuffer(data, len, m_iRcvLastAck);
-#else
     const int res = m_pRcvBuffer->readBuffer(data, len);
-#endif
     leaveCS(m_RcvBufferLock);
 
     /* Kick TsbPd thread to schedule next wakeup (if running) */
@@ -7304,12 +7300,7 @@ int64_t srt::CUDT::recvfile(fstream &ofs, int64_t &offset, int64_t size, int blo
 
         unitsize = int((torecv > block) ? block : torecv);
         enterCS(m_RcvBufferLock);
-        // TODO: readBufferFromFile
-#if ENABLE_NEW_RCVBUFFER
-        recvsize = m_pRcvBuffer->readBufferToFile(ofs, unitsize, m_iRcvLastAck);
-#else
         recvsize = m_pRcvBuffer->readBufferToFile(ofs, unitsize);
-#endif
         leaveCS(m_RcvBufferLock);
 
         if (recvsize > 0)

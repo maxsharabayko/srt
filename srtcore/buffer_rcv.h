@@ -51,7 +51,7 @@ class CRcvBufferNew
     typedef sync::steady_clock::duration   duration;
 
 public:
-    CRcvBufferNew(int initSeqNo, size_t size, CUnitQueue* unitqueue, bool peerRexmit);
+    CRcvBufferNew(int initSeqNo, size_t size, CUnitQueue* unitqueue, bool peerRexmit, bool bMessageAPI);
 
     ~CRcvBufferNew();
 
@@ -93,16 +93,14 @@ public:
     /// Read acknowledged data into a user buffer.
     /// @param [in, out] dst pointer to the target user buffer.
     /// @param [in] len length of user buffer.
-    /// @param iFirstUnackSeqNo the first unack packet sequence number.
     /// @return size of data read.
-    int readBuffer(char* dst, int len, int iFirstUnackSeqNo);
+    int readBuffer(char* dst, int len);
 
     /// Read acknowledged data directly into file.
     /// @param [in] ofs C++ file stream.
     /// @param [in] len expected length of data to write into the file.
-    /// @param iFirstUnackSeqNo the first unack packet sequence number.
     /// @return size of data read.
-    int readBufferToFile(std::fstream& ofs, int len, int iFirstUnackSeqNo);
+    int readBufferToFile(std::fstream& ofs, int len);
 
 public:
     /// Get the starting position of the buffer as a packet sequence number.
@@ -233,9 +231,8 @@ private:
     /// Read acknowledged data directly into file.
     /// @param [in] ofs C++ file stream.
     /// @param [in] len expected length of data to write into the file.
-    /// @param iFirstUnackSeqNo the first unack packet sequence number.
     /// @return size of data read.
-    int readBufferTo(int len, int iFirstUnackSeqNo, copy_to_dst_f funcCopyToDst, void* arg);
+    int readBufferTo(int len, copy_to_dst_f funcCopyToDst, void* arg);
 
     /// @brief Estimate timespan of the stored packets (acknowledged and unacknowledged).
     /// @return timespan in milliseconds
@@ -293,6 +290,7 @@ private:
     int m_iFirstReadableOutOfOrder; // In case of out ouf order packet, points to a position of the first such packet to
                                     // read
     const bool m_bPeerRexmitFlag;   // Needed to read message number correctly
+    const bool m_bMessageAPI;       // Operation mode flag: message or stream.
 
 public: // TSBPD public functions
     /// Set TimeStamp-Based Packet Delivery Rx Mode

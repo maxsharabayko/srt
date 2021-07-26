@@ -33,7 +33,7 @@ protected:
         //m_unit_queue = make_unique<CUnitQueue>();
         m_unit_queue = unique_ptr<CUnitQueue>(new CUnitQueue);
         m_unit_queue->init(m_buff_size_pkts, 1500, AF_INET);
-        m_rcv_buffer = unique_ptr<CRcvBufferNew>(new CRcvBufferNew(m_init_seqno, m_buff_size_pkts, m_unit_queue.get(), true));
+        m_rcv_buffer = unique_ptr<CRcvBufferNew>(new CRcvBufferNew(m_init_seqno, m_buff_size_pkts, m_unit_queue.get(), true, true));
         m_rcv_buffer->setTsbPdMode(m_tsbpd_base, false, m_delay);
     }
 

@@ -13,7 +13,7 @@ TEST(CRcvBufferNew, Create)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size, 1500, AF_INET);
     const int init_seqno = 0;
-    CRcvBufferNew rcv_buffer(init_seqno, buffer_size, &unit_queue, true);
+    CRcvBufferNew rcv_buffer(init_seqno, buffer_size, &unit_queue, true, true);
 
     EXPECT_EQ(rcv_buffer.getAvailSize(init_seqno), buffer_size - 1);   // logic
 }
@@ -80,7 +80,7 @@ TEST(CRcvBufferNew, FullBuffer)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1234;
-    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true);
+    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true, true);
 
     const size_t payload_size = 1456;
     // Add a number of units (packets) to the buffer
@@ -137,7 +137,7 @@ TEST(CRcvBufferNew, HandleSeqGap)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1234;
-    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true);
+    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true, true);
 
     const size_t payload_size = 1456;
     // Add a number of units (packets) to the buffer
@@ -164,7 +164,7 @@ TEST(CRcvBufferNew, OneMessageInSeveralPackets)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1000;
-    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true);
+    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true, true);
 
     const size_t payload_size = 1456;
     const int message_len_in_pkts = 4;
@@ -212,7 +212,7 @@ TEST(CRcvBufferNew, MessageOutOfOrder)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1000;
-    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true);
+    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true, true);
 
     const size_t payload_size = 1456;
     const int message_len_in_pkts = 4;
@@ -260,7 +260,7 @@ TEST(CRcvBufferNew, GetFirstValidPacket)
     CUnitQueue unit_queue;
     unit_queue.init(buffer_size_pkts, 1500, AF_INET);
     const int initial_seqno = 1234;
-    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true);
+    CRcvBufferNew rcv_buffer(initial_seqno, buffer_size_pkts, &unit_queue, true, true);
 
     const size_t payload_size = 1456;
     // Add a number of units (packets) to the buffer

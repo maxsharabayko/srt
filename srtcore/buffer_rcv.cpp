@@ -71,7 +71,7 @@ namespace {
  *    m_iMaxPosInc:     none? (modified on add and ack
  */
 
-CRcvBufferNew::CRcvBufferNew(int initSeqNo, size_t size, CUnitQueue* unitqueue, bool peerRexmit)
+CRcvBufferNew::CRcvBufferNew(int initSeqNo, size_t size, CUnitQueue* unitqueue, bool peerRexmit, bool bMessageAPI)
     : m_entries(size)
     , m_szSize(size) // TODO: maybe just use m_entries.size()
     , m_pUnitQueue(unitqueue)
@@ -83,6 +83,7 @@ CRcvBufferNew::CRcvBufferNew(int initSeqNo, size_t size, CUnitQueue* unitqueue, 
     , m_numOutOfOrderPackets(0)
     , m_iFirstReadableOutOfOrder(-1)
     , m_bPeerRexmitFlag(peerRexmit)
+    , m_bMessageAPI(bMessageAPI)
     , m_iBytesCount(0)
     , m_iPktsCount(0)
     , m_uAvgPayloadSz(SRT_LIVE_DEF_PLSIZE)
@@ -147,7 +148,7 @@ int CRcvBufferNew::insert(CUnit* unit)
 
     // If packet "in order" flag is zero, it can be read out of order.
     // With TSBPD enabled packets are always assumed in order (the flag is ignored).
-    if (!m_tsbpd.isEnabled() && !unit->m_Packet.getMsgOrderFlag())
+    if (!m_tsbpd.isEnabled() && m_bMessageAPI && !unit->m_Packet.getMsgOrderFlag())
     {
         ++m_numOutOfOrderPackets;
         onInsertNotInOrderPacket(pos);
@@ -382,20 +383,10 @@ namespace {
     }
 }
 
-int CRcvBufferNew::readBufferTo(int len, int iFirstUnackSeqNo, copy_to_dst_f funcCopyToDst, void* arg)
+int CRcvBufferNew::readBufferTo(int len, copy_to_dst_f funcCopyToDst, void* arg)
 {
-    if (CSeqNo::seqcmp(m_iStartSeqNo, iFirstUnackSeqNo) >= 0)
-        return 0;
-
     int p = m_iStartPos;
-    const int iNumAvail = CSeqNo::seqlen(m_iStartSeqNo, iFirstUnackSeqNo) - 1;
-    if (iNumAvail > m_iMaxPosInc)
-    {
-        LOGC(rbuflog.Error, log << "readBufferTo: IPE: iNumAvail " << iNumAvail << " iMaxPosInc " << m_iMaxPosInc);
-    }
-
-    SRT_ASSERT(iNumAvail <= m_iMaxPosInc);
-    const int end_pos = incPos(m_iStartPos, iNumAvail);
+    const int end_pos = m_iFirstNonreadPos;
 
     const bool bTsbPdEnabled = m_tsbpd.isEnabled();
     const steady_clock::time_point now = (bTsbPdEnabled ? steady_clock::now() : steady_clock::time_point());
@@ -460,17 +451,22 @@ int CRcvBufferNew::readBufferTo(int len, int iFirstUnackSeqNo, copy_to_dst_f fun
         //updateNonreadPos();
     }
 
+    if (len - rs == 0)
+    {
+        LOGC(rbuflog.Error, log << "readBufferTo: 0 bytes read. m_iStartPos=" << m_iStartPos << ", m_iFirstNonreadPos=" << m_iFirstNonreadPos);
+    }
+
     return len - rs;
 }
 
-int CRcvBufferNew::readBuffer(char* dst, int len, int iFirstUnackSeqNo)
+int CRcvBufferNew::readBuffer(char* dst, int len)
 {
-    return readBufferTo(len, iFirstUnackSeqNo, copyBytesToBuf, reinterpret_cast<void*>(dst));
+    return readBufferTo(len, copyBytesToBuf, reinterpret_cast<void*>(dst));
 }
 
-int CRcvBufferNew::readBufferToFile(fstream& ofs, int len, int iFirstUnackSeqNo)
+int CRcvBufferNew::readBufferToFile(fstream& ofs, int len)
 {
-    return readBufferTo(len, iFirstUnackSeqNo, writeBytesToFile, reinterpret_cast<void*>(&ofs));
+    return readBufferTo(len, writeBytesToFile, reinterpret_cast<void*>(&ofs));
 }
 
 int CRcvBufferNew::getRcvDataSize() const
@@ -565,6 +561,7 @@ bool CRcvBufferNew::isRcvDataReady(time_point time_now) const
         if (haveInorderPackets)
             return true;
 
+        SRT_ASSERT((!m_bMessageAPI && m_numOutOfOrderPackets == 0) || m_bMessageAPI);
         return (m_numOutOfOrderPackets > 0 && m_iFirstReadableOutOfOrder != -1);
     }
 
