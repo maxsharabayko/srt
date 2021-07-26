@@ -537,7 +537,8 @@ CRcvBufferNew::PacketInfo CRcvBufferNew::getFirstValidPacketInfo() const
         return info;
     }
 
-    return PacketInfo{ -1, false, time_point() };
+    const PacketInfo info = { -1, false, time_point() };
+    return info;
 }
 
 std::pair<int, int> CRcvBufferNew::getAvailablePacketsRange() const
