@@ -243,6 +243,7 @@ void srt::CUDT::construct()
     // Will be reset to 0 for HSv5, this value is important for HSv4.
     m_iSndHsRetryCnt = SRT_MAX_HSRETRY + 1;
 
+    m_PeerID              = 0;
     m_bOpened             = false;
     m_bListening          = false;
     m_bConnecting         = false;
@@ -1419,7 +1420,7 @@ bool srt::CUDT::createSrtHandshake(
         w_hs.m_iType = 0; // Prepare it for flags
     }
 
-    HLOGC(cnlog.Debug,
+    LOGC(cnlog.Note,
           log << "createSrtHandshake: buf size=" << w_pkt.getLength() << " hsx=" << MessageTypeStr(UMSG_EXT, srths_cmd)
               << " kmx=" << MessageTypeStr(UMSG_EXT, srtkm_cmd) << " kmdata_wordsize=" << kmdata_wordsize
               << " version=" << w_hs.m_iVersion);
@@ -1478,7 +1479,7 @@ bool srt::CUDT::createSrtHandshake(
         size_t hs_size = w_pkt.getLength();
         w_hs.store_to((w_pkt.m_pcData), (hs_size));
         w_pkt.setLength(hs_size);
-        HLOGC(cnlog.Debug, log << "createSrtHandshake: (no ext) size=" << hs_size << " data: " << w_hs.show());
+        LOGC(cnlog.Note, log << "createSrtHandshake: (no ext) size=" << hs_size << " data: " << w_hs.show());
         return true;
     }
 
@@ -1562,6 +1563,8 @@ bool srt::CUDT::createSrtHandshake(
         w_hs.m_iType |= CHandShake::HS_EXT_KMREQ;
         logext << ",KMX";
     }
+
+    LOGC(cnlog.Note, log << "createSrtHandshake: crypto " << (m_pCryptoControl.get() != NULL) << ", CryptoSecret.len: " << m_config.CryptoSecret.len << ", kmdata_wordsize=" << kmdata_wordsize);
 
 #if ENABLE_EXPERIMENTAL_BONDING
     bool have_group = false;
@@ -1726,6 +1729,16 @@ bool srt::CUDT::createSrtHandshake(
                   << (m_config.CryptoSecret.len > 0 ? "Agent uses ENCRYPTION" : "Peer requires ENCRYPTION"));
         if (srtkm_cmd == SRT_CMD_KMREQ)
         {
+            SRT_ASSERT(m_pCryptoControl);
+            if (!m_pCryptoControl)
+            {
+                m_RejectReason = SRT_REJ_IPE;
+                LOGC(cnlog.Error, log << "createSrtHandshake: IPE: need to send KM, but CryptoControl does not exist."
+                    << " Socket state: connected=" << boolalpha << m_bConnected << ", connecting=" << m_bConnecting
+                    << ", broken=" << m_bBroken << ", closing=" << m_bClosing << ".");
+                return false;
+            }
+
             bool have_any_keys = false;
             for (size_t ki = 0; ki < 2; ++ki)
             {
@@ -2423,7 +2436,7 @@ bool srt::CUDT::interpretSrtHandshake(const CHandShake& hs,
         return false;
     }
 
-    HLOGC(cnlog.Debug,
+    LOGC(cnlog.Note,
           log << "HS VERSION=" << hs.m_iVersion << " EXTENSIONS: " << CHandShake::ExtensionFlagStr(ext_flags));
 
     // Ok, now find the beginning of an int32_t array that follows the UDT handshake.
@@ -2525,7 +2538,7 @@ bool srt::CUDT::interpretSrtHandshake(const CHandShake& hs,
         }
     }
 
-    HLOGC(cnlog.Debug, log << "interpretSrtHandshake: HSREQ done, checking KMREQ");
+    LOGC(cnlog.Note, log << "interpretSrtHandshake: HSREQ done, checking KMREQ");
 
     // Now check the encrypted
 
@@ -2533,7 +2546,7 @@ bool srt::CUDT::interpretSrtHandshake(const CHandShake& hs,
 
     if (IsSet(ext_flags, CHandShake::HS_EXT_KMREQ))
     {
-        HLOGC(cnlog.Debug, log << "interpretSrtHandshake: extracting KMREQ/RSP type extension");
+        LOGC(cnlog.Note, log << "interpretSrtHandshake: extracting KMREQ/RSP type extension");
 
 #ifdef SRT_ENABLE_ENCRYPTION
         if (!m_pCryptoControl->hasPassphrase())
@@ -3467,8 +3480,8 @@ void srt::CUDT::startConnect(const sockaddr_any& serv_addr, int32_t forced_isn)
     steady_clock::time_point now = steady_clock::now();
     setPacketTS(reqpkt, now);
 
-    HLOGC(cnlog.Debug,
-          log << CONID() << "CUDT::startConnect: REQ-TIME set HIGH (TimeStamp: " << reqpkt.m_iTimeStamp << "). SENDING HS: " << m_ConnReq.show());
+    LOGC(cnlog.Note,
+          log << CONID() << "CUDT::startConnect: REQ-TIME set HIGH (TimeStamp: " << reqpkt.m_iTimeStamp << "). Crypto: " << (m_pCryptoControl.get() != NULL) << ". SENDING HS: " << m_ConnReq.show());
 
     /*
      * Race condition if non-block connect response thread scheduled before we set m_bConnecting to true?
@@ -3596,8 +3609,11 @@ void srt::CUDT::startConnect(const sockaddr_any& serv_addr, int32_t forced_isn)
                 break;
             }
 
-            if (cst == CONN_REJECT)
+            if (cst == CONN_REJECT) {
+                LOGC(cnlog.Note,
+                    log << "startConnect: cst == CONN_REJECT, shutdown to " << m_PeerID);
                 sendCtrl(UMSG_SHUTDOWN);
+            }
 
             if (cst != CONN_CONTINUE && cst != CONN_CONFUSED)
                 break; // --> OUTSIDE-LOOP
@@ -3732,7 +3748,7 @@ EConnectStatus srt::CUDT::processAsyncConnectResponse(const CPacket &pkt) ATR_NO
     return cst;
 }
 
-bool srt::CUDT::processAsyncConnectRequest(EReadStatus         rst,
+bool srt::CUDT::processAsyncConnectRequest(EReadStatus    rst,
                                       EConnectStatus      cst,
                                       const CPacket*      pResponse /*[[nullable]]*/,
                                       const sockaddr_any& serv_addr)
@@ -3759,6 +3775,10 @@ bool srt::CUDT::processAsyncConnectRequest(EReadStatus         rst,
     bool status = true;
 
     ScopedLock cg(m_ConnectionLock);
+    if (!m_bOpened)
+    {
+        return false;
+    }
 
     if (cst == CONN_RENDEZVOUS)
     {
@@ -3784,9 +3804,9 @@ bool srt::CUDT::processAsyncConnectRequest(EReadStatus         rst,
     {
         // m_RejectReason already set at worker_ProcessAddressedPacket.
         LOGC(cnlog.Warn,
-             log << "processAsyncConnectRequest: REJECT reported from HS processing:"
+             log << "processAsyncConnectRequest: REJECT reported from HS processing: "
              << srt_rejectreason_str(m_RejectReason)
-             << "- not processing further"); //; REQ-TIME LOW"); XXX ?
+             << " - not processing further");
         // m_tsLastReqTime = steady_clock::time_point(); XXX ?
         return false;
     }
@@ -4017,6 +4037,7 @@ EConnectStatus srt::CUDT::processRendezvous(
     // 3. The agent is winner in attention or fine state, it sends HSREQ extension
     m_ConnReq.m_iReqType  = rsp_type;
     m_ConnReq.m_extension = needs_extension;
+    LOGC(cnlog.Error, log << "processRendezvous: m_ConnReq.m_extension" << std::boolalpha << m_ConnReq.m_extension);
 
     // This must be done before prepareConnectionObjects().
     if (!applyResponseSettings())
@@ -4076,7 +4097,7 @@ EConnectStatus srt::CUDT::processRendezvous(
         // when HSREQ was interpreted (to store HSRSP extension).
         m_ConnReq.m_extension = true;
 
-        HLOGC(cnlog.Debug,
+        LOGC(cnlog.Note,
               log << "processRendezvous: HSREQ extension ok, creating HSRSP response. kmdatasize=" << kmdatasize);
 
         w_reqpkt.setLength(m_iMaxSRTPayloadSize);
@@ -4151,6 +4172,7 @@ EConnectStatus srt::CUDT::processRendezvous(
     // Rest of the data will be filled together with
     // serialization.
     m_ConnReq.m_extension = needs_extension;
+    LOGC(cnlog.Note, log << "processRendezvous: m_ConnReq.m_extension = " << std::boolalpha << m_ConnReq.m_extension);
 
     w_reqpkt.setLength(m_iMaxSRTPayloadSize);
     if (m_RdvState == CHandShake::RDV_CONNECTED)
@@ -4322,7 +4344,7 @@ EConnectStatus srt::CUDT::processConnectResponse(const CPacket& response, CUDTEx
         return CONN_REJECT;
     }
 
-    HLOGC(cnlog.Debug, log << CONID() << "processConnectResponse: HS RECEIVED: " << m_ConnRes.show());
+    LOGC(cnlog.Note, log << CONID() << "processConnectResponse: HS RECEIVED: " << m_ConnRes.show());
     if (m_ConnRes.m_iReqType > URQ_FAILURE_TYPES)
     {
         m_RejectReason = RejectReasonForURQ(m_ConnRes.m_iReqType);
@@ -4338,6 +4360,7 @@ EConnectStatus srt::CUDT::processConnectResponse(const CPacket& response, CUDTEx
         return CONN_REJECT;
     }
 
+    LOGC(cnlog.Note, log << CONID() << "processConnectResponse: bRendezvous=" << m_config.bRendezvous);
     // (see createCrypter() call below)
     //
     // The CCryptoControl attached object must be created early
@@ -4405,7 +4428,7 @@ EConnectStatus srt::CUDT::processConnectResponse(const CPacket& response, CUDTEx
         // set cookie
         if (m_ConnRes.m_iReqType == URQ_INDUCTION)
         {
-            HLOGC(cnlog.Debug,
+            LOGC(cnlog.Note,
                   log << CONID() << "processConnectResponse: REQ-TIME LOW; got INDUCTION HS response (cookie:" << hex
                       << m_ConnRes.m_iCookie << " version:" << dec << m_ConnRes.m_iVersion
                       << "), sending CONCLUSION HS with this cookie");
@@ -4441,6 +4464,8 @@ EConnectStatus srt::CUDT::processConnectResponse(const CPacket& response, CUDTEx
                 // serialization.
                 m_ConnReq.m_extension = true;
 
+                LOGC(cnlog.Warn, log << "processConnectResponse: m_iVersion > HS_VERSION_UDT4, m_ConnReq.m_extension = true");
+
                 // For HSv5, the caller is INITIATOR and the listener is RESPONDER.
                 // The m_config.bDataSender value should be completely ignored and the
                 // connection is always bidirectional.
@@ -4457,10 +4482,12 @@ EConnectStatus srt::CUDT::processConnectResponse(const CPacket& response, CUDTEx
             }
             // NOTE: This setup sets URQ_CONCLUSION and appropriate data in the handshake structure.
             // The full handshake to be sent will be filled back in the caller function -- CUDT::startConnect().
+            LOGC(cnlog.Note, log << "processConnectResponse: return CONN_CONTINUE");
             return CONN_CONTINUE;
         }
     }
 
+    HLOGC(cnlog.Debug, log << CONID() << "processConnectResponse: calling postConnect(..)");
     return postConnect(&response, false, eout);
 }
 
@@ -4530,17 +4557,20 @@ EConnectStatus srt::CUDT::postConnect(const CPacket* pResponse, bool rendezvous,
         // Currently just this function must be called always BEFORE prepareConnectionObjects
         // everywhere except acceptAndRespond().
         ok = applyResponseSettings();
+        LOGC(cnlog.Error, log << "postConnect - applyResponseSettings result " << std::boolalpha << ok);
 
         // This will actually be done also in rendezvous HSv4,
         // however in this case the HSREQ extension will not be attached,
         // so it will simply go the "old way".
         // (&&: skip if failed already)
         ok = ok &&  prepareConnectionObjects(m_ConnRes, m_SrtHsSide, eout);
+        LOGC(cnlog.Error, log << "postConnect - prepareConnectionObjects result " << std::boolalpha << ok);
 
         // May happen that 'response' contains a data packet that was sent in rendezvous mode.
         // In this situation the interpretation of handshake was already done earlier.
         ok = ok && pResponse->isControl();
         ok = ok && interpretSrtHandshake(m_ConnRes, *pResponse, 0, 0);
+        LOGC(cnlog.Error, log << "postConnect - interpretSrtHandshake result " << std::boolalpha << ok);
 
         if (!ok)
         {
@@ -4601,7 +4631,7 @@ EConnectStatus srt::CUDT::postConnect(const CPacket* pResponse, bool rendezvous,
     }
 
     // And, I am connected too.
-    m_bConnecting = false;
+    m_bConnecting = false; // MAX: remove from Rendezvous?
 
     // The lock on m_ConnectionLock should still be applied, but
     // the socket could have been started removal before this function
@@ -5436,6 +5466,8 @@ void srt::CUDT::rewriteHandshakeData(const sockaddr_any& peer, CHandShake& w_hs)
         // when AGENT is listener. In this case, conclusion response
         // must always contain HSv5 handshake extensions.
         w_hs.m_extension = true;
+
+        LOGC(cnlog.Note, log << "rewriteHandshakeData: m_extension = true;");
     }
 
     CIPAddress::ntop(peer, (w_hs.m_piPeerIP));
@@ -5628,6 +5660,8 @@ bool srt::CUDT::createCrypter(HandshakeSide side, bool bidirectional)
     // Lazy initialization
     if (m_pCryptoControl)
         return true;
+
+    LOGC(rslog.Note, log << "createCrypter");
 
     // Write back this value, when it was just determined.
     m_SrtHsSide = side;
@@ -5838,13 +5872,13 @@ bool srt::CUDT::closeInternal()
     // that has m_bBroken == false or m_bConnected == true.
     // If it is intended to forcefully close the socket, make sure
     // that it's in response to a broken connection.
-    HLOGC(smlog.Debug, log << CONID() << " - closing socket:");
+    LOGC(smlog.Note, log << CONID() << " - closing socket:");
 
     if (m_config.Linger.l_onoff != 0)
     {
         const steady_clock::time_point entertime = steady_clock::now();
 
-        HLOGC(smlog.Debug, log << CONID() << " ... (linger)");
+        LOGC(smlog.Note, log << CONID() << " ... (linger)");
         while (!m_bBroken && m_bConnected && (m_pSndBuffer->getCurrBufSize() > 0) &&
                (steady_clock::now() - entertime < seconds_from(m_config.Linger.l_linger)))
         {
@@ -5858,7 +5892,7 @@ bool srt::CUDT::closeInternal()
                 if (is_zero(m_tsLingerExpiration))
                     m_tsLingerExpiration = entertime + seconds_from(m_config.Linger.l_linger);
 
-                HLOGC(smlog.Debug,
+                LOGC(smlog.Note,
                       log << "CUDT::close: linger-nonblocking, setting expire time T="
                           << FormatTime(m_tsLingerExpiration));
 
@@ -5895,7 +5929,7 @@ bool srt::CUDT::closeInternal()
     leaveCS(s_UDTUnited.m_EPoll.m_EPollLock);
 
     // trigger any pending IO events.
-    HLOGC(smlog.Debug, log << "close: SETTING ERR readiness on E" << Printable(epollid) << " of @" << m_SocketID);
+    LOGC(smlog.Note, log << "close: SETTING ERR readiness on E" << Printable(epollid) << " of @" << m_SocketID);
     s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_ERR, true);
     // then remove itself from all epoll monitoring
     int no_events = 0;
@@ -5933,6 +5967,7 @@ bool srt::CUDT::closeInternal()
 
     // Inform the threads handler to stop.
     m_bClosing = true;
+    LOGC(smlog.Note, log << CONID() << "closeInternal(): m_bClosing = true");
 
     HLOGC(smlog.Debug, log << CONID() << "CLOSING STATE. Acquiring connection lock");
 
@@ -5951,13 +5986,14 @@ bool srt::CUDT::closeInternal()
     else if (m_bConnecting)
     {
         m_pRcvQueue->removeConnector(m_SocketID);
+        LOGC(smlog.Note, log << CONID() << "closeInternal(): removeConnector");
     }
 
     if (m_bConnected)
     {
         if (!m_bShutdown)
         {
-            HLOGC(smlog.Debug, log << CONID() << "CLOSING - sending SHUTDOWN to the peer");
+            LOGC(smlog.Note, log << CONID() << "CLOSING - sending SHUTDOWN to the peer " << m_PeerID);
             sendCtrl(UMSG_SHUTDOWN);
         }
 
@@ -5990,6 +6026,7 @@ bool srt::CUDT::closeInternal()
         m_pCryptoControl->close();
 
     m_pCryptoControl.reset();
+    LOGC(smlog.Note, log << CONID() << "closeInternal(): reset crypto");
     leaveCS(m_RcvBufferLock);
 
     m_uPeerSrtVersion        = SRT_VERSION_UNK;
@@ -7615,6 +7652,9 @@ void srt::CUDT::sendCtrl(UDTMessageType pkttype, const int32_t* lparam, void* rp
         break;
 
     case UMSG_SHUTDOWN: // 101 - Shutdown
+        LOGC(xtlog.Note, log << "sendCtrl(SHUTDOWN)");
+        if (m_PeerID == 0)
+            break;
         ctrlpkt.pack(pkttype);
         ctrlpkt.m_iID = m_PeerID;
         nbsent        = m_pSndQueue->sendto(m_PeerAddr, ctrlpkt);
@@ -8558,7 +8598,7 @@ void srt::CUDT::processCtrlHS(const CPacket& ctrlpkt)
 
         initdata.m_extension = have_hsreq;
 
-        HLOGC(inlog.Debug,
+        LOGC(inlog.Note,
             log << CONID() << "processCtrl: responding HS reqtype=" << RequestTypeStr(initdata.m_iReqType)
             << (have_hsreq ? " WITH SRT HS response extensions" : ""));
 
@@ -9243,6 +9283,8 @@ std::pair<int, steady_clock::time_point> srt::CUDT::packData(CPacket& w_packet)
 // This is a close request, but called from the
 void srt::CUDT::processClose()
 {
+    LOGC(cnlog.Note,
+        log << "processClose: shutdown to " << m_PeerID);
     sendCtrl(UMSG_SHUTDOWN);
 
     m_bShutdown      = true;
@@ -10624,6 +10666,9 @@ int srt::CUDT::processConnectRequest(const sockaddr_any& addr, CPacket& packet)
             {
                 // Always attach extension.
                 hs.m_extension = true;
+                LOGC(cnlog.Note,
+                    log << CONID() << "processConnectRequest: hs.m_extension = true, sending REPEATED handshake response req="
+                    << RequestTypeStr(hs.m_iReqType));
                 conn = acpu->craftKmResponse((kmdata), (kmdatasize));
             }
             else
@@ -10658,7 +10703,7 @@ int srt::CUDT::processConnectRequest(const sockaddr_any& addr, CPacket& packet)
         {
             if (hs.m_iVersion < HS_VERSION_SRT1)
             {
-                HLOGC(cnlog.Debug, log << CONID() << "processConnectRequest: HSv4 caller, sending SHUTDOWN after rejection with "
+                LOGC(cnlog.Note, log << CONID() << "processConnectRequest: HSv4 caller, sending SHUTDOWN after rejection with "
                         << RequestTypeStr(hs.m_iReqType));
                 // The HSv4 clients do not interpret the error handshake response correctly.
                 // In order to really disallow them to connect there's needed the shutdown response.

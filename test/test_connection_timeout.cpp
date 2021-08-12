@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <chrono>
+#include <future>
 
 #ifdef _WIN32
 #define INC_SRT_WIN_WINTIME // exclude gettimeofday from srt headers
@@ -206,3 +207,53 @@ TEST_F(TestConnectionTimeout, BlockingLoop)
 }
 
 
+TEST_F(TestConnectionTimeout, CloseWhileConnecting) {
+
+    int64_t frequency = 1; // 1 tick per microsecond.
+
+    LARGE_INTEGER ccf; // in counts per second
+    QueryPerformanceFrequency(&ccf);
+    cout << "Ticks per second: " << (int64_t) ccf.QuadPart << "\n";
+
+    const int yes = 1;
+    const int no = 0;
+
+    m_sa.sin_port = htons(4200);
+    const sockaddr* psa = reinterpret_cast<const sockaddr*>(&m_sa);
+
+    // Create another client
+
+    const SRTSOCKET client_sock = srt_create_socket();
+    ASSERT_GT(client_sock, 0);    // socket_id should be > 0
+
+    srt_setloglevel(LOG_NOTICE);
+
+    ASSERT_EQ(srt_setsockopt(client_sock, 0, SRTO_RCVSYN, &no, sizeof no), SRT_SUCCESS); // for async connect
+    ASSERT_EQ(srt_setsockopt(client_sock, 0, SRTO_SNDSYN, &no, sizeof no), SRT_SUCCESS); // for async connect
+
+    const char* pwd = "1234567890";
+    ASSERT_EQ(srt_setsockopt(client_sock, 0, SRTO_PASSPHRASE, pwd, 10), SRT_SUCCESS); // for async connect
+
+    // Set connection timeout to 500 ms to reduce the test execution time
+    const int connection_timeout_ms = 300;
+    EXPECT_EQ(srt_setsockopt(client_sock, 0, SRTO_CONNTIMEO, &connection_timeout_ms, sizeof connection_timeout_ms), SRT_SUCCESS);
+
+    const int pollid = srt_epoll_create();
+    ASSERT_GE(pollid, 0);
+    const int epoll_out = SRT_EPOLL_OUT | SRT_EPOLL_ERR;
+    ASSERT_NE(srt_epoll_add_usock(pollid, client_sock, &epoll_out), SRT_ERROR);
+
+
+    //auto fut = std::async([](SRTSOCKET s) { std::cout << "srt_close()\n"; srt_close(s); }, client_sock);
+    ASSERT_NE(srt_connect(client_sock, psa, sizeof m_sa), SRT_ERROR);
+    //fut.wait();
+
+    this_thread::sleep_for(600ms);
+
+    this_thread::sleep_for(5s);
+
+    cout << "srt_close()\n";
+    EXPECT_EQ(srt_epoll_remove_usock(pollid, client_sock), SRT_SUCCESS);
+    EXPECT_EQ(srt_close(client_sock), SRT_SUCCESS);
+    (void)srt_epoll_release(pollid);
+}

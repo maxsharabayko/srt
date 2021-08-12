@@ -819,6 +819,8 @@ void srt::CHash::insert(int32_t id, CUDT* u)
     n->m_pNext = b;
 
     m_pBucket[id % m_iHashSize] = n;
+
+    std::cerr << "Hash::insert " << id << "\n";
 }
 
 void srt::CHash::remove(int32_t id)
@@ -836,6 +838,7 @@ void srt::CHash::remove(int32_t id)
                 p->m_pNext = b->m_pNext;
 
             delete b;
+            std::cerr << "Hash::remove " << id << "\n";
 
             return;
         }
@@ -936,7 +939,7 @@ void srt::CRendezvousQueue::updateConnStatus(EReadStatus rst, EConnectStatus cst
     if (!qualifyToHandle(rst, cst, dest_id, (toRemove), (toProcess)))
         return;
 
-    HLOGC(cnlog.Debug,
+    LOGC(cnlog.Note,
           log << "updateConnStatus: collected " << toProcess.size() << " for processing, " << toRemove.size()
               << " to close");
 
@@ -966,11 +969,15 @@ void srt::CRendezvousQueue::updateConnStatus(EReadStatus rst, EConnectStatus cst
             conn_st = CONN_AGAIN;
         }
 
-        HLOGC(cnlog.Debug,
-              log << "updateConnStatus: processing async conn for @" << i->id << " FROM " << i->peeraddr.str());
+        LOGC(cnlog.Warn,
+            log << "updateConnStatus: processing async conn for @" << i->id << " FROM " << i->peeraddr.str()
+                << " read_st: " << read_st << ", conn_st " << conn_st << ", packet: " << (pkt ? "yes" : "null"));
 
         if (!i->u->processAsyncConnectRequest(read_st, conn_st, pkt, i->peeraddr))
         {
+            LOGC(cnlog.Note,
+                log << "updateConnStatus: @" << i->id << " sendCtrl(SHUTDOWN) to " << i->u->m_PeerID);
+
             // cst == CONN_REJECT can only be result of worker_ProcessAddressedPacket and
             // its already set in this case.
             LinkStatusInfo fi = *i;
@@ -988,12 +995,13 @@ void srt::CRendezvousQueue::updateConnStatus(EReadStatus rst, EConnectStatus cst
 
     for (vector<LinkStatusInfo>::iterator i = toRemove.begin(); i != toRemove.end(); ++i)
     {
-        HLOGC(cnlog.Debug, log << "updateConnStatus: COMPLETING dep objects update on failed @" << i->id);
+        LOGC(cnlog.Note, log << "updateConnStatus: COMPLETING dep objects update on failed @" << i->id);
         /*
          * Setting m_bConnecting to false but keeping socket in rendezvous queue is not a good idea.
          * Next CUDT::close will not remove it from rendezvous queue (because !m_bConnecting)
          * and may crash on next pass.
          */
+        // TODO: maybe lock i->u->m_ConnectionLock?
         i->u->m_bConnecting = false;
         remove(i->u->m_SocketID);
 
@@ -1261,7 +1269,7 @@ void* srt::CRcvQueue::worker(void* param)
                 cst = self->worker_ProcessAddressedPacket(id, unit, sa);
                 // CAN RETURN CONN_REJECT, but m_RejectReason is already set
             }
-            HLOGC(qrlog.Debug, log << self->CONID() << "worker: result for the unit: " << ConnectStatusStr(cst));
+            LOGC(qrlog.Note, log << self->CONID() << "worker: id=" << id << ", result for the unit : " << ConnectStatusStr(cst));
             if (cst == CONN_AGAIN)
             {
                 HLOGC(qrlog.Debug, log << self->CONID() << "worker: packet not dispatched, continuing reading.");
@@ -1321,7 +1329,7 @@ void* srt::CRcvQueue::worker(void* param)
 
         if (have_received)
         {
-            HLOGC(qrlog.Debug,
+            LOGC(qrlog.Note,
                   log << "worker: RECEIVED PACKET --> updateConnStatus. cst=" << ConnectStatusStr(cst) << " id=" << id
                       << " pkt-payload-size=" << unit->m_Packet.getLength());
         }
@@ -1358,13 +1366,14 @@ EReadStatus srt::CRcvQueue::worker_RetrieveUnit(int32_t& w_id, CUnit*& w_unit, s
         CUDT* ne = getNewEntry();
         if (ne)
         {
-            HLOGC(qrlog.Debug,
+            LOGC(qrlog.Note,
                   log << CUDTUnited::CONID(ne->m_SocketID)
                       << " SOCKET pending for connection - ADDING TO RCV QUEUE/MAP");
             m_pRcvUList->insert(ne);
             m_pHash->insert(ne->m_SocketID, ne);
         }
     }
+
     // find next available slot for incoming packet
     w_unit = m_UnitQueue.getNextAvailUnit();
     if (!w_unit)
@@ -1452,7 +1461,7 @@ EConnectStatus srt::CRcvQueue::worker_ProcessAddressedPacket(int32_t id, CUnit* 
     {
         // Pass this to either async rendezvous connection,
         // or store the packet in the queue.
-        HLOGC(cnlog.Debug, log << "worker_ProcessAddressedPacket: resending to QUEUED socket @" << id);
+        LOGC(cnlog.Note, log << "worker_ProcessAddressedPacket: resending to QUEUED socket @" << id);
         return worker_TryAsyncRend_OrStore(id, unit, addr);
     }
 
@@ -1537,7 +1546,7 @@ EConnectStatus srt::CRcvQueue::worker_TryAsyncRend_OrStore(int32_t id, CUnit* un
     // otherwise wait for the UDT socket to retrieve this packet
     if (!u->m_config.bSynRecving)
     {
-        HLOGC(cnlog.Debug, log << "AsyncOrRND: packet RESOLVED TO @" << id << " -- continuing as ASYNC CONNECT");
+        LOGC(cnlog.Note, log << "AsyncOrRND: packet RESOLVED TO @" << id << " -- continuing as ASYNC CONNECT");
         // This is practically same as processConnectResponse, just this applies
         // appropriate mutex lock - which can't be done here because it's intentionally private.
         // OTOH it can't be applied to processConnectResponse because the synchronous
@@ -1751,7 +1760,7 @@ void srt::CRcvQueue::removeConnector(const SRTSOCKET& id)
 
 void srt::CRcvQueue::setNewEntry(CUDT* u)
 {
-    HLOGC(cnlog.Debug, log << CUDTUnited::CONID(u->m_SocketID) << "setting socket PENDING FOR CONNECTION");
+    LOGC(cnlog.Note, log << CUDTUnited::CONID(u->m_SocketID) << "setting socket PENDING FOR CONNECTION");
     ScopedLock listguard(m_IDLock);
     m_vNewEntry.push_back(u);
 }
