@@ -2641,7 +2641,7 @@ void srt::CUDTUnited::checkBrokenSockets()
             // this function is called (isRcvDataReady also checks if the
             // available data is "ready to play").
 #if ENABLE_NEW_RCVBUFFER
-            && s->core().>m_pRcvBuffer->isRcvDataReady()) // zero time includes any available packets
+            && s->core().m_pRcvBuffer->isRcvDataReady()) // zero time includes any available packets
 #else
             && s->core().m_pRcvBuffer->isRcvDataAvailable())
 #endif
