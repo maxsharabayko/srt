@@ -6580,6 +6580,12 @@ int srt::CUDT::recvmsg2(char* data, int len, SRT_MSGCTRL& w_mctrl)
     return receiveBuffer(data, len);
 }
 
+bool srt::CUDT::isRcvBufferReady() const
+{
+    ScopedLock lck(m_RcvBufferLock);
+    return m_pRcvBuffer->isRcvDataReady();
+}
+
 // int by_exception: accepts values of CUDTUnited::ErrorHandling:
 // - 0 - by return value
 // - 1 - by exception
