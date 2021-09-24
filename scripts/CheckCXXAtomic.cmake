@@ -15,12 +15,11 @@
 
 include(CheckCXXSourceCompiles)
 include(CheckLibraryExists)
-include(UnSetVariableFull)
 
 function(CheckCXXAtomic)
 
-   UnSetVariableFull(HAVE_CXX_ATOMIC)
-   UnSetVariableFull(HAVE_CXX_ATOMIC_STATIC)
+   unset(HAVE_CXX_ATOMIC CACHE)
+   unset(HAVE_CXX_ATOMIC_STATIC CACHE)
 
    unset(CMAKE_REQUIRED_FLAGS)
    unset(CMAKE_REQUIRED_LIBRARIES)

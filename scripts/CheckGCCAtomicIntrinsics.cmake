@@ -11,6 +11,8 @@
 #
 # Sets:
 #     HAVE_LIBATOMIC
+#     HAVE_LIBATOMIC_COMPILES
+#     HAVE_LIBATOMIC_COMPILES_STATIC
 #     HAVE_GCCATOMIC_INTRINSICS
 #     HAVE_GCCATOMIC_INTRINSICS_REQUIRES_LIBATOMIC
 #
@@ -20,13 +22,43 @@
 
 include(CheckCSourceCompiles)
 include(CheckLibraryExists)
-include(UnSetVariableFull)
 
 function(CheckGCCAtomicIntrinsics)
 
-   UnSetVariableFull(HAVE_LIBATOMIC)
-   UnSetVariableFull(HAVE_GCCATOMIC_INTRINSICS)
-   UnSetVariableFull(HAVE_GCCATOMIC_INTRINSICS_REQUIRES_LIBATOMIC)
+   unset(HAVE_LIBATOMIC CACHE)
+   unset(HAVE_LIBATOMIC_COMPILES CACHE)
+   unset(HAVE_LIBATOMIC_COMPILES_STATIC CACHE)
+   unset(HAVE_GCCATOMIC_INTRINSICS CACHE)
+   unset(HAVE_GCCATOMIC_INTRINSICS_REQUIRES_LIBATOMIC CACHE)
+
+   set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE) # CMake 3.6
+
+   check_library_exists(
+      atomic __atomic_fetch_add_8 "" HAVE_LIBATOMIC)
+
+   set(CheckLibAtomicCompiles_CODE
+      "
+      int main(void)
+      {
+         const int result = 0;
+         return result;
+      }
+      ")
+
+   check_c_source_compiles(
+      "${CheckLibAtomicCompiles_CODE}"
+      HAVE_LIBATOMIC_COMPILES)
+   if (NOT HAVE_LIBATOMIC_COMPILES)
+      UnSetVariableFull(HAVE_LIBATOMIC)
+   endif()
+   if (HAVE_LIBATOMIC AND HAVE_LIBATOMIC_COMPILES)
+      set(CMAKE_REQUIRED_LINK_OPTIONS "-static")
+      check_c_source_compiles(
+         "${CheckLibAtomicCompiles_CODE}"
+         HAVE_LIBATOMIC_COMPILES_STATIC)
+   else()
+      set(HAVE_LIBATOMIC_COMPILES_STATIC FALSE PARENT_SCOPE)
+   endif()
 
    unset(CMAKE_REQUIRED_FLAGS)
    unset(CMAKE_REQUIRED_LIBRARIES)
@@ -47,10 +79,6 @@ function(CheckGCCAtomicIntrinsics)
       }
       ")
 
-   check_library_exists(
-      atomic __atomic_fetch_add_8 "" HAVE_LIBATOMIC)
-
-   set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE) # CMake 3.6
    check_c_source_compiles(
       "${CheckGCCAtomicIntrinsics_CODE}"
       HAVE_GCCATOMIC_INTRINSICS)
@@ -64,9 +92,5 @@ function(CheckGCCAtomicIntrinsics)
          set(HAVE_GCCATOMIC_INTRINSICS TRUE PARENT_SCOPE)
       endif()
    endif()
-
-   unset(CMAKE_REQUIRED_FLAGS)
-   unset(CMAKE_REQUIRED_LIBRARIES)
-   unset(CMAKE_REQUIRED_LINK_OPTIONS)
 
 endfunction(CheckGCCAtomicIntrinsics)
