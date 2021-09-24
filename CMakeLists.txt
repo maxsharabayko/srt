@@ -999,6 +999,8 @@ if (HAVE_GCCATOMIC_INTRINSICS_REQUIRES_LIBATOMIC AND HAVE_LIBATOMIC)
 		target_link_libraries(${TARGET_srt}_shared PUBLIC atomic)
 	endif()
 elseif (HAVE_LIBATOMIC AND HAVE_LIBATOMIC_COMPILES_STATIC)
+	# This is a workaround for ANDROID NDK<17 builds, which need to link
+	#  to libatomic when linking statically to the SRT library.
 	if (srt_libspec_static)
 		target_link_libraries(${TARGET_srt}_static PUBLIC atomic)
 	endif()
