@@ -1343,6 +1343,22 @@ if (DEFINED SRT_EXTRA_APPS_INC)
 endif()
 
 if (ENABLE_SHOW_PROJECT_CONFIG)
+
+    set(static_property_link_libraries)
+    if (srt_libspec_static)
+      get_target_property(
+         static_property_link_libraries
+         ${TARGET_srt}_static
+         LINK_LIBRARIES)
+    endif()
+    set(shared_property_link_libraries)
+    if (srt_libspec_shared)
+      get_target_property(
+         shared_property_link_libraries
+         ${TARGET_srt}_shared
+         LINK_LIBRARIES)
+    endif()
+
     message(STATUS
         "Project Configuration:\n"
         "  SRT Version:\n"
@@ -1428,5 +1444,8 @@ if (ENABLE_SHOW_PROJECT_CONFIG)
         "    DISABLE_CXX11: ${DISABLE_CXX11}\n"
         "    USE_ENCLIB: ${USE_ENCLIB}\n"
         "    ENABLE_EXAMPLES: ${ENABLE_EXAMPLES}\n"
+        "    Target Link Libraries:\n"
+        "      Static: ${static_property_link_libraries}\n"
+        "      Shared: ${shared_property_link_libraries}\n"
    )
 endif()
