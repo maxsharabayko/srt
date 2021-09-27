@@ -1359,6 +1359,32 @@ if (ENABLE_SHOW_PROJECT_CONFIG)
          LINK_LIBRARIES)
     endif()
 
+   # See https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html#id13
+   set(__more_tc1_config)
+   if (CMAKE_CROSSCOMPILING)
+      set(__more_tc1_config
+         "    CMAKE_SYSROOT: ${CMAKE_SYSROOT}\n")
+   endif()
+
+   # See https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html#id13
+   set(__more_tc2_config)
+   if (APPLE)
+      set(__more_tc2_config
+    "    CMAKE_INSTALL_NAME_TOOL: ${CMAKE_INSTALL_NAME_TOOL}
+    CMAKE_OSX_SYSROOT: ${CMAKE_OSX_SYSROOT}
+    CMAKE_OSX_ARCHITECTURES: ${CMAKE_OSX_ARCHITECTURES}
+    CMAKE_OSX_DEPLOYMENT_TARGET: ${CMAKE_OSX_DEPLOYMENT_TARGET}
+    CMAKE_OSX_SYSROOT: ${CMAKE_OSX_SYSROOT}\n")
+   elseif (ANDROID)
+      set(__more_tc2_config
+    "    CMAKE_ANDROID_NDK: ${CMAKE_ANDROID_NDK}
+    CMAKE_ANDROID_STANDALONE_TOOLCHAIN: ${CMAKE_ANDROID_STANDALONE_TOOLCHAIN}
+    CMAKE_ANDROID_API: ${CMAKE_ANDROID_API}
+    CMAKE_ANDROID_ARCH_ABI: ${CMAKE_ANDROID_ARCH_ABI}
+    CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION: ${CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION}
+    CMAKE_ANDROID_STL_TYPE: ${CMAKE_ANDROID_STL_TYPE}\n")
+   endif()
+
     message(STATUS
         "Project Configuration:\n"
         "  SRT Version:\n"
@@ -1370,6 +1396,7 @@ if (ENABLE_SHOW_PROJECT_CONFIG)
         "    CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}\n"
         "  Target Configuration:\n"
         "    CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}\n"
+        "    CMAKE_SYSTEM_VERSION: ${CMAKE_SYSTEM_VERSION}\n"
         "    CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}\n"
         "    CMAKE_SIZEOF_VOID_P: ${CMAKE_SIZEOF_VOID_P}\n"
         "    DARWIN: ${DARWIN}\n"
@@ -1381,6 +1408,7 @@ if (ENABLE_SHOW_PROJECT_CONFIG)
         "    SUNOS: ${SUNOS}\n"
         "    POSIX: ${POSIX}\n"
         "    SYMLINKABLE: ${SYMLINKABLE}\n"
+        "    APPLE: ${APPLE}\n"
         "    UNIX: ${UNIX}\n"
         "    WIN32: ${WIN32}\n"
         "    MINGW: ${MINGW}\n"
@@ -1389,15 +1417,26 @@ if (ENABLE_SHOW_PROJECT_CONFIG)
         "  Toolchain Configuration:\n"
         "    CMAKE_TOOLCHAIN_FILE: ${CMAKE_TOOLCHAIN_FILE}\n"
         "    CMAKE_CROSSCOMPILING: ${CMAKE_CROSSCOMPILING}\n"
+        "${__more_tc1_config}"
+        "    CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}\n"
+        "    CMAKE_C_COMPILER_VERSION: ${CMAKE_C_COMPILER_VERSION}\n"
+        "    CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}\n"
+        "    CMAKE_C_COMPILE_FEATURES: ${CMAKE_C_COMPILE_FEATURES}\n"
+        "    CMAKE_C_STANDARD: ${CMAKE_CXX_STANDARD}\n"
         "    CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}\n"
         "    CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}\n"
-        "    CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}\n"
         "    CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}\n"
+        "    CMAKE_CXX_COMPILE_FEATURES: ${CMAKE_CXX_COMPILE_FEATURES}\n"
+        "    CMAKE_CXX_STANDARD: ${CMAKE_CXX_STANDARD}\n"
+        "    CMAKE_LINKER: ${CMAKE_LINKER}\n"
+        "    CMAKE_NM: ${CMAKE_NM}\n"
+        "    CMAKE_AR: ${CMAKE_AR}\n"
+        "    CMAKE_RANLIB: ${CMAKE_RANLIB}\n"
+        "${__more_tc2_config}"
         "    HAVE_COMPILER_GNU_COMPAT: ${HAVE_COMPILER_GNU_COMPAT}\n"
         "    CMAKE_THREAD_LIBS: ${CMAKE_THREAD_LIBS}\n"
         "    CMAKE_THREAD_LIBS_INIT: ${CMAKE_THREAD_LIBS_INIT}\n"
         "    ENABLE_THREAD_CHECK: ${ENABLE_THREAD_CHECK}\n"
-        "    CMAKE_CXX_STANDARD: ${CMAKE_CXX_STANDARD}\n"
         "    USE_CXX_STD_APP: ${USE_CXX_STD_APP}\n"
         "    USE_CXX_STD_LIB: ${USE_CXX_STD_LIB}\n"
         "    STDCXX: ${STDCXX}\n"
@@ -1444,10 +1483,13 @@ if (ENABLE_SHOW_PROJECT_CONFIG)
         "    ENABLE_SHOW_PROJECT_CONFIG: ${ENABLE_SHOW_PROJECT_CONFIG}\n"
         "    ENABLE_CLANG_TSA: ${ENABLE_CLANG_TSA}\n"
         "    ATOMIC_USE_SRT_SYNC_MUTEX: ${ATOMIC_USE_SRT_SYNC_MUTEX}\n"
-        "  Project Non-Configuration:\n"
+        "  Constructed Configuration:\n"
         "    DISABLE_CXX11: ${DISABLE_CXX11}\n"
         "    USE_ENCLIB: ${USE_ENCLIB}\n"
         "    ENABLE_EXAMPLES: ${ENABLE_EXAMPLES}\n"
+        "    TARGET_srt: ${TARGET_srt}\n"
+        "    srt_libspec_static: ${srt_libspec_static}\n"
+        "    srt_libspec_shared: ${srt_libspec_shared}\n"
         "    Target Link Libraries:\n"
         "      Static: ${static_property_link_libraries}\n"
         "      Shared: ${shared_property_link_libraries}\n"
