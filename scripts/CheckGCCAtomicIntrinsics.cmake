@@ -37,6 +37,7 @@ function(CheckGCCAtomicIntrinsics)
    unset(CMAKE_REQUIRED_LIBRARIES)
    unset(CMAKE_REQUIRED_LINK_OPTIONS)
 
+   # Check for existance of libatomic and whether this symbol is present.
    check_library_exists(
       atomic __atomic_fetch_add_8 "" HAVE_LIBATOMIC)
 
@@ -51,6 +52,8 @@ function(CheckGCCAtomicIntrinsics)
 
    set(CMAKE_REQUIRED_LIBRARIES "atomic")
 
+   # Check that the compiler can build a simple application and link with
+   #  libatomic.
    check_c_source_compiles(
       "${CheckLibAtomicCompiles_CODE}"
       HAVE_LIBATOMIC_COMPILES)
@@ -64,6 +67,8 @@ function(CheckGCCAtomicIntrinsics)
       else()
          set(CMAKE_REQUIRED_FLAGS "-static")
       endif()
+      # Check that the compiler can build a simple application and statically
+      #  link with libatomic.
       check_c_source_compiles(
          "${CheckLibAtomicCompiles_CODE}"
          HAVE_LIBATOMIC_COMPILES_STATIC)
