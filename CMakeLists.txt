@@ -123,7 +123,12 @@ endif()
 
 # options
 option(CYGWIN_USE_POSIX "Should the POSIX API be used for cygwin. Ignored if the system isn't cygwin." OFF)
-option(ENABLE_CXX11 "Should the c++11 parts (srt-live-transmit) be enabled" ON)
+if (CMAKE_CXX_COMPILER_ID MATCHES "^GNU$"
+		AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
+	option(ENABLE_CXX11 "Should the c++11 parts (srt-live-transmit) be enabled" OFF)
+else()
+	option(ENABLE_CXX11 "Should the c++11 parts (srt-live-transmit) be enabled" ON)
+endif()
 option(ENABLE_APPS "Should the Support Applications be Built?" ON)
 option(ENABLE_EXPERIMENTAL_BONDING "Should the EXPERIMENTAL bonding functionality be enabled?" OFF)
 option(ENABLE_TESTING "Should the Developer Test Applications be Built?" OFF)
@@ -147,6 +152,7 @@ option(USE_OPENSSL_PC "Use pkg-config to find OpenSSL libraries" ON)
 option(USE_BUSY_WAITING "Enable more accurate sending times at a cost of potentially higher CPU load" OFF)
 option(USE_GNUSTL "Get c++ library/headers from the gnustl.pc" OFF)
 option(ENABLE_SOCK_CLOEXEC "Enable setting SOCK_CLOEXEC on a socket" ON)
+option(ENABLE_SHOW_PROJECT_CONFIG "Enable show Project Configuration" ON)
 
 option(ENABLE_CLANG_TSA "Enable Clang Thread Safety Analysis" OFF)
 
@@ -1334,4 +1340,89 @@ if (DEFINED SRT_EXTRA_APPS_INC)
 	include(${SRT_EXTRA_APPS_INC}.cmake)
 	# No extra variables expected. Just use the variables
 	# already provided and define additional targets.
+endif()
+
+if (ENABLE_SHOW_PROJECT_CONFIG)
+    message(STATUS
+        "Project Configuration:\n"
+        "  SRT Version:\n"
+        "    SRT_VERSION: ${SRT_VERSION}\n"
+        "    SRT_VERSION_BUILD: ${SRT_VERSION_BUILD}\n"
+        "  CMake Configuration:\n"
+        "    CMAKE_VERSION: ${CMAKE_VERSION}\n"
+        "    CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}\n"
+        "    CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}\n"
+        "  Target Configuration:\n"
+        "    CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}\n"
+        "    CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}\n"
+        "    CMAKE_SIZEOF_VOID_P: ${CMAKE_SIZEOF_VOID_P}\n"
+        "    DARWIN: ${DARWIN}\n"
+        "    LINUX: ${LINUX}\n"
+        "    BSD: ${BSD}\n"
+        "    MICROSOFT: ${MICROSOFT}\n"
+        "    GNU: ${GNU}\n"
+        "    ANDROID: ${ANDROID}\n"
+        "    SUNOS: ${SUNOS}\n"
+        "    POSIX: ${POSIX}\n"
+        "    SYMLINKABLE: ${SYMLINKABLE}\n"
+        "    UNIX: ${UNIX}\n"
+        "    WIN32: ${WIN32}\n"
+        "    MINGW: ${MINGW}\n"
+        "    CYGWIN: ${CYGWIN}\n"
+        "    CYGWIN_USE_POSIX: ${CYGWIN_USE_POSIX}\n"
+        "  Toolchain Configuration:\n"
+        "    CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}\n"
+        "    CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}\n"
+        "    CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}\n"
+        "    CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}\n"
+        "    HAVE_COMPILER_GNU_COMPAT: ${HAVE_COMPILER_GNU_COMPAT}\n"
+        "    ENABLE_THREAD_CHECK: ${ENABLE_THREAD_CHECK}\n"
+        "    CMAKE_CXX_STANDARD: ${CMAKE_CXX_STANDARD}\n"
+        "    USE_CXX_STD_APP: ${USE_CXX_STD_APP}\n"
+        "    USE_CXX_STD_LIB: ${USE_CXX_STD_LIB}\n"
+        "    STDCXX: ${STDCXX}\n"
+        "    USE_CXX_STD: ${USE_CXX_STD}\n"
+        "    HAVE_CLOCK_GETTIME_IN: ${HAVE_CLOCK_GETTIME_IN}\n"
+        "    HAVE_CLOCK_GETTIME_LIBRT: ${HAVE_CLOCK_GETTIME_LIBRT}\n"
+        "    HAVE_LIBATOMIC: ${HAVE_LIBATOMIC}\n"
+        "    HAVE_LIBATOMIC_COMPILES: ${HAVE_LIBATOMIC_COMPILES}\n"
+        "    HAVE_LIBATOMIC_COMPILES_STATIC: ${HAVE_LIBATOMIC_COMPILES_STATIC}\n"
+        "    HAVE_GCCATOMIC_INTRINSICS: ${HAVE_GCCATOMIC_INTRINSICS}\n"
+        "    HAVE_GCCATOMIC_INTRINSICS_REQUIRES_LIBATOMIC: ${HAVE_GCCATOMIC_INTRINSICS_REQUIRES_LIBATOMIC}\n"
+        "    HAVE_CXX_ATOMIC: ${HAVE_CXX_ATOMIC}\n"
+        "    HAVE_CXX_ATOMIC_STATIC: ${HAVE_CXX_ATOMIC_STATIC}\n"
+        "  Project Configuration:\n"
+        "    ENABLE_DEBUG: ${ENABLE_DEBUG}\n"
+        "    ENABLE_CXX11: ${ENABLE_CXX11}\n"
+        "    ENABLE_APPS: ${ENABLE_APPS}\n"
+        "    ENABLE_EXPERIMENTAL_BONDING: ${ENABLE_EXPERIMENTAL_BONDING}\n"
+        "    ENABLE_TESTING: ${ENABLE_TESTING}\n"
+        "    ENABLE_PROFILE: ${ENABLE_PROFILE}\n"
+        "    ENABLE_LOGGING: ${ENABLE_LOGGING}\n"
+        "    ENABLE_HEAVY_LOGGING: ${ENABLE_HEAVY_LOGGING}\n"
+        "    ENABLE_HAICRYPT_LOGGING: ${ENABLE_HAICRYPT_LOGGING}\n"
+        "    ENABLE_SHARED: ${ENABLE_SHARED}\n"
+        "    ENABLE_STATIC: ${ENABLE_STATIC}\n"
+        "    ENABLE_RELATIVE_LIBPATH: ${ENABLE_RELATIVE_LIBPATH}\n"
+        "    ENABLE_GETNAMEINFO: ${ENABLE_GETNAMEINFO}\n"
+        "    ENABLE_UNITTESTS: ${ENABLE_UNITTESTS}\n"
+        "    ENABLE_ENCRYPTION: ${ENABLE_ENCRYPTION}\n"
+        "    ENABLE_CXX_DEPS: ${ENABLE_CXX_DEPS}\n"
+        "    USE_STATIC_LIBSTDCXX: ${USE_STATIC_LIBSTDCXX}\n"
+        "    ENABLE_INET_PTON: ${ENABLE_INET_PTON}\n"
+        "    ENABLE_CODE_COVERAGE: ${ENABLE_CODE_COVERAGE}\n"
+        "    ENABLE_MONOTONIC_CLOCK: ${ENABLE_MONOTONIC_CLOCK}\n"
+        "    ENABLE_STDCXX_SYNC: ${ENABLE_STDCXX_SYNC}\n"
+        "    USE_OPENSSL_PC: ${USE_OPENSSL_PC}\n"
+        "    USE_BUSY_WAITING: ${USE_BUSY_WAITING}\n"
+        "    USE_GNUSTL: ${USE_GNUSTL}\n"
+        "    ENABLE_SOCK_CLOEXEC: ${ENABLE_SOCK_CLOEXEC}\n"
+        "    ENABLE_SHOW_PROJECT_CONFIG: ${ENABLE_SHOW_PROJECT_CONFIG}\n"
+        "    ENABLE_CLANG_TSA: ${ENABLE_CLANG_TSA}\n"
+        "    ATOMIC_USE_SRT_SYNC_MUTEX: ${ATOMIC_USE_SRT_SYNC_MUTEX}\n"
+        "  Project Non-Configuration:\n"
+        "    DISABLE_CXX11: ${DISABLE_CXX11}\n"
+        "    USE_ENCLIB: ${USE_ENCLIB}\n"
+        "    ENABLE_EXAMPLES: ${ENABLE_EXAMPLES}\n"
+   )
 endif()

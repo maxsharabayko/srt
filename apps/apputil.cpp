@@ -9,12 +9,19 @@
  */
 
 #include <cstring>
-#include <chrono>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <utility>
 #include <memory>
+
+// Note: std::put_time is supported only in GCC 5 and higher
+#if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 5)
+#define HAS_PUT_TIME
+#endif
+#ifdef HAS_PUT_TIME
+   #include <chrono>
+#endif
 
 #include "apputil.hpp"
 #include "netinet_any.h"
@@ -353,11 +360,6 @@ string OptionHelpItem(const OptionName& o)
 }
 
 // Stats module
-
-// Note: std::put_time is supported only in GCC 5 and higher
-#if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 5)
-#define HAS_PUT_TIME
-#endif
 
 template <class TYPE>
 inline SrtStatData* make_stat(SrtStatCat cat, const string& name, const string& longname,
