@@ -58,7 +58,12 @@ function(CheckGCCAtomicIntrinsics)
       set(HAVE_LIBATOMIC 0 CACHE INTERNAL "" FORCE)
    endif()
    if (HAVE_LIBATOMIC AND HAVE_LIBATOMIC_COMPILES)
-      set(CMAKE_REQUIRED_LINK_OPTIONS "-static")
+      # CMAKE_REQUIRED_LINK_OPTIONS was introduced in CMake 3.14.
+      if(CMAKE_VERSION VERSION_LESS "3.14")
+         set(CMAKE_REQUIRED_LINK_OPTIONS "-static")
+      else()
+         set(CMAKE_REQUIRED_FLAGS "-static")
+      endif()
       check_c_source_compiles(
          "${CheckLibAtomicCompiles_CODE}"
          HAVE_LIBATOMIC_COMPILES_STATIC)
