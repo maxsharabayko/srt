@@ -8,6 +8,16 @@
 
 function(ShowProjectConfig)
 
+   set(__ssl_configuration)
+   if (SSL_FOUND OR SSL_LIBRARIES)
+      set(__ssl_configuration
+      "    SSL Configuration:
+      SSL_FOUND=${SSL_FOUND}
+      SSL_INCLUDE_DIRS=${SSL_INCLUDE_DIRS}
+      SSL_LIBRARIES=${SSL_LIBRARIES}
+      SSL_VERSION=${SSL_VERSION}\n")
+   endif()
+
    set(static_property_link_libraries)
    if (srt_libspec_static)
       get_target_property(
@@ -88,14 +98,24 @@ function(ShowProjectConfig)
       "    CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}\n"
       "    CMAKE_C_COMPILER_VERSION: ${CMAKE_C_COMPILER_VERSION}\n"
       "    CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}\n"
+      "    CMAKE_C_FLAGS: '${CMAKE_C_FLAGS}'\n"
       "    CMAKE_C_COMPILE_FEATURES: ${CMAKE_C_COMPILE_FEATURES}\n"
       "    CMAKE_C_STANDARD: ${CMAKE_CXX_STANDARD}\n"
       "    CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}\n"
       "    CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}\n"
       "    CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}\n"
+      "    CMAKE_CXX_FLAGS: '${CMAKE_CXX_FLAGS}'\n"
       "    CMAKE_CXX_COMPILE_FEATURES: ${CMAKE_CXX_COMPILE_FEATURES}\n"
       "    CMAKE_CXX_STANDARD: ${CMAKE_CXX_STANDARD}\n"
       "    CMAKE_LINKER: ${CMAKE_LINKER}\n"
+      #"    CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}\n"
+      #"    CMAKE_EXE_LINKER_FLAGS_INIT: ${CMAKE_EXE_LINKER_FLAGS_INIT}\n"
+      #"    CMAKE_MODULE_LINKER_FLAGS: ${CMAKE_MODULE_LINKER_FLAGS}\n"
+      #"    CMAKE_MODULE_LINKER_FLAGS_INIT: ${CMAKE_MODULE_LINKER_FLAGS_INIT}\n"
+      #"    CMAKE_SHARED_LINKER_FLAGS: ${CMAKE_SHARED_LINKER_FLAGS}\n"
+      #"    CMAKE_SHARED_LINKER_FLAGS_INIT: ${CMAKE_SHARED_LINKER_FLAGS_INIT}\n"
+      #"    CMAKE_STATIC_LINKER_FLAGS: ${CMAKE_STATIC_LINKER_FLAGS}\n"
+      #"    CMAKE_STATIC_LINKER_FLAGS_INIT: ${CMAKE_STATIC_LINKER_FLAGS_INIT}\n"
       "    CMAKE_NM: ${CMAKE_NM}\n"
       "    CMAKE_AR: ${CMAKE_AR}\n"
       "    CMAKE_RANLIB: ${CMAKE_RANLIB}\n"
@@ -125,6 +145,7 @@ function(ShowProjectConfig)
       "    ENABLE_DEBUG: ${ENABLE_DEBUG}\n"
       "    ENABLE_CXX11: ${ENABLE_CXX11}\n"
       "    ENABLE_APPS: ${ENABLE_APPS}\n"
+      "    ENABLE_EXAMPLES: ${ENABLE_EXAMPLES}\n"
       "    ENABLE_EXPERIMENTAL_BONDING: ${ENABLE_EXPERIMENTAL_BONDING}\n"
       "    ENABLE_TESTING: ${ENABLE_TESTING}\n"
       "    ENABLE_PROFILE: ${ENABLE_PROFILE}\n"
@@ -152,11 +173,14 @@ function(ShowProjectConfig)
       "    ATOMIC_USE_SRT_SYNC_MUTEX: ${ATOMIC_USE_SRT_SYNC_MUTEX}\n"
       "  Constructed Configuration:\n"
       "    DISABLE_CXX11: ${DISABLE_CXX11}\n"
+      "    HAVE_INET_PTON: ${HAVE_INET_PTON}\n"
+      "    PTHREAD_LIBRARY: ${PTHREAD_LIBRARY}\n"
       "    USE_ENCLIB: ${USE_ENCLIB}\n"
-      "    ENABLE_EXAMPLES: ${ENABLE_EXAMPLES}\n"
+      "${__ssl_configuration}"
       "    TARGET_srt: ${TARGET_srt}\n"
       "    srt_libspec_static: ${srt_libspec_static}\n"
       "    srt_libspec_shared: ${srt_libspec_shared}\n"
+      "    SRT_LIBS_PRIVATE: ${SRT_LIBS_PRIVATE}\n"
       "    Target Link Libraries:\n"
       "      Static: ${static_property_link_libraries}\n"
       "      Shared: ${shared_property_link_libraries}\n"
