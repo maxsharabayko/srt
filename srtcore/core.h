@@ -866,7 +866,10 @@ private: // Timers
     int32_t m_iReXmitCount;                      // Re-Transmit Count since last ACK
 
 private: // Receiving related data
+    SRT_ATTR_GUARDED_BY(m_RcvBufferLock)
     CRcvBuffer* m_pRcvBuffer;                    //< Receiver buffer
+
+    SRT_ATTR_GUARDED_BY(m_RcvLossLock)
     CRcvLossList* m_pRcvLossList;                //< Receiver loss list
     std::deque<CRcvFreshLoss> m_FreshLoss;       //< Lost sequence already added to m_pRcvLossList, but not yet sent UMSG_LOSSREPORT for.
     int m_iReorderTolerance;                     //< Current value of dynamic reorder tolerance
@@ -965,6 +968,11 @@ private: // Generation and processing of packets
     /// @param size     Sends lite ACK if size is SEND_LITE_ACK, Full ACK otherwise
     ///
     /// @returns the nmber of packets sent.
+
+    /// Reads: m_iRcvLastAckAck, m_PeerID, m_iRcvLastAck, m_iSRTT, m_iRTTVar, m_tdACKInterval, m_iMaxSRTPayloadSize
+    /// Writes: m_iRcvLastAck, m_iRcvLastSkipAck, m_tsLastAckTime, m_iAckSeqNo, m_stats.sentACK, m_stats.sentACKTotal
+    /// Calls: CSndQueue::sendto(..)
+    SRT_ATTR_EXCLUDES(m_RcvLossLock, m_RcvBufferLock, m_RecvLock, m_StatsLock)
     int  sendCtrlAck(CPacket& ctrlpkt, int size);
     void sendLossReport(const std::vector< std::pair<int32_t, int32_t> >& losslist);
 
@@ -1033,7 +1041,10 @@ private: // Generation and processing of packets
     int processConnectRequest(const sockaddr_any& addr, CPacket& packet);
     static void addLossRecord(std::vector<int32_t>& lossrecord, int32_t lo, int32_t hi);
     int32_t bake(const sockaddr_any& addr, int32_t previous_cookie = 0, int correction = 0);
+
+    SRT_ATTR_REQUIRES(m_RcvBufferLock)
     int32_t ackDataUpTo(int32_t seq);
+
     void handleKeepalive(const char* data, size_t lenghth);
 
     /// Locks m_RcvBufferLock and retrieves the available size of the receiver buffer.
