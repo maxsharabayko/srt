@@ -6271,10 +6271,10 @@ int srt::CUDT::receiveBuffer(char *data, int len)
             // make this function return 0, potentially also without breaking
             // the connection and potentially also with losing no ability to
             // send some larger portion of data next time.
-            HLOGC(arlog.Debug, log << "STREAM API, SHUTDOWN: marking as EOF");
+            LOGC(arlog.Error, log << "STREAM API, SHUTDOWN: marking as EOF");
             return 0;
         }
-        HLOGC(arlog.Debug,
+        LOGC(arlog.Error,
               log << (m_config.bMessageAPI ? "MESSAGE" : "STREAM") << " API, " << (m_bShutdown ? "" : "no")
                   << " SHUTDOWN. Reporting as BROKEN.");
         throw CUDTException(MJ_CONNECTION, MN_CONNLOST, 0);
@@ -8931,6 +8931,8 @@ void srt::CUDT::processCtrlShutdown()
     m_bClosing = true;
     m_bBroken = true;
     m_iBrokenCounter = 60;
+
+    LOGC(inlog.Error, log << CONID() << "received SHUTDOWN");
 
     // This does the same as it would happen on connection timeout,
     // just we know about this state prematurely thanks to this message.

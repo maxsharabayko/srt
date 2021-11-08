@@ -1249,6 +1249,12 @@ if (ENABLE_EXAMPLES)
 
 	srt_add_example(recvfile.cpp)
 	srt_make_application(recvfile)
+	
+	srt_add_example(recvfile-epoll.cpp)
+	srt_make_application(recvfile-epoll)
+	
+	srt_add_example(sendfile-epoll.cpp)
+	srt_make_application(sendfile-epoll)
 
 	srt_add_example(recvlive.cpp)
 	srt_make_application(recvlive)
