@@ -17,6 +17,35 @@
 
 using namespace std;
 
+const char* srt_sockstatus_str(SRT_SOCKSTATUS status)
+{
+    switch (status)
+    {
+    case SRTS_INIT:
+        return "INIT";
+    case SRTS_OPENED:
+        return "OPENED";
+    case SRTS_LISTENING:
+        return "LISTENING";
+    case SRTS_CONNECTING:
+        return "CONNECTING";
+    case SRTS_CONNECTED:
+        return "CONNECTED";
+    case SRTS_BROKEN:
+        return "BROKEN";
+    case SRTS_CLOSING:
+        return "CLOSING";
+    case SRTS_CLOSED:
+        return "CLOSED";
+    case SRTS_NONEXIST:
+        return "NONEXIST";
+    default:
+        break;
+    }
+
+    return "INVALID_STATE";
+}
+
 int connect_using_epoll(SRTSOCKET sock, const struct sockaddr* sa, size_t sa_len)
 {
     // TODO: Check RCVSYN and SNDSYN
@@ -125,7 +154,7 @@ int main(int argc, char* argv[])
     }
 
     const int pollid = srt_epoll_create();
-    if (pollid)
+    if (pollid == SRT_ERROR)
     {
         fprintf(stderr, "srt_epoll_create: %s\n", srt_getlasterror_str());
         return 1;
@@ -146,21 +175,22 @@ int main(int argc, char* argv[])
         SRTSOCKET read[2], write[2];
         int rlen = 2, wlen = 2;
 
+        const int ms_to_wait = -1; // infinitely
         const int epoll_res = srt_epoll_wait(pollid, read, &rlen,
             write, &wlen,
-            500, // ms
+            ms_to_wait,
             0, 0, 0, 0);
 
         if (epoll_res == SRT_ERROR)
         {
-            fprintf(stderr, "srt_epoll_wait: %s\n", srt_getlasterror_str());
+            fprintf(stderr, "srt_epoll_wait: %s, socket status %s\n", srt_getlasterror_str(), srt_sockstatus_str(srt_getsockstate(client_sock)));
             break;
         }
 
         // Handle error notification
         if (rlen > 0 && wlen > 0)
         {
-            fprintf(stderr, "srt_epoll_wait: socket status %d\n", srt_getsockstate(read[0]));
+            fprintf(stderr, "srt_epoll_wait: socket status %s\n", srt_sockstatus_str(srt_getsockstate(read[0])));
             //break;
         }
 
@@ -177,7 +207,8 @@ int main(int argc, char* argv[])
             if (n == -1)
             {
                 if (srt_getlasterror(nullptr) != SRT_EASYNCRCV || num_reads == 0)
-                    std::cerr << "srt_recv error: " << srt_getlasterror_str() << ". Reads: " << num_reads << "\n";
+                    std::cerr << "srt_recv error: " << srt_getlasterror_str() << ". Reads: "
+                              << num_reads << ", socket state: " << srt_sockstatus_str(srt_getsockstate(read[0])) << "\n";
                 break;
             }
 

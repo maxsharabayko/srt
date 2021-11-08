@@ -911,6 +911,20 @@ string CRcvBufferNew::strFullnessState(int iFirstUnackSeqNo, const time_point& t
     return ss.str();
 }
 
+std::string CRcvBufferNew::strBufferState() const
+{
+    stringstream ss;
+
+    ss << "[RCVBUF] iStartSeqNo " << m_iStartSeqNo
+        << ", iStartPos " << m_iStartPos
+        << ", iFirstNonreadPos " << m_iFirstNonreadPos
+        << ", iMaxPosInc " << m_iMaxPosInc
+        << ", iNotch " << m_iNotch
+        << ", numOutOfOrderPackets " << m_numOutOfOrderPackets
+        << "\n";
+    return ss.str();
+}
+
 CRcvBufferNew::time_point CRcvBufferNew::getPktTsbPdTime(uint32_t usPktTimestamp) const
 {
     return m_tsbpd.getPktTsbPdTime(usPktTimestamp);

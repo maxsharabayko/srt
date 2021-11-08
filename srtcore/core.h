@@ -698,7 +698,7 @@ private:
     }
 
     SRT_ATTR_EXCLUDES(m_RcvBufferLock)
-    bool isRcvBufferReady() const;
+    bool isRcvBufferReady(bool print_state = false) const;
 
     // TSBPD thread main function.
     static void* tsbpd(void* param);

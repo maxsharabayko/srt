@@ -6286,33 +6286,32 @@ int srt::CUDT::receiveBuffer(char *data, int len)
     {
         if (!m_config.bSynRecving)
         {
+            LOGC(arlog.Error, log << "receiveBuffer not ready. " << m_pRcvBuffer->strBufferState());
             throw CUDTException(MJ_AGAIN, MN_RDAVAIL, 0);
+        }
+
+        // Kick TsbPd thread to schedule next wakeup (if running)
+        if (m_config.iRcvTimeOut < 0)
+        {
+            THREAD_PAUSED();
+            while (stillConnected() && !isRcvBufferReady())
+            {
+                // Do not block forever, check connection status each 1 sec.
+                rcond.wait_for(seconds_from(1));
+            }
+            THREAD_RESUMED();
         }
         else
         {
-            /* Kick TsbPd thread to schedule next wakeup (if running) */
-            if (m_config.iRcvTimeOut < 0)
+            const steady_clock::time_point exptime =
+                steady_clock::now() + milliseconds_from(m_config.iRcvTimeOut);
+            THREAD_PAUSED();
+            while (stillConnected() && !isRcvBufferReady())
             {
-                THREAD_PAUSED();
-                while (stillConnected() && !isRcvBufferReady())
-                {
-                    // Do not block forever, check connection status each 1 sec.
-                    rcond.wait_for(seconds_from(1));
-                }
-                THREAD_RESUMED();
+                if (!rcond.wait_until(exptime)) // NOT means "not received a signal"
+                    break; // timeout
             }
-            else
-            {
-                const steady_clock::time_point exptime =
-                    steady_clock::now() + milliseconds_from(m_config.iRcvTimeOut);
-                THREAD_PAUSED();
-                while (stillConnected() && !isRcvBufferReady())
-                {
-                    if (!rcond.wait_until(exptime)) // NOT means "not received a signal"
-                        break; // timeout
-                }
-                THREAD_RESUMED();
-            }
+            THREAD_RESUMED();
         }
     }
 
@@ -6352,6 +6351,7 @@ int srt::CUDT::receiveBuffer(char *data, int len)
 
     if (!isRcvBufferReady())
     {
+        LOGC(arlog.Error, log << "receiveBuffer after read not ready. " << m_pRcvBuffer->strBufferState());
         // read is not available any more
         uglobal().m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_IN, false);
     }
@@ -6820,10 +6820,12 @@ size_t srt::CUDT::getAvailRcvBufferSizeNoLock() const
 #endif
 }
 
-bool srt::CUDT::isRcvBufferReady() const
+bool srt::CUDT::isRcvBufferReady(bool print_state) const
 {
     ScopedLock lck(m_RcvBufferLock);
 #if ENABLE_NEW_RCVBUFFER
+    if (print_state)
+        LOGC(xtlog.Error, log  << "isRcvBufferReady: " << m_pRcvBuffer->strBufferState());
     return m_pRcvBuffer->isRcvDataReady(steady_clock::now());
 #else
     return m_pRcvBuffer->isRcvDataReady();
@@ -8066,23 +8068,32 @@ int srt::CUDT::sendCtrlAck(CPacket& ctrlpkt, int size)
             {
                 UniqueLock rdlock (m_RecvLock);
                 CSync      rdcond (m_RecvDataCond, rdlock);
-                if (m_config.bSynRecving)
+
+#if ENABLE_NEW_RCVBUFFER
+                // Locks m_RcvBufferLock, which is unlocked above by InvertedLock un_bufflock.
+                // Must check read-readiness under m_RecvLock protect epoll event from changes in readBuffer()
+                if (isRcvBufferReady(true))
+#endif
                 {
-                    // signal a waiting "recv" call if there is any data available
-                    rdcond.signal_locked(rdlock);
+                    if (m_config.bSynRecving)
+                    {
+                        // signal a waiting "recv" call if there is any data available
+                        rdcond.signal_locked(rdlock);
+                    }
+                    LOGC(xtlog.Error, log << "sendCtrl(UMSG_ACK): read ready up to %" << ack << ". " << m_pRcvBuffer->strBufferState());
+                    // acknowledge any waiting epolls to read
+                    // fix SRT_EPOLL_IN event loss but rcvbuffer still have data：
+                    // 1. user call receive/receivemessage(about line number:6482)
+                    // 2. after read/receive, if rcvbuffer is empty, will set SRT_EPOLL_IN event to false
+                    // 3. but if we do not do some lock work here, will cause some sync problems between threads:
+                    //      (1) user thread: call receive/receivemessage
+                    //      (2) user thread: read data
+                    //      (3) user thread: no data in rcvbuffer, set SRT_EPOLL_IN event to false
+                    //      (4) receive thread: receive data and set SRT_EPOLL_IN to true
+                    //      (5) user thread: set SRT_EPOLL_IN to false
+                    // 4. so , m_RecvLock must be used here to protect epoll event
+                    uglobal().m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_IN, true);
                 }
-                // acknowledge any waiting epolls to read
-                // fix SRT_EPOLL_IN event loss but rcvbuffer still have data：
-                // 1. user call receive/receivemessage(about line number:6482)
-                // 2. after read/receive, if rcvbuffer is empty, will set SRT_EPOLL_IN event to false
-                // 3. but if we do not do some lock work here, will cause some sync problems between threads:
-                //      (1) user thread: call receive/receivemessage
-                //      (2) user thread: read data
-                //      (3) user thread: no data in rcvbuffer, set SRT_EPOLL_IN event to false
-                //      (4) receive thread: receive data and set SRT_EPOLL_IN to true
-                //      (5) user thread: set SRT_EPOLL_IN to false
-                // 4. so , m_RecvLock must be used here to protect epoll event
-                uglobal().m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_IN, true);
             }
 #if ENABLE_EXPERIMENTAL_BONDING
             if (m_parent->m_GroupOf)
