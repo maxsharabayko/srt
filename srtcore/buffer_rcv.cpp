@@ -28,7 +28,7 @@ namespace {
         stringstream ss;
     };
 
-#define IF_RCVBUF_DEBUG(instr) (void)0
+#define IF_RCVBUF_DEBUG(instr) instr
 
     // Check if iFirstNonreadPos is in range [iStartPos, (iStartPos + iMaxPosInc) % iSize].
     // The right edge is included because we expect iFirstNonreadPos to be
@@ -110,7 +110,7 @@ int CRcvBufferNew::insert(CUnit* unit)
     const int     offset = CSeqNo::seqoff(m_iStartSeqNo, seqno);
 
     IF_RCVBUF_DEBUG(ScopedLog scoped_log);
-    IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::insert: seqno " << seqno << " m_iStartSeqNo " << m_iStartSeqNo << " offset " << offset);
+    IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::insert: seqno " << seqno << " msgno " << unit->m_Packet.getMsgSeq(m_bPeerRexmitFlag) << " m_iStartSeqNo " << m_iStartSeqNo << " offset " << offset);
 
     if (offset < 0)
     {
@@ -288,10 +288,10 @@ int CRcvBufferNew::readMessage(char* data, size_t len, SRT_MSGCTRL* msgctrl)
         return 0;
     }
 
-    IF_RCVBUF_DEBUG(ScopedLog scoped_log);
-    IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::readMessage. m_iStartSeqNo " << m_iStartSeqNo);
-
     const int readPos = canReadInOrder ? m_iStartPos : m_iFirstReadableOutOfOrder;
+
+    IF_RCVBUF_DEBUG(ScopedLog scoped_log);
+    IF_RCVBUF_DEBUG(scoped_log.ss << "CRcvBufferNew::readMessage. m_iStartSeqNo " << m_iStartSeqNo << " m_iStartPos " << m_iStartPos << " readPos " << readPos);
 
     size_t remain = len;
     char* dst = data;
@@ -380,6 +380,8 @@ int CRcvBufferNew::readMessage(char* data, size_t len, SRT_MSGCTRL* msgctrl)
     {
         LOGC(rbuflog.Error, log << "readMessage: small dst buffer, copied only " << bytes_read << "/" << bytes_extracted << " bytes.");
     }
+
+    IF_RCVBUF_DEBUG(scoped_log.ss << " pldi64 " << *reinterpret_cast<uint64_t*>(data));
 
     return bytes_read;
 }
