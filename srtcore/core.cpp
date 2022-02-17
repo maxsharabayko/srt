@@ -8819,7 +8819,7 @@ void srt::CUDT::processCtrlDropReq(const CPacket& ctrlpkt)
             if (iDropCnt > 0)
             {
                 LOGC(brlog.Warn, log << CONID() << "RCV-DROPPED " << iDropCnt << " packet(s), seqno range %"
-                    << dropdata[0] << "-" << dropdata[1] << ", msgno " << ctrlpkt.getMsgSeq(using_rexmit_flag)
+                    << dropdata[0] << "-%" << dropdata[1] << ", msgno " << ctrlpkt.getMsgSeq(using_rexmit_flag)
                     << " (SND DROP REQUEST).");
 
                 enterCS(m_StatsLock);

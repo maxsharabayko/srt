@@ -263,8 +263,8 @@ int CRcvBufferNew::dropMessage(int32_t seqnolo, int32_t seqnohi, int32_t msgno)
     {
         // Don't drop messages, if all its packets are in the buffer.
         // TODO: Don't drop a several-packet message if all packets are in the buffer.
-        //if (m_entries[i].pUnit && m_entries[i].pUnit->m_Packet.getMsgBoundary() == PacketBoundary::PB_SOLO)
-        //    continue;
+        if (m_entries[i].pUnit && m_entries[i].pUnit->m_Packet.getMsgBoundary() == PacketBoundary::PB_SOLO)
+            continue;
 
         dropUnitInPos(i);
         ++iDropCnt;
