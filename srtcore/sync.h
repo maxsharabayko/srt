@@ -91,9 +91,13 @@ public:
     {
     }
 
+    Duration(const Duration& other)
+        : m_duration(other.m_duration)
+    {
+    }
+
 public:
     inline int64_t count() const { return m_duration; }
-
     static Duration zero() { return Duration(); }
 
 public: // Relational operators
@@ -108,6 +112,7 @@ public: // Assignment operators
     inline void operator*=(const int64_t mult) { m_duration = static_cast<int64_t>(m_duration * mult); }
     inline void operator+=(const Duration& rhs) { m_duration += rhs.m_duration; }
     inline void operator-=(const Duration& rhs) { m_duration -= rhs.m_duration; }
+    inline void operator=(const Duration& rhs) { m_duration = rhs.m_duration; }
 
     inline Duration operator+(const Duration& rhs) const { return Duration(m_duration + rhs.m_duration); }
     inline Duration operator-(const Duration& rhs) const { return Duration(m_duration - rhs.m_duration); }
@@ -226,7 +231,7 @@ srt::sync::Duration<srt::sync::steady_clock> srt::sync::TimePoint<srt::sync::ste
 
 inline Duration<steady_clock> operator*(const int& lhs, const Duration<steady_clock>& rhs)
 {
-    return rhs * lhs;
+    return Duration<steady_clock>(rhs * lhs);
 }
 
 #endif // ENABLE_STDCXX_SYNC

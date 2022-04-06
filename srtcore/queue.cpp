@@ -456,6 +456,185 @@ void srt::CSndUList::remove_(const CUDT* u)
         m_pTimer->interrupt();
 }
 
+#define SRT_DEBUG_TRACE_SND_QUEUE 1
+#if SRT_DEBUG_TRACE_SND_QUEUE
+using namespace srt::sync;
+class sndqueue_logger
+{
+    typedef srt::sync::steady_clock steady_clock;
+public:
+    sndqueue_logger()
+    {
+    }
+
+    ~sndqueue_logger()
+    {
+        ScopedLock lck(m_mtx);
+        m_fout.close();
+    }
+
+    /// @param sleep_delta SND inaccuracy: the actual time of sending minus expected sending time.
+    void record_snd_accuracy(const steady_clock::duration& snd_accuracy)
+    {
+        ScopedLock lck(m_mtx);
+        m_snd_accuracy.record(count_microseconds(snd_accuracy));
+    }
+
+    /// @param sleep_duration_actual the actual sleep duration.
+    /// @param sleep_delta sleep inaccuracy, oversleep: the actual sleep duration minus target sleep duration.
+    void record_sleep_accuracy(const steady_clock::duration& sleep_duration_actual,
+                               const steady_clock::duration& sleep_delta)
+    {
+        ScopedLock lck(m_mtx);
+        m_sleep_duration.record(count_microseconds(sleep_duration_actual));
+        m_sleep_accuracy.record(count_microseconds(sleep_delta));
+    }
+
+    /// @param wait_duration_actual the time spent in waiting for something to come into the queue.
+    void record_wait_nonempty(const steady_clock::duration& wait_duration_actual)
+    {
+        ScopedLock lck(m_mtx);
+        m_wait_nonempty.record(count_microseconds(wait_duration_actual));
+    }
+
+    /// @param duration the time spent inside the CUDT::packData function.
+    void record_pack_data(const steady_clock::duration& duration)
+    {
+        ScopedLock lck(m_mtx);
+        m_pack_data.record(count_microseconds(duration));
+    }
+
+    void trace()
+    {
+        ScopedLock lck(m_mtx);
+        create_file();
+
+        steady_clock::time_point tnow = steady_clock::now();
+        if (tnow < m_next_time)
+            return;
+
+        m_next_time = tnow + m_trace_interval;
+
+        std::string str_tnow_sys = srt::sync::FormatTimeSys(tnow);
+        str_tnow_sys.resize(str_tnow_sys.size() - 7); // remove trailing ' [SYST]' part
+
+        m_fout << str_tnow_sys << ",";
+        m_fout << count_microseconds(tnow - m_start_time) << ',';
+
+        m_fout << m_snd_accuracy.valMin << ",";
+        m_fout << m_snd_accuracy.valMax << ",";
+        m_fout << m_snd_accuracy.valAvgRma << ",";
+        m_fout << m_snd_accuracy.valTotalSum << ",";
+        m_fout << m_sleep_duration.valMin << ",";
+        m_fout << m_sleep_duration.valMax << ",";
+        m_fout << m_sleep_duration.valAvgRma << ",";
+        m_fout << m_sleep_duration.valTotalSum << ",";
+        m_fout << m_sleep_accuracy.valMin << ",";
+        m_fout << m_sleep_accuracy.valMax << ",";
+        m_fout << m_sleep_accuracy.valAvgRma << ",";
+        m_fout << m_sleep_accuracy.valTotalSum << ",";
+        m_fout << m_wait_nonempty.valMin << ",";
+        m_fout << m_wait_nonempty.valMax << ",";
+        m_fout << m_wait_nonempty.valAvgRma << ",";
+        m_fout << m_wait_nonempty.valTotalSum << ",";
+        m_fout << m_pack_data.valMin << ",";
+        m_fout << m_pack_data.valMax << ",";
+        m_fout << m_pack_data.valAvgRma << ',';
+        m_fout << m_pack_data.valTotalSum << '\n';
+        m_fout.flush();
+
+        m_sleep_duration.reset();
+        m_sleep_accuracy.reset();
+        m_wait_nonempty.reset();
+        m_pack_data.reset();
+    }
+
+private:
+    void print_header()
+    {
+        m_fout << "Timepoint,usElapsedStd,";
+        m_fout << "usSndAccuracyMin,usSndAccuracyMax,usSndAccuracyRma,usSndAccuracyTotal,";
+        m_fout << "usSleepDurationMin,usSleepDurationMax,usSleepDurationRma,usSleepDurationTotal,";
+        m_fout << "usSleepAccuracyMin,usSleepAccuracyMax,usSleepAccuracyRma,usSleepAccuracyTotal,";
+        m_fout << "usWaitNonEmptyMin,usWaitNonEmptyyMax,usWaitNonEmptyRma,usWaitNonEmptyTotal,";
+        m_fout << "usPackDataMin,usPackDataMax,usPackDataRma,usPackDataTotal\n";
+    }
+
+    void create_file()
+    {
+        if (m_fout.is_open())
+            return;
+
+        m_trace_interval    = seconds_from(5);
+        m_start_time         = srt::sync::steady_clock::now();
+        m_next_time          = m_start_time + m_trace_interval;
+        std::string str_tnow = srt::sync::FormatTimeSys(m_start_time);
+        str_tnow.resize(str_tnow.size() - 7); // remove trailing ' [SYST]' part
+        while (str_tnow.find(':') != std::string::npos)
+        {
+            str_tnow.replace(str_tnow.find(':'), 1, 1, '_');
+        }
+        const std::string fname = "sndqueue_trace_" + str_tnow + ".csv";
+        m_fout.open(fname, std::ofstream::out);
+        if (!m_fout)
+            std::cerr << "IPE: Failed to open " << fname << "!!!\n";
+
+        print_header();
+    }
+
+private:
+    struct MinMaxAvg
+    {
+        MinMaxAvg()
+        {
+            reset();
+        }
+
+        void record(int64_t val)
+        {
+            if (val < valMin)
+                valMin = val;
+            if (val > valMax)
+                valMax = val;
+
+            valAvgRma = avg_iir<8>(valAvgRma, val);
+            valTotalSum += val;
+            ++count;
+        }
+
+        void reset()
+        {
+            valMin = INT64_MAX;
+            valMax = INT64_MIN;
+            valAvgRma = 0;
+            valTotalSum = 0;
+            count = 0;
+        }
+
+        int64_t valMin;
+        int64_t valMax;
+        int64_t valAvgRma;
+        int64_t valTotalSum;
+        int count;
+    };
+
+    srt::sync::Mutex                    m_mtx;
+    std::ofstream                       m_fout;
+    srt::sync::steady_clock::time_point m_start_time;
+    srt::sync::steady_clock::time_point m_next_time;
+    steady_clock::duration        m_trace_interval;
+
+    MinMaxAvg m_sleep_duration;
+    MinMaxAvg m_sleep_accuracy;
+    MinMaxAvg m_wait_nonempty;
+    MinMaxAvg m_snd_accuracy;
+    MinMaxAvg m_pack_data;
+};
+
+sndqueue_logger g_sndqueue_logger;
+
+#endif // SRT_DEBUG_TRACE_SND_QUEUE
+
 //
 srt::CSndQueue::CSndQueue()
     : m_pSndUList(NULL)
@@ -567,7 +746,10 @@ void* srt::CSndQueue::worker(void* param)
             THREAD_PAUSED();
             if (!self->m_bClosing)
             {
+                const steady_clock::time_point waitStart = steady_clock::now();
                 self->m_pSndUList->waitNonEmpty();
+                const steady_clock::time_point waitStop = steady_clock::now();
+                g_sndqueue_logger.record_wait_nonempty(waitStop - waitStart);
 
 #if defined(SRT_DEBUG_SNDQ_HIGHRATE)
                 self->m_WorkerStats.lCondWait++;
@@ -600,7 +782,11 @@ void* srt::CSndQueue::worker(void* param)
         THREAD_PAUSED();
         if (currtime < next_time)
         {
+            const steady_clock::time_point sleepStart = steady_clock::now();
             self->m_pTimer->sleep_until(next_time);
+            const steady_clock::time_point sleepStop = steady_clock::now();
+            // TODO: Collect sleep time and inaccuracy.
+            g_sndqueue_logger.record_sleep_accuracy(sleepStop - sleepStart, sleepStop - next_time);
 
 #if defined(HAI_DEBUG_SNDQ_HIGHRATE)
             self->m_WorkerStats.lSleepTo++;
@@ -634,8 +820,13 @@ void* srt::CSndQueue::worker(void* param)
         }
 
         // pack a packet from the socket
+        //const steady_clock::time_point expectedNextSndTime = u->m_tsNextSendTime;
+        const steady_clock::time_point packStart = steady_clock::now();
         CPacket pkt;
         const std::pair<bool, steady_clock::time_point> res_time = u->packData((pkt));
+        const steady_clock::time_point packStop = steady_clock::now();
+        g_sndqueue_logger.record_pack_data(packStop - packStart);
+        g_sndqueue_logger.record_snd_accuracy(packStart - next_time);
 
         // Check if payload size is invalid.
         if (res_time.first == false)
@@ -653,6 +844,8 @@ void* srt::CSndQueue::worker(void* param)
 
         HLOGC(qslog.Debug, log << self->CONID() << "chn:SENDING: " << pkt.Info());
         self->m_pChannel->sendto(addr, pkt);
+
+        g_sndqueue_logger.trace();
 
 #if defined(SRT_DEBUG_SNDQ_HIGHRATE)
         self->m_WorkerStats.lSendTo++;
