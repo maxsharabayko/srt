@@ -10748,8 +10748,6 @@ int srt::CUDT::processConnectRequest(const sockaddr_any& addr, CPacket& packet)
         HLOGC(cnlog.Debug, log << "processConnectRequest: ... NOT. Rejecting because broken.");
         return m_RejectReason;
     }
-    size_t exp_len =
-        CHandShake::m_iContentSize; // When CHandShake::m_iContentSize is used in log, the file fails to link!
 
     // NOTE!!! Old version of SRT code checks if the size of the HS packet
     // is EQUAL to the above CHandShake::m_iContentSize.
@@ -10757,11 +10755,11 @@ int srt::CUDT::processConnectRequest(const sockaddr_any& addr, CPacket& packet)
     // Changed to < exp_len because we actually need that the packet
     // be at least of a size for handshake, although it may contain
     // more data, depending on what's inside.
-    if (packet.getLength() < exp_len)
+    if (packet.getLength() < CHandShake::m_iContentSize)
     {
         m_RejectReason = SRT_REJ_ROGUE;
         HLOGC(cnlog.Debug,
-              log << "processConnectRequest: ... NOT. Wrong size: " << packet.getLength() << " (expected: " << exp_len
+              log << "processConnectRequest: ... NOT. Wrong size: " << packet.getLength() << " (expected: " << CHandShake::m_iContentSize
                   << ")");
         return m_RejectReason;
     }
