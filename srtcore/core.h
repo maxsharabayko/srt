@@ -1072,7 +1072,7 @@ private: // Generation and processing of packets
     ///         If is_payload_valid is false, there was nothing packed for sending,
     ///         and the timestamp value should be ignored.
     ///         The timestamp is the full source/origin timestamp of the data.
-    std::pair<bool, time_point> packData(CPacket& packet);
+    std::pair<bool, time_point> packData(CPacket& packet, time_point& origintime);
 
     int processData(CUnit* unit);
     void processClose();

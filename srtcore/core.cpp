@@ -9338,11 +9338,10 @@ bool srt::CUDT::isRetransmissionAllowed(const time_point& tnow SRT_ATR_UNUSED)
     return true;
 }
 
-std::pair<bool, steady_clock::time_point> srt::CUDT::packData(CPacket& w_packet)
+std::pair<bool, steady_clock::time_point> srt::CUDT::packData(CPacket& w_packet, steady_clock::time_point& origintime)
 {
     int payload = 0;
     bool probe = false;
-    steady_clock::time_point origintime;
     bool new_packet_packed = false;
     bool filter_ctl_pkt = false;
 

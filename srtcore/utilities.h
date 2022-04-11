@@ -1025,14 +1025,14 @@ inline size_t safe_advance(It& it, size_t num, It end)
 template <class V, size_t N> inline
 ATR_CONSTEXPR size_t Size(const V (&)[N]) ATR_NOEXCEPT { return N; }
 
-template <size_t DEPRLEN, typename ValueType>
+template <int64_t DEPRLEN, typename ValueType>
 inline ValueType avg_iir(ValueType old_value, ValueType new_value)
 {
     return (old_value * (DEPRLEN - 1) + new_value) / DEPRLEN;
 }
 
-template <size_t DEPRLEN, typename ValueType>
-inline ValueType avg_iir_w(ValueType old_value, ValueType new_value, size_t new_val_weight)
+template <int64_t DEPRLEN, typename ValueType>
+inline ValueType avg_iir_w(ValueType old_value, ValueType new_value, int64_t new_val_weight)
 {
     return (old_value * (DEPRLEN - new_val_weight) + new_value * new_val_weight) / DEPRLEN;
 }

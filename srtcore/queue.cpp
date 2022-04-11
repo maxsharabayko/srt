@@ -504,6 +504,21 @@ public:
         m_pack_data.record(count_microseconds(duration));
     }
 
+    /// @param delta the time diff between packet send time and packet origin time (including retransmissions).
+    void record_snd_ts_delay(const steady_clock::duration& delta)
+    {
+        ScopedLock lck(m_mtx);
+        m_snd_timestamp_delay.record(count_microseconds(delta));
+    }
+
+    /// @param diff tracking CUDT::m_tdSndTimeDiff.
+    void record_snd_time_diff(const steady_clock::duration& diff)
+    {
+        ScopedLock lck(m_mtx);
+        m_snd_time_diff.record(count_microseconds(diff));
+        //std::cout << count_microseconds(diff) << '\n';
+    }
+
     void trace()
     {
         ScopedLock lck(m_mtx);
@@ -540,13 +555,24 @@ public:
         m_fout << m_pack_data.valMin << ",";
         m_fout << m_pack_data.valMax << ",";
         m_fout << m_pack_data.valAvgRma << ',';
-        m_fout << m_pack_data.valTotalSum << '\n';
+        m_fout << m_pack_data.valTotalSum << ',';
+        m_fout << m_snd_time_diff.valMin << ",";
+        m_fout << m_snd_time_diff.valMax << ",";
+        m_fout << m_snd_time_diff.valAvgRma << ',';
+        m_fout << m_snd_time_diff.valTotalSum << ',';
+        m_fout << m_snd_timestamp_delay.valMin << ',';
+        m_fout << m_snd_timestamp_delay.valMax << ',';
+        m_fout << m_snd_timestamp_delay.valAvgRma << ',';
+        m_fout << m_snd_timestamp_delay.valTotalSum << '\n';
         m_fout.flush();
 
+        m_snd_accuracy.reset();
         m_sleep_duration.reset();
         m_sleep_accuracy.reset();
         m_wait_nonempty.reset();
         m_pack_data.reset();
+        m_snd_timestamp_delay.reset();
+        m_snd_time_diff.reset();
     }
 
 private:
@@ -556,8 +582,10 @@ private:
         m_fout << "usSndAccuracyMin,usSndAccuracyMax,usSndAccuracyRma,usSndAccuracyTotal,";
         m_fout << "usSleepDurationMin,usSleepDurationMax,usSleepDurationRma,usSleepDurationTotal,";
         m_fout << "usSleepAccuracyMin,usSleepAccuracyMax,usSleepAccuracyRma,usSleepAccuracyTotal,";
-        m_fout << "usWaitNonEmptyMin,usWaitNonEmptyyMax,usWaitNonEmptyRma,usWaitNonEmptyTotal,";
-        m_fout << "usPackDataMin,usPackDataMax,usPackDataRma,usPackDataTotal\n";
+        m_fout << "usWaitNonEmptyMin,usWaitNonEmptyMax,usWaitNonEmptyRma,usWaitNonEmptyTotal,";
+        m_fout << "usPackDataMin,usPackDataMax,usPackDataRma,usPackDataTotal,";
+        m_fout << "usSndTimeDiffMin,usSndTimeDiffMax,usSndTimeDiffRma,usSndTimeDiffTotal,";
+        m_fout << "usSndTSDelayMin,usSndTSDelayMax,usSndTSDelayRma,usSndTSDelayTotal\n";
     }
 
     void create_file()
@@ -565,7 +593,7 @@ private:
         if (m_fout.is_open())
             return;
 
-        m_trace_interval    = seconds_from(5);
+        m_trace_interval     = seconds_from(5);
         m_start_time         = srt::sync::steady_clock::now();
         m_next_time          = m_start_time + m_trace_interval;
         std::string str_tnow = srt::sync::FormatTimeSys(m_start_time);
@@ -628,6 +656,8 @@ private:
     MinMaxAvg m_sleep_accuracy;
     MinMaxAvg m_wait_nonempty;
     MinMaxAvg m_snd_accuracy;
+    MinMaxAvg m_snd_timestamp_delay;
+    MinMaxAvg m_snd_time_diff;
     MinMaxAvg m_pack_data;
 };
 
@@ -823,10 +853,9 @@ void* srt::CSndQueue::worker(void* param)
         //const steady_clock::time_point expectedNextSndTime = u->m_tsNextSendTime;
         const steady_clock::time_point packStart = steady_clock::now();
         CPacket pkt;
-        const std::pair<bool, steady_clock::time_point> res_time = u->packData((pkt));
+        steady_clock::time_point origintime;
+        const std::pair<bool, steady_clock::time_point> res_time = u->packData((pkt), origintime);
         const steady_clock::time_point packStop = steady_clock::now();
-        g_sndqueue_logger.record_pack_data(packStop - packStart);
-        g_sndqueue_logger.record_snd_accuracy(packStart - next_time);
 
         // Check if payload size is invalid.
         if (res_time.first == false)
@@ -845,6 +874,10 @@ void* srt::CSndQueue::worker(void* param)
         HLOGC(qslog.Debug, log << self->CONID() << "chn:SENDING: " << pkt.Info());
         self->m_pChannel->sendto(addr, pkt);
 
+        g_sndqueue_logger.record_snd_ts_delay(steady_clock::now() - origintime);
+        g_sndqueue_logger.record_pack_data(packStop - packStart);
+        g_sndqueue_logger.record_snd_accuracy(packStart - next_time);
+        g_sndqueue_logger.record_snd_time_diff(u->m_tdSendTimeDiff.load());
         g_sndqueue_logger.trace();
 
 #if defined(SRT_DEBUG_SNDQ_HIGHRATE)
