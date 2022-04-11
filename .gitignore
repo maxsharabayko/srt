@@ -40,6 +40,8 @@ _*/
 
 # Ignore vcpkg submodule
 vcpkg/
+venv/
+.venv/
 
 # LSP
 compile_commands.json
