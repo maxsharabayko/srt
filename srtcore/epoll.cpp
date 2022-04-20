@@ -634,54 +634,6 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
 
             if ((lrfds || lwfds) && !ed.m_sLocals.empty())
             {
-#ifdef LINUX
-                const int max_events = ed.m_sLocals.size();
-                SRT_ASSERT(max_events > 0);
-                epoll_event ev[max_events];
-                int nfds = ::epoll_wait(ed.m_iLocalID, ev, max_events, 0);
-
-                IF_HEAVY_LOGGING(const int prev_total = total);
-                for (int i = 0; i < nfds; ++ i)
-                {
-                    if ((NULL != lrfds) && (ev[i].events & EPOLLIN))
-                    {
-                        lrfds->insert(ev[i].data.fd);
-                        ++ total;
-                    }
-                    if ((NULL != lwfds) && (ev[i].events & EPOLLOUT))
-                    {
-                        lwfds->insert(ev[i].data.fd);
-                        ++ total;
-                    }
-                }
-                HLOGC(ealog.Debug, log << "CEPoll::wait: LINUX: picking up " << (total - prev_total)  << " ready fds.");
-
-#elif defined(BSD) || TARGET_OS_MAC
-                struct timespec tmout = {0, 0};
-                const int max_events = ed.m_sLocals.size();
-                SRT_ASSERT(max_events > 0);
-                struct kevent ke[max_events];
-
-                int nfds = kevent(ed.m_iLocalID, NULL, 0, ke, max_events, &tmout);
-                IF_HEAVY_LOGGING(const int prev_total = total);
-
-                for (int i = 0; i < nfds; ++ i)
-                {
-                    if ((NULL != lrfds) && (ke[i].filter == EVFILT_READ))
-                    {
-                        lrfds->insert(ke[i].ident);
-                        ++ total;
-                    }
-                    if ((NULL != lwfds) && (ke[i].filter == EVFILT_WRITE))
-                    {
-                        lwfds->insert(ke[i].ident);
-                        ++ total;
-                    }
-                }
-
-                HLOGC(ealog.Debug, log << "CEPoll::wait: Darwin/BSD: picking up " << (total - prev_total)  << " ready fds.");
-
-#else
                 //currently "select" is used for all non-Linux platforms.
                 //faster approaches can be applied for specific systems in the future.
 
@@ -725,7 +677,6 @@ int CEPoll::wait(const int eid, set<SRTSOCKET>* readfds, set<SRTSOCKET>* writefd
                 }
 
                 HLOGC(ealog.Debug, log << "CEPoll::wait: select(otherSYS): picking up " << (total - prev_total)  << " ready fds.");
-#endif
             }
 
         } // END-LOCK: m_EPollLock
