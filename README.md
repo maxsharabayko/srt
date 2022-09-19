@@ -1,6 +1,6 @@
 # Secure Reliable Transport (SRT) Protocol
 
-[About SRT](#what-is-srt) | [Features](#features) | [Getting Started](#getting-started-with-srt) | [Builds](#build-instructions) | [Sample Apps and Tools](#sample-applications-and-tools) | [Contribute](#contributing) | [License](#license) | [Releases](#release-history)
+[About SRT](#what-is-srt) | [Features](#features) | [Getting Started](#getting-started-with-srt) | [Build Instructions](#build-instructions) | [Sample Apps and Tools](#sample-applications-and-tools) | [Contribute](#contributing) | [License](#license) | [Releases](#release-history)
 
 <p align="left">
   <a href="http://srtalliance.org/">
@@ -29,7 +29,7 @@ SRT is applied to contribution and distribution endpoints as part of a video str
 | **R**eliable  | Recovers from severe packet loss                  |
 | **T**ransport | Dynamically adapts to changing network conditions |
 
-In live streaming configurations, the SRT protocol maintains a constant end-to-end latency. This allows the live stream’s signal characteristics to be recreated on the receiver side, reducing the need for buffering. As packets are streamed from source to destination, SRT detects and adapts to real-time network conditions between the two endpoints. It helps compensate for jitter and bandwidth fluctuations due to congestion over noisy networks.
+In live streaming configurations, the SRT protocol maintains a constant end-to-end latency. This allows the live stream's signal characteristics to be recreated on the receiver side, reducing the need for buffering. As packets are streamed from source to destination, SRT detects and adapts to real-time network conditions between the two endpoints. It helps compensate for jitter and bandwidth fluctuations due to congestion over noisy networks.
 
 [SRT implements AES encryption](https://datatracker.ietf.org/doc/html/draft-sharabayko-srt-01#section-6) to protect the payload of the media streams, and offers various error recovery mechanisms for minimizing the packet loss that is typical of Internet connections, of which Automatic Repeat reQuest (ARQ) is the primary method. With ARQ, when a receiver detects that a packet is missing it sends an alert to the sender requesting retransmission of this missing packet. [Forward Error Correction (FEC)](./docs/features/packet-filtering-and-fec.md) and [Connection Bonding](./docs/features/bonding-quick-start.md), which adds seamless stream protection and hitless failover, are also supported by the protocol.
 
@@ -168,6 +168,42 @@ In live streaming configurations, the SRT protocol maintains a constant end-to-e
   * C++11: standard library (`std` by [`-DENABLE_STDCXX_SYNC=ON`](./docs/build/build-options.md#enable_stdcxx_sync) CMake option),
   * C++03: Pthreads (for POSIX systems it's built in, for Windows there is a ported library).
 * Tcl 8.5 is optional and is used by `./configure` script. Otherwise, use CMake directly.
+
+### Package Managers
+
+The SRT library can be installed with the help of following package managers:
+
+- [Vcpkg](https://github.com/Microsoft/vcpkg)
+
+  The SRT library package name is `libsrt`. For example, to install the library on Unix systems, run:
+
+  ```
+  ./vcpkg/vcpkg install libsrt
+  ```
+
+  Check out `vcpkg` [Getting Started](https://github.com/Microsoft/vcpkg#getting-started) section for detailed instructions and how to use `vcpkg` for either Windows, macOS or Linux.
+
+  The `libsrt` port in `vcpkg` is kept up to date by Microsoft team members and community contributors. If the SRT version is out of date, please [create an issue or pull request](https://github.com/Microsoft/vcpkg) on the `vcpkg` repository.
+
+- [Homebrew](https://brew.sh/)
+
+  Homebrew formulae is [`srt`](https://formulae.brew.sh/formula/srt):
+
+  ```
+  brew install srt
+  ```
+  
+  See also ["Building SRT on macOS"](./docs/build/build-macOS.md).
+
+- [apt](https://ubuntu.com/server/docs/package-management)
+
+  ```
+  sudo apt install libsrt
+  ```
+
+- [conan](https://conan.io/)
+
+  The SRT library package name is [`srt`](https://conan.io/center/srt).
 
 ### Build Options
 
