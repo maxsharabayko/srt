@@ -871,6 +871,8 @@ void srt::CUDT::clearData()
     int udpsize = m_config.iMSS - CPacket::UDP_HDR_SIZE;
 
     m_iMaxSRTPayloadSize = udpsize - CPacket::HDR_SIZE;
+    //if (m_config.iCryptoMode != 0)
+    //    m_iMaxSRTPayloadSize -= SRT_AUTHTAG_BYTELEN;
 
     HLOGC(cnlog.Debug, log << CONID() << "clearData: PAYLOAD SIZE: " << m_iMaxSRTPayloadSize);
 
@@ -5478,6 +5480,7 @@ bool srt::CUDT::prepareConnectionObjects(const CHandShake &hs, HandshakeSide hsd
 
     try
     {
+        // TODO: Set auth tag size depending on the crypto mode.
         const int authtag = m_config.iCryptoMode == CSrtConfig::CIPHER_MODE_AES_GCM ? HAICRYPT_AUTHTAG_MAX : 0;
         m_pSndBuffer = new CSndBuffer(32, m_iMaxSRTPayloadSize, authtag);
         SRT_ASSERT(m_iISN != -1);

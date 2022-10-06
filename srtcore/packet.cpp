@@ -151,11 +151,11 @@ modified by
 //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 //   Loss List Field Coding:
-//      For any consectutive lost seqeunce numbers that the differnece between
+//      For any consecutive lost sequence numbers that the difference between
 //      the last and first is more than 1, only record the first (a) and the
 //      the last (b) sequence numbers in the loss list field, and modify the
 //      the first bit of a to 1.
-//      For any single loss or consectutive loss less than 2 packets, use
+//      For any single loss or consecutive loss less than 2 packets, use
 //      the original sequence numbers in the field.
 
 #include "platform_sys.h"
@@ -174,7 +174,7 @@ using namespace srt_logging;
 
 namespace srt {
 
-// Set up the aliases in the constructure
+// Set up the aliases in the constructor
 CPacket::CPacket()
     : m_extra_pad()
     , m_data_owned(false)
@@ -340,7 +340,7 @@ void CPacket::pack(UDTMessageType pkttype, const int32_t* lparam, void* rparam, 
             m_nHeader[SRT_PH_MSGNO] = *lparam;
 
         // data ACK seq. no.
-        // optional: RTT (microsends), RTT variance (microseconds) advertised flow window size (packets), and estimated
+        // optional: RTT (microseconds), RTT variance (microseconds) advertised flow window size (packets), and estimated
         // link capacity (packets per second)
         m_PacketVector[PV_DATA].set(rparam, size);
 
@@ -552,7 +552,7 @@ void CPacket::setMsgCryptoFlags(EncryptionKeySpec spec)
 
 uint32_t CPacket::getMsgTimeStamp() const
 {
-    // SRT_DEBUG_TSBPD_WRAP may enable smaller timestamp for faster wraparoud handling tests
+    // SRT_DEBUG_TSBPD_WRAP may enable smaller timestamp for faster wraparound handling tests
     return (uint32_t)m_nHeader[SRT_PH_TIMESTAMP] & TIMESTAMP_MASK;
 }
 

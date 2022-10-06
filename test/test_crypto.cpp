@@ -33,6 +33,7 @@ namespace srt
         {
             CSrtConfig cfg;
 
+
             memset(&cfg.CryptoSecret, 0, sizeof(cfg.CryptoSecret));
             cfg.CryptoSecret.typ = HAICRYPT_SECTYP_PASSPHRASE;
             cfg.CryptoSecret.len = (m_pwd.size() <= (int)sizeof(cfg.CryptoSecret.str) ? m_pwd.size() : (int)sizeof(cfg.CryptoSecret.str));
@@ -52,6 +53,7 @@ namespace srt
             uint32_t kmout[72];
             size_t kmout_len = 72;
 
+
             std::array<uint32_t, 72> km_nworder;
             NtoHLA(km_nworder.data(), reinterpret_cast<const uint32_t*>(kmmsg), km_len);
             m_crypt.processSrtMsg_KMREQ(km_nworder.data(), km_len, 5, kmout, kmout_len);
@@ -65,7 +67,9 @@ namespace srt
 
         srt::CCryptoControl m_crypt;
         const std::string m_pwd = "abcdefghijk";
+ 
     };
+
 
 
     // Check that destroying the buffer also frees memory units.
@@ -88,6 +92,7 @@ namespace srt
 
         pkt.m_iSeqNo = seqno;
         pkt.m_iMsgNo = msgno | inorder | PacketBoundaryBits(PB_SOLO) | MSGNO_ENCKEYSPEC::wrap(kflg);;
+
         pkt.m_iTimeStamp = 356;
 
         std::iota(pkt.data(), pkt.data() + pld_size, '0');

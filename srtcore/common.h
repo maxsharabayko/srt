@@ -104,6 +104,8 @@ namespace srt_logging
 namespace srt
 {
 
+#define SRT_AUTHTAG_BYTELEN 16 // AEAD authentication tag len
+
 // Class CUDTException exposed for C++ API.
 // This is actually useless, unless you'd use a DIRECT C++ API,
 // however there's no such API so far. The current C++ API for UDT/SRT
