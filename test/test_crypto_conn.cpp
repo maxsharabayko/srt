@@ -11,6 +11,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <array>
 #include <thread>
 #include <condition_variable> 
 #include <mutex>
@@ -174,6 +175,9 @@ protected:
     void SetUp()
     {
         ASSERT_EQ(srt_startup(), 0);
+
+        srt_addlogfa(SRT_LOGFA_HAICRYPT);
+        srt_setloglevel(srt_logging::LogLevel::note);
 
         m_pollid = srt_epoll_create();
         ASSERT_GE(m_pollid, 0);
@@ -374,8 +378,10 @@ public:
                         << " (expected: " << m_socket_state[expect.socket_state[CHECK_SOCKET_ACCEPTED]] << ")\n";
                 }
 
-                // TODO: receive message.
-                // TODO: send message.
+                std::array<char, 1500> buff;
+                const int num_bytes = srt_recvmsg(accepted_socket, buff.data(), (int) buff.size());
+                EXPECT_NE(num_bytes, SRT_ERROR);
+                EXPECT_NE(srt_sendmsg2(accepted_socket, buff.data(), num_bytes, nullptr), SRT_ERROR);
             }
         });
 
@@ -422,8 +428,11 @@ public:
         {
             EXPECT_EQ(srt_getsockstate(m_caller_socket), SRTS_CONNECTED);
 
-            // TODO: Send message.
-            // TODO: Receive message.
+            std::array<char, 1316> buff;
+            EXPECT_NE(srt_sendmsg2(m_caller_socket, buff.data(), (int) buff.size(), nullptr), SRT_ERROR);
+            const int num_bytes = srt_recvmsg(m_caller_socket, buff.data(), (int) buff.size());
+            EXPECT_NE(num_bytes, SRT_ERROR);
+            EXPECT_EQ(num_bytes, buff.size());
         }
         else
         {

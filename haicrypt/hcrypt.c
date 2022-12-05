@@ -200,6 +200,9 @@ int HaiCrypt_ExtractConfig(HaiCrypt_Handle hhcSrc, HaiCrypt_Cfg* pcfg)
     if (ctx->mode == HCRYPT_CTX_MODE_AESGCM)
         pcfg->flags |= HAICRYPT_CFG_F_GCM;
 
+    if (ctx->mode == HCRYPT_CTX_MODE_AESGCM)
+        pcfg->flags |= HAICRYPT_CFG_F_GCM;
+
     /* Set this explicitly - this use of this library is SRT only. */
     pcfg->xport = HAICRYPT_XPT_SRT;
     pcfg->cryspr = crypto->cryspr;
@@ -236,7 +239,7 @@ int HaiCrypt_Clone(HaiCrypt_Handle hhcSrc, HaiCrypt_CryptoDir tx, HaiCrypt_Handl
 
     ASSERT(NULL != hhcSrc);
 
-    HCRYPT_LOG(LOG_INFO, "%s\n", "creating CLONED crypto context");
+    HCRYPT_LOG(LOG_INFO, "creating CLONED %s crypto context\n", (tx ? "tx" : "rx"));
 
     if (tx) {
         HaiCrypt_Cfg crypto_config;
