@@ -115,13 +115,13 @@ const TestCaseNonBlocking g_test_matrix_non_blocking[] =
     /*A.4 */ { {2,     2 }, {s_pwd_no,  s_pwd_b}, { SRT_SUCCESS, SRT_INVALID_SOCK,             0,  0,             {SRTS_BROKEN,       IGNORE_SRTS}, {SRT_KM_S_UNSECURED,        IGNORE_SRTS}}},
     /*A.5 */ { {2,     2 }, {s_pwd_no, s_pwd_no}, { SRT_SUCCESS,                0,             1,  SRT_EPOLL_IN,  {SRTS_CONNECTED, SRTS_CONNECTED}, {SRT_KM_S_UNSECURED, SRT_KM_S_UNSECURED}}},
 
-    /*B.1 */ { {2,     1 }, {s_pwd_a,   s_pwd_a}, { SRT_SUCCESS,                0,             1,  SRT_EPOLL_IN,  {SRTS_CONNECTED, SRTS_CONNECTED}, {SRT_KM_S_SECURED,     SRT_KM_S_SECURED}}},
-    /*B.2 */ { {2,     1 }, {s_pwd_a,   s_pwd_b}, { SRT_SUCCESS,                0,  IGNORE_EPOLL,  0,             {SRTS_CONNECTING,   SRTS_BROKEN}, {SRT_KM_S_BADSECRET, SRT_KM_S_BADSECRET}}},
-    /*B.3 */ { {2,     1 }, {s_pwd_a,  s_pwd_no}, { SRT_SUCCESS,                0,  IGNORE_EPOLL,  0,             {SRTS_CONNECTING,   SRTS_BROKEN}, {SRT_KM_S_UNSECURED, SRT_KM_S_UNSECURED}}},
-    /*B.4 */ { {2,     1 }, {s_pwd_no,  s_pwd_b}, { SRT_SUCCESS,                0,  IGNORE_EPOLL,  0,             {SRTS_CONNECTING,   SRTS_BROKEN}, {SRT_KM_S_UNSECURED,  SRT_KM_S_NOSECRET}}},
+    /*B.1 */ { {2,     1 }, {s_pwd_a,   s_pwd_a}, { SRT_SUCCESS, SRT_INVALID_SOCK,  IGNORE_EPOLL,  0,             {SRTS_CONNECTING,   SRTS_BROKEN}, {SRT_KM_S_UNSECURED, SRT_KM_S_UNSECURED}}},
+    /*B.2 */ { {2,     1 }, {s_pwd_a,   s_pwd_b}, { SRT_SUCCESS, SRT_INVALID_SOCK,  IGNORE_EPOLL,  0,             {SRTS_CONNECTING,   SRTS_BROKEN}, {SRT_KM_S_UNSECURED, SRT_KM_S_BADSECRET}}},
+    /*B.3 */ { {2,     1 }, {s_pwd_a,  s_pwd_no}, { SRT_SUCCESS, SRT_INVALID_SOCK,  IGNORE_EPOLL,  0,             {SRTS_CONNECTING,   SRTS_BROKEN}, {SRT_KM_S_UNSECURED, SRT_KM_S_UNSECURED}}},
+    /*B.4 */ { {2,     1 }, {s_pwd_no,  s_pwd_b}, { SRT_SUCCESS, SRT_INVALID_SOCK,  IGNORE_EPOLL,  0,             {SRTS_CONNECTING,   SRTS_BROKEN}, {SRT_KM_S_UNSECURED,  SRT_KM_S_NOSECRET}}},
     /*B.5 */ { {2,     1 }, {s_pwd_no, s_pwd_no}, { SRT_SUCCESS,                0,             1,  SRT_EPOLL_IN,  {SRTS_CONNECTED, SRTS_CONNECTED}, {SRT_KM_S_UNSECURED, SRT_KM_S_UNSECURED}}},
 
-    /*C.1 */ { {1,     2 }, {s_pwd_a,   s_pwd_a}, { SRT_SUCCESS,                0,             1,  SRT_EPOLL_IN,  {SRTS_CONNECTED, SRTS_CONNECTED}, {SRT_KM_S_SECURED,     SRT_KM_S_SECURED}}},
+    /*C.1 */ { {1,     2 }, {s_pwd_a,   s_pwd_a}, { SRT_SUCCESS, SRT_INVALID_SOCK,             0,  0,             {SRTS_BROKEN,       IGNORE_SRTS}, {SRT_KM_S_UNSECURED,        IGNORE_SRTS}}},
     /*C.2 */ { {1,     2 }, {s_pwd_a,   s_pwd_b}, { SRT_SUCCESS, SRT_INVALID_SOCK,             0,  0,             {SRTS_BROKEN,       IGNORE_SRTS}, {SRT_KM_S_UNSECURED,        IGNORE_SRTS}}},
     /*C.3 */ { {1,     2 }, {s_pwd_a,  s_pwd_no}, { SRT_SUCCESS, SRT_INVALID_SOCK,             0,  0,             {SRTS_BROKEN,       IGNORE_SRTS}, {SRT_KM_S_UNSECURED,        IGNORE_SRTS}}},
     /*C.4 */ { {1,     2 }, {s_pwd_no,  s_pwd_b}, { SRT_SUCCESS, SRT_INVALID_SOCK,             0,  0,             {SRTS_BROKEN,       IGNORE_SRTS}, {SRT_KM_S_UNSECURED,        IGNORE_SRTS}}},
@@ -149,7 +149,7 @@ const TestCaseBlocking g_test_matrix_blocking[] =
     /*C.2 */ { {1,    2  }, {s_pwd_a,   s_pwd_b}, { SRT_INVALID_SOCK,               -2, {SRTS_OPENED,                -1}, {SRT_KM_S_UNSECURED,                 -1}}},
     /*C.3 */ { {1,    2  }, {s_pwd_a,  s_pwd_no}, { SRT_INVALID_SOCK,               -2, {SRTS_OPENED,                -1}, {SRT_KM_S_UNSECURED,                 -1}}},
     /*C.4 */ { {1,    2  }, {s_pwd_no,  s_pwd_b}, { SRT_INVALID_SOCK,               -2, {SRTS_OPENED,                -1}, {SRT_KM_S_UNSECURED,                 -1}}},
-    /*C.5 */ { {1,    2  }, {s_pwd_no, s_pwd_no}, { SRT_INVALID_SOCK,                0, {SRTS_CONNECTED, SRTS_CONNECTED}, {SRT_KM_S_UNSECURED, SRT_KM_S_UNSECURED}}}
+    /*C.5 */ { {1,    2  }, {s_pwd_no, s_pwd_no}, { SRT_SUCCESS,                     0, {SRTS_CONNECTED, SRTS_CONNECTED}, {SRT_KM_S_UNSECURED, SRT_KM_S_UNSECURED}}}
 };
 
 } // namespace ciphermode
@@ -473,7 +473,7 @@ public:
             EXPECT_NE(num_bytes, SRT_ERROR);
             EXPECT_EQ(num_bytes, buff.size());
 
-            accept_io.get();
+            accept_io.wait();
         }
         else
         {
@@ -494,8 +494,11 @@ public:
             // srt_accept() has no timeout, so we have to close the socket and wait for the thread to exit.
             // Just give it some time and close the socket.
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            ASSERT_NE(srt_close(m_listener_socket), SRT_ERROR);
-            accepted_future.wait();
+            std::cerr << "closing listener\n";
+            EXPECT_NE(srt_close(m_listener_socket), SRT_ERROR);
+            std::cerr << "Waiting accept thread.\n";
+            if (accepted_future.valid())
+                accepted_future.wait();
         }
     }
 
