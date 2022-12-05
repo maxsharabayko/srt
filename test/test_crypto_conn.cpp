@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 #include <array>
+#include <future>
 #include <thread>
 #include <condition_variable> 
 #include <mutex>
@@ -160,6 +161,7 @@ class TestCipherMode
 {
 protected:
     TestCipherMode()
+        : m_caller_done(false)
     {
         // initialization code here
     }
@@ -253,6 +255,89 @@ public:
         return val;
     }
 
+    template<typename TResult>
+    SRTSOCKET Accept(const TResult& expect)
+    {
+        const int epoll_event = WaitOnEpoll(expect);
+
+        // In a blocking mode we expect a socket returned from srt_accept() if the srt_connect succeeded.
+        // In a non-blocking mode we expect a socket returned from srt_accept() if the srt_connect succeeded,
+        // otherwise SRT_INVALID_SOCKET after the listening socket is closed.
+        sockaddr_in client_address;
+        int length = sizeof(sockaddr_in);
+        SRTSOCKET accepted_socket = SRT_INVALID_SOCK;
+        if (epoll_event == SRT_EPOLL_IN)
+        {
+            accepted_socket = srt_accept(m_listener_socket, (sockaddr*)&client_address, &length);
+            std::cout << "ACCEPT: done, result=" << accepted_socket << std::endl;
+        }
+        else
+        {
+            std::cout << "ACCEPT: NOT done\n";
+        }
+
+        if (accepted_socket == SRT_INVALID_SOCK)
+        {
+            std::cerr << "[T] ACCEPT ERROR: " << srt_getlasterror_str() << std::endl;
+        }
+        else
+        {
+            std::cerr << "[T] ACCEPT SUCCEEDED: @" << accepted_socket << "\n";
+        }
+
+        EXPECT_NE(accepted_socket, 0);
+        if (expect.accept_ret == SRT_INVALID_SOCK)
+        {
+            EXPECT_EQ(accepted_socket, SRT_INVALID_SOCK);
+        }
+        else if (expect.accept_ret != -2)
+        {
+            EXPECT_NE(accepted_socket, SRT_INVALID_SOCK);
+        }
+
+        if (accepted_socket != SRT_INVALID_SOCK && expect.socket_state[CHECK_SOCKET_ACCEPTED] != IGNORE_SRTS)
+        {
+            if (m_is_tracing)
+            {
+                std::cerr << "EARLY Socket state accepted: " << m_socket_state[srt_getsockstate(accepted_socket)]
+                    << " (expected: " << m_socket_state[expect.socket_state[CHECK_SOCKET_ACCEPTED]] << ")\n";
+                std::cerr << "KM State accepted:     " << m_km_state[GetKMState(accepted_socket)] << '\n';
+                std::cerr << "RCV KM State accepted:     " << m_km_state[GetSocetkOption(accepted_socket, SRTO_RCVKMSTATE)] << '\n';
+                std::cerr << "SND KM State accepted:     " << m_km_state[GetSocetkOption(accepted_socket, SRTO_SNDKMSTATE)] << '\n';
+            }
+
+            // We have to wait some time for the socket to be able to process the HS response from the caller.
+            // In test cases B2 - B4 the socket is expected to change its state from CONNECTED to BROKEN
+            // due to KM mismatches
+            do
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            } while (!m_caller_done);
+
+            // Special case when the expected state is "broken": if so, tolerate every possible
+            // socket state, just NOT LESS than SRTS_BROKEN, and also don't read any flags on that socket.
+
+            if (expect.socket_state[CHECK_SOCKET_ACCEPTED] == SRTS_BROKEN)
+            {
+                EXPECT_GE(srt_getsockstate(accepted_socket), SRTS_BROKEN);
+            }
+            else
+            {
+                EXPECT_EQ(srt_getsockstate(accepted_socket), expect.socket_state[CHECK_SOCKET_ACCEPTED]);
+                EXPECT_EQ(GetSocetkOption(accepted_socket, SRTO_SNDKMSTATE), expect.km_state[CHECK_SOCKET_ACCEPTED]);
+            }
+
+            if (m_is_tracing)
+            {
+                const SRT_SOCKSTATUS status = srt_getsockstate(accepted_socket);
+                std::cerr << "LATE Socket state accepted: " << m_socket_state[status]
+                    << " (expected: " << m_socket_state[expect.socket_state[CHECK_SOCKET_ACCEPTED]] << ")\n";
+            }
+        }
+
+        return accepted_socket;
+    }
+
 
     template<typename TResult>
     int WaitOnEpoll(const TResult& expect);
@@ -291,7 +376,6 @@ public:
         const TResult& expect = test.expected_result;
 
         // Start testing
-        srt::sync::atomic<bool> caller_done;
         sockaddr_in sa;
         memset(&sa, 0, sizeof sa);
         sa.sin_family = AF_INET;
@@ -301,89 +385,7 @@ public:
         ASSERT_NE(srt_bind(m_listener_socket, psa, sizeof sa), SRT_ERROR);
         ASSERT_NE(srt_listen(m_listener_socket, 4), SRT_ERROR);
 
-        auto accepting_thread = std::thread([&] {
-            const int epoll_event = WaitOnEpoll(expect);
-
-            // In a blocking mode we expect a socket returned from srt_accept() if the srt_connect succeeded.
-            // In a non-blocking mode we expect a socket returned from srt_accept() if the srt_connect succeeded,
-            // otherwise SRT_INVALID_SOCKET after the listening socket is closed.
-            sockaddr_in client_address;
-            int length = sizeof(sockaddr_in);
-            SRTSOCKET accepted_socket = -1;
-            if (epoll_event == SRT_EPOLL_IN)
-            {
-                accepted_socket = srt_accept(m_listener_socket, (sockaddr*)&client_address, &length);
-                std::cout << "ACCEPT: done, result=" << accepted_socket << std::endl;
-            }
-            else
-            {
-                std::cout << "ACCEPT: NOT done\n";
-            }
-
-            if (accepted_socket == SRT_INVALID_SOCK)
-            {
-                std::cerr << "[T] ACCEPT ERROR: " << srt_getlasterror_str() << std::endl;
-            }
-            else
-            {
-                std::cerr << "[T] ACCEPT SUCCEEDED: @" << accepted_socket << "\n";
-            }
-
-            EXPECT_NE(accepted_socket, 0);
-            if (expect.accept_ret == SRT_INVALID_SOCK)
-            {
-                EXPECT_EQ(accepted_socket, SRT_INVALID_SOCK);
-            }
-            else if (expect.accept_ret != -2)
-            {
-                EXPECT_NE(accepted_socket, SRT_INVALID_SOCK);
-            }
-
-            if (accepted_socket != SRT_INVALID_SOCK && expect.socket_state[CHECK_SOCKET_ACCEPTED] != IGNORE_SRTS)
-            {
-                if (m_is_tracing)
-                {
-                    std::cerr << "EARLY Socket state accepted: " << m_socket_state[srt_getsockstate(accepted_socket)]
-                        << " (expected: " << m_socket_state[expect.socket_state[CHECK_SOCKET_ACCEPTED]] << ")\n";
-                    std::cerr << "KM State accepted:     " << m_km_state[GetKMState(accepted_socket)] << '\n';
-                    std::cerr << "RCV KM State accepted:     " << m_km_state[GetSocetkOption(accepted_socket, SRTO_RCVKMSTATE)] << '\n';
-                    std::cerr << "SND KM State accepted:     " << m_km_state[GetSocetkOption(accepted_socket, SRTO_SNDKMSTATE)] << '\n';
-                }
-
-                // We have to wait some time for the socket to be able to process the HS response from the caller.
-                // In test cases B2 - B4 the socket is expected to change its state from CONNECTED to BROKEN
-                // due to KM mismatches
-                do
-                {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                } while (!caller_done);
-
-                // Special case when the expected state is "broken": if so, tolerate every possible
-                // socket state, just NOT LESS than SRTS_BROKEN, and also don't read any flags on that socket.
-
-                if (expect.socket_state[CHECK_SOCKET_ACCEPTED] == SRTS_BROKEN)
-                {
-                    EXPECT_GE(srt_getsockstate(accepted_socket), SRTS_BROKEN);
-                }
-                else
-                {
-                    EXPECT_EQ(srt_getsockstate(accepted_socket), expect.socket_state[CHECK_SOCKET_ACCEPTED]);
-                    EXPECT_EQ(GetSocetkOption(accepted_socket, SRTO_SNDKMSTATE), expect.km_state[CHECK_SOCKET_ACCEPTED]);
-                }
-
-                if (m_is_tracing)
-                {
-                    const SRT_SOCKSTATUS status = srt_getsockstate(accepted_socket);
-                    std::cerr << "LATE Socket state accepted: " << m_socket_state[status]
-                        << " (expected: " << m_socket_state[expect.socket_state[CHECK_SOCKET_ACCEPTED]] << ")\n";
-                }
-
-                std::array<char, 1500> buff;
-                const int num_bytes = srt_recvmsg(accepted_socket, buff.data(), (int) buff.size());
-                EXPECT_NE(num_bytes, SRT_ERROR);
-                EXPECT_NE(srt_sendmsg2(accepted_socket, buff.data(), num_bytes, nullptr), SRT_ERROR);
-            }
-        });
+        auto accepted_future = std::async(std::launch::async, &TestCipherMode::Accept<TResult>, this, expect);
 
         const int connect_ret = srt_connect(m_caller_socket, psa, sizeof sa);
         EXPECT_EQ(connect_ret, expect.connect_ret);
@@ -397,10 +399,10 @@ public:
                 << ").\n";
         }
 
-        caller_done = true;
+        m_caller_done = true;
 
         if (is_blocking == false)
-            accepting_thread.join();
+            accepted_future.wait();
 
         if (m_is_tracing)
         {
@@ -417,6 +419,7 @@ public:
             }
         }
 
+
         // If a blocking call to srt_connect() returned error, then the state is not valid,
         // but we still check it because we know what it should be. This way we may see potential changes in the core behavior.
         if (is_blocking)
@@ -424,15 +427,53 @@ public:
             EXPECT_EQ(srt_getsockstate(m_caller_socket), expect.socket_state[CHECK_SOCKET_CALLER]);
         }
         // A caller socket, regardless of the mode, if it's not expected to be connected, check negatively.
+        std::cerr << "Caller: checking state\n";
         if (expect.socket_state[CHECK_SOCKET_CALLER] == SRTS_CONNECTED)
         {
             EXPECT_EQ(srt_getsockstate(m_caller_socket), SRTS_CONNECTED);
 
+            const SRTSOCKET accepted_socket = accepted_future.get();
+            EXPECT_NE(accepted_socket, SRT_INVALID_SOCK);
+            // Make accepted socket blocking to avoid using epoll for IO.
+            const bool is_blocking = std::is_same<TResult, TestResultBlocking>::value;
+            if (!is_blocking)
+            {
+                EXPECT_NE(srt_setsockopt(accepted_socket, 0, SRTO_RCVSYN, &s_yes, sizeof s_yes), SRT_ERROR);
+                EXPECT_NE(srt_setsockopt(accepted_socket, 0, SRTO_SNDSYN, &s_yes, sizeof s_yes), SRT_ERROR);
+            }
+
+            auto accept_io = std::async(std::launch::async, [&](SRTSOCKET accepted_socket) {
+                std::cerr << "Accepted socket: waiting for RCV\n";
+                std::array<char, 1500> buff;
+                const int num_bytes = srt_recvmsg(accepted_socket, buff.data(), (int)buff.size());
+                EXPECT_NE(num_bytes, SRT_ERROR);
+                EXPECT_NE(srt_sendmsg2(accepted_socket, buff.data(), num_bytes, nullptr), SRT_ERROR);
+            }, accepted_socket);
+
             std::array<char, 1316> buff;
             EXPECT_NE(srt_sendmsg2(m_caller_socket, buff.data(), (int) buff.size(), nullptr), SRT_ERROR);
+
+            std::cerr << "Caller: sent message, waiting for RCV\n";
+            if (!is_blocking)
+            {
+                const int io_epoll = srt_epoll_create();
+                EXPECT_GE(io_epoll, 0);
+
+                const int epoll_f_all = SRT_EPOLL_IN | SRT_EPOLL_ERR;
+                EXPECT_NE(srt_epoll_add_usock(io_epoll, m_caller_socket, &epoll_f_all), SRT_ERROR);
+
+                const int default_len = 3;
+                SRT_EPOLL_EVENT ready[default_len];
+                const int epoll_res = srt_epoll_uwait(io_epoll, ready, default_len, 500);
+
+                // TODO: check if the socket read-readiness was signalled.
+            }
+
             const int num_bytes = srt_recvmsg(m_caller_socket, buff.data(), (int) buff.size());
             EXPECT_NE(num_bytes, SRT_ERROR);
             EXPECT_EQ(num_bytes, buff.size());
+
+            accept_io.get();
         }
         else
         {
@@ -440,6 +481,8 @@ public:
             // then it is ok if it's CONNECTING or BROKEN.
             EXPECT_NE(srt_getsockstate(m_caller_socket), SRTS_CONNECTED);
         }
+
+        std::cerr << "Caller: checking state done\n";
 
         EXPECT_EQ(GetSocetkOption(m_caller_socket, SRTO_RCVKMSTATE), expect.km_state[CHECK_SOCKET_CALLER]);
 
@@ -452,7 +495,7 @@ public:
             // Just give it some time and close the socket.
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             ASSERT_NE(srt_close(m_listener_socket), SRT_ERROR);
-            accepting_thread.join();
+            accepted_future.wait();
         }
     }
 
@@ -468,6 +511,7 @@ private:
     const bool s_yes = true;
     const bool s_no = false;
 
+    srt::sync::atomic<bool> m_caller_done;
     const bool          m_is_tracing = true;
     static const char* m_km_state[];
     static const char* const* m_socket_state;
