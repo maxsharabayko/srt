@@ -201,7 +201,7 @@ The following table lists SRT API socket options in alphabetical order. Option d
 
 | Option Name                                             | Since | Restrict | Type      | Units   | Default           | Range    | Dir |Entity |
 | :------------------------------------------------------ | :---: | :------: | :-------: | :-----: | :---------------: | :------: |:---:|:-----:|
-| [`SRTO_BINDTODEVICE`](#SRTO_BINDTODEVICE)               | 1.4.2 | pre-bind | `string`  |         |                   |          | RW  | GSD+  |
+| [`SRTO_BINDTODEVICE`](#srto_bindtodevice)               | 1.4.2 | pre-bind | `string`  |         |                   |          | RW  | GSD+  |
 | [`SRTO_CONGESTION`](#SRTO_CONGESTION)                   | 1.3.0 | pre      | `string`  |         | "live"            | \*       | W   | S     |
 | [`SRTO_CONNTIMEO`](#SRTO_CONNTIMEO)                     | 1.1.2 | pre      | `int32_t` | ms      | 3000              | 0..      | W   | GSD+  |
 | [`SRTO_CRYPTOMODE`](#SRTO_CRYPTOMODE)                   | 1.6.0-dev | pre      | `int32_t` |     | 0 (Auto)          | [0, 2]   | W   | GSD   |
