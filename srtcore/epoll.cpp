@@ -71,7 +71,7 @@ modified by
 using namespace std;
 using namespace srt::sync;
 
-#if ENABLE_HEAVY_LOGGING
+#if 1
 namespace srt {
 static ostream& PrintEpollEvent(ostream& os, int events, int et_events = 0);
 }
@@ -952,7 +952,7 @@ int srt::CEPoll::update_events(const SRTSOCKET& uid, std::set<int>& eids, const 
 }
 
 // Debug use only.
-#if ENABLE_HEAVY_LOGGING
+#if 1
 namespace srt
 {
 

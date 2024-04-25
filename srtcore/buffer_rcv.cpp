@@ -1134,6 +1134,45 @@ string CRcvBuffer::strFullnessState(int iFirstUnackSeqNo, const time_point& tsNo
     return ss.str();
 }
 
+std::string CRcvBuffer::describe(const time_point& tsNow) const
+{
+	stringstream ss;
+	const int offset = offPos(m_iStartPos, m_iFirstNonreadPos);
+	ss << "m_iStartSeqNo=" << m_iStartSeqNo << " iFirstNonReadSeqNo=" << CSeqNo::incseq(m_iStartSeqNo, offset) << ". ";
+
+    if (m_tsbpd.isEnabled() && m_iMaxPosOff > 0)
+    {
+        const PacketInfo nextValidPkt = getFirstValidPacketInfo();
+        ss << "(TSBPD ready in ";
+        if (!is_zero(nextValidPkt.tsbpd_time))
+        {
+            ss << count_milliseconds(nextValidPkt.tsbpd_time - tsNow) << "ms";
+            const int iLastPos = incPos(m_iStartPos, m_iMaxPosOff - 1);
+            if (m_entries[iLastPos].pUnit)
+            {
+                ss << ", timespan ";
+                const uint32_t usPktTimestamp = packetAt(iLastPos).getMsgTimeStamp();
+                ss << count_microseconds(m_tsbpd.getPktTsbPdTime(usPktTimestamp) - nextValidPkt.tsbpd_time);
+                ss << " us";
+            }
+			const int iFirstPos = incPos(m_iStartPos, CSeqNo::seqoff(m_iStartSeqNo, nextValidPkt.seqno));
+			if (m_entries[iFirstPos].pUnit)
+			{
+				const uint32_t usPktTimestamp = packetAt(iFirstPos).getMsgTimeStamp();
+				ss << ". First pkt ts=" << usPktTimestamp << ", time base=" << std::chrono::duration_cast<std::chrono::nanoseconds>(getTsbPdTimeBase(usPktTimestamp).time_since_epoch()).count();
+			}
+        }
+        else
+        {
+            ss << "n/a";
+        }
+        ss << "). ";
+    }
+
+    ss << SRT_SYNC_CLOCK_STR " drift " << getDrift() / 1000 << " ms.";
+    return ss.str();
+}
+
 CRcvBuffer::time_point CRcvBuffer::getPktTsbPdTime(uint32_t usPktTimestamp) const
 {
     return m_tsbpd.getPktTsbPdTime(usPktTimestamp);

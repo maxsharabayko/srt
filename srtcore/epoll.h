@@ -149,7 +149,7 @@ class CEPollDesc
 
    typedef std::map<SRTSOCKET, Wait> ewatch_t;
 
-#if ENABLE_HEAVY_LOGGING
+#if 1
 std::string DisplayEpollWatch();
 #endif
 
@@ -499,7 +499,7 @@ private:
    mutable srt::sync::Mutex m_EPollLock;
 };
 
-#if ENABLE_HEAVY_LOGGING
+#if 1
 std::string DisplayEpollResults(const std::map<SRTSOCKET, int>& sockset);
 #endif
 

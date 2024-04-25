@@ -129,11 +129,11 @@ bool CTsbpdTime::addDriftSample(uint32_t usPktTimestamp, const time_point& tsPkt
 
     if (updated)
     {
-        IF_HEAVY_LOGGING(const steady_clock::time_point oldbase = m_tsTsbPdTimeBase);
+        const steady_clock::time_point oldbase = m_tsTsbPdTimeBase;
         steady_clock::duration overdrift = microseconds_from(m_DriftTracer.overdrift());
         m_tsTsbPdTimeBase += overdrift;
 
-        HLOGC(brlog.Debug,
+        LOGC(brlog.Note,
               log << "DRIFT=" << FormatDuration(tdDrift) << " AVG=" << (m_DriftTracer.drift() / 1000.0)
                   << "ms, TB: " << FormatTime(oldbase) << " EXCESS: " << FormatDuration(overdrift)
                   << " UPDATED TO: " << FormatTime(m_tsTsbPdTimeBase));
@@ -197,7 +197,7 @@ void CTsbpdTime::applyGroupDrift(const steady_clock::time_point& timebase,
                                  const steady_clock::duration&   udrift)
 {
     // This is only when a drift was updated on one of the group members.
-    HLOGC(brlog.Debug,
+    LOGC(brlog.Note,
           log << "rcv-buffer: group synch uDRIFT: " << m_DriftTracer.drift() << " -> " << FormatDuration(udrift)
               << " TB: " << FormatTime(m_tsTsbPdTimeBase) << " -> " << FormatTime(timebase));
 
@@ -247,7 +247,7 @@ void CTsbpdTime::updateTsbPdTimeBase(uint32_t usPktTimestamp)
             /* Exiting wrap check period (if for packet delivery head) */
             m_bTsbPdWrapCheck = false;
             m_tsTsbPdTimeBase += microseconds_from(int64_t(CPacket::MAX_TIMESTAMP) + 1);
-            LOGC(tslog.Debug,
+            LOGC(tslog.Note,
                  log << "tsbpd wrap period ends with ts=" << usPktTimestamp << " - NEW TIME BASE: "
                      << FormatTime(m_tsTsbPdTimeBase) << " drift: " << m_DriftTracer.drift() << "us");
         }
@@ -259,7 +259,7 @@ void CTsbpdTime::updateTsbPdTimeBase(uint32_t usPktTimestamp)
     {
         // Approching wrap around point, start wrap check period (if for packet delivery head)
         m_bTsbPdWrapCheck = true;
-        LOGC(tslog.Debug,
+        LOGC(tslog.Note,
              log << "tsbpd wrap period begins with ts=" << usPktTimestamp
                  << " TIME BASE: " << FormatTime(m_tsTsbPdTimeBase) << " drift: " << m_DriftTracer.drift() << "us.");
     }

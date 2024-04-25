@@ -380,6 +380,8 @@ public: // TSBPD public functions
     /// number of packets acknowledged, TSBPD readiness, etc.
     std::string strFullnessState(int iFirstUnackSeqNo, const time_point& tsNow) const;
 
+	std::string describe(const time_point& tsNow) const;
+
 private:
     CTsbpdTime  m_tsbpd;
 

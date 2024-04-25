@@ -3324,6 +3324,10 @@ SRTSOCKET srt::CUDT::makeMePeerOf(SRTSOCKET peergroup, SRT_GROUP_TYPE gtp, uint3
 
         gp->set_peerid(peergroup);
         gp->deriveSettings(this);
+		steady_clock::time_point start_time = m_stats.tsStartTime;
+		steady_clock::time_point peer_start_time = m_tsRcvPeerStartTime;
+		gp->applyGroupTime(start_time, peer_start_time);
+		// TODO: What about group sequences? applyGroupSequences(..).
 
         // This can only happen on a listener (it's only called on a site that is
         // HSD_RESPONDER), so it was a response for a groupwise connection.
@@ -5461,6 +5465,10 @@ void * srt::CUDT::tsbpd(void* param)
                 }
 #endif
 #endif
+				if (timediff_us > 1000000)
+				{
+					LOGC(brlog.Warn, log << self->CONID() << "RCV Buffer " << self->m_pRcvBuffer->describe(tnow));
+				}
 
                 tsNextDelivery = steady_clock::time_point(); // Ready to read, nothing to wait for.
             }
@@ -5469,7 +5477,7 @@ void * srt::CUDT::tsbpd(void* param)
 
         if (rxready)
         {
-            HLOGC(tslog.Debug,
+            LOGC(tslog.Note,
                 log << self->CONID() << "tsbpd: PLAYING PACKET seq=" << info.seqno << " (belated "
                 << (count_milliseconds(steady_clock::now() - info.tsbpd_time)) << "ms)");
             /*
@@ -5536,13 +5544,13 @@ void * srt::CUDT::tsbpd(void* param)
 
         if (!is_zero(tsNextDelivery))
         {
-            IF_HEAVY_LOGGING(const steady_clock::duration timediff = tsNextDelivery - tnow);
+            const steady_clock::duration timediff = tsNextDelivery - tnow;
             /*
              * Buffer at head of queue is not ready to play.
              * Schedule wakeup when it will be.
              */
             self->m_bTsbPdAckWakeup = false;
-            HLOGC(tslog.Debug,
+            LOGC(tslog.Note,
                 log << self->CONID() << "tsbpd: FUTURE PACKET seq=" << info.seqno
                 << " T=" << FormatTime(tsNextDelivery) << " - waiting " << count_milliseconds(timediff) << "ms");
             THREAD_PAUSED();
@@ -5562,14 +5570,14 @@ void * srt::CUDT::tsbpd(void* param)
              * - New buffers ACKed
              * - Closing the connection
              */
-            HLOGC(tslog.Debug, log << self->CONID() << "tsbpd: no data, scheduling wakeup at ack");
+            LOGC(tslog.Note, log << self->CONID() << "tsbpd: no data, scheduling wakeup at ack");
             self->m_bTsbPdAckWakeup = true;
             THREAD_PAUSED();
             tsbpd_cc.wait();
             THREAD_RESUMED();
         }
 
-        HLOGC(tslog.Debug, log << self->CONID() << "tsbpd: WAKE UP!!!");
+        LOGC(tslog.Note, log << self->CONID() << "tsbpd: WAKE UP!!!");
     }
     THREAD_EXIT();
     HLOGC(tslog.Debug, log << self->CONID() << "tsbpd: EXITING");
@@ -8136,15 +8144,7 @@ int srt::CUDT::sendCtrlAck(CPacket& ctrlpkt, int size)
               log << CONID() << "ACK: clip %" << m_iRcvLastAck << "-%" << ack << ", REVOKED "
                   << CSeqNo::seqoff(ack, m_iRcvLastAck) << " from RCV buffer");
 
-        if (m_bTsbPd)
-        {
-            /* Newly acknowledged data, signal TsbPD thread */
-            CUniqueSync tslcc (m_RecvLock, m_RcvTsbPdCond);
-            // m_bTsbPdAckWakeup is protected by m_RecvLock in the tsbpd() thread
-            if (m_bTsbPdAckWakeup)
-                tslcc.notify_one();
-        }
-        else
+        if (!m_bTsbPd)
         {
             {
                 CUniqueSync rdcc (m_RecvLock, m_RecvDataCond);
